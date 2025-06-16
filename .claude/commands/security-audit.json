@@ -1,31 +1,158 @@
 {
   "name": "security-audit",
-  "description": "Perform comprehensive security analysis and testing",
+  "description": "Perform comprehensive security analysis and testing following the security workflow",
+  "agent": "security_agent",
+  "workflow": "security_workflow",
+  "contexts": [
+    "security_context",
+    "test_status"
+  ],
   "parameters": {
     "module": {
       "type": "string",
-      "description": "Optional module name to audit specifically",
-      "required": false
+      "description": "Optional module name to audit specifically (crypto, network, dag, protocol)",
+      "required": false,
+      "enum": ["crypto", "network", "dag", "protocol", "all"]
+    },
+    "depth": {
+      "type": "string",
+      "description": "Audit depth level",
+      "required": false,
+      "default": "comprehensive",
+      "enum": ["quick", "standard", "comprehensive"]
+    },
+    "focus": {
+      "type": "array",
+      "description": "Specific security aspects to focus on",
+      "required": false,
+      "items": {
+        "enum": ["timing", "memory", "crypto", "network", "input-validation", "side-channel"]
+      }
+    }
+  },
+  "prompts": {
+    "analysis": "Follow the security workflow to perform a comprehensive audit:
+1. Static Analysis: Run clippy with security lints, check for unsafe blocks, validate error handling
+2. Crypto Review: Verify constant-time operations, check RNG usage, validate key management
+   - ML-KEM: Validate encapsulation/decapsulation against NIST FIPS 203
+   - ML-DSA: Verify signing/verification against NIST FIPS 204
+   - HQC: Check encryption/decryption implementation
+   - Test vectors: Validate against NIST PQC test vectors
+3. Network Security: Review protocol validation, check authentication flows, verify message integrity
+4. Integration Security: Analyze component interactions, identify trust boundaries, assess attack surface",
+    "validation": "Ensure all security criteria are met:
+- No critical vulnerabilities found
+- Memory safety verified with no leaks or use-after-free
+- Cryptographic operations are constant-time
+- Quantum-resistant algorithms properly implemented
+- Secure random number generation (ChaCha20Rng)
+- Network protocols resist common attacks
+- All unsafe code is justified and reviewed",
+    "reporting": "Generate structured security audit report with:
+- Executive summary with risk assessment
+- Detailed findings categorized by severity
+- Proof-of-concept for any vulnerabilities
+- Remediation recommendations with priority
+- Compliance status against security requirements
+- NIST PQC compliance verification"
+  },
+  "crypto_specific": {
+    "ml_kem": {
+      "standard": "FIPS 203",
+      "security_level": "Level 3 (192-bit)",
+      "checks": [
+        "Constant-time matrix operations",
+        "Secure sampling procedures",
+        "Proper error correction",
+        "Side-channel resistance"
+      ]
+    },
+    "ml_dsa": {
+      "standard": "FIPS 204",
+      "security_level": "Level 3 (192-bit)",
+      "checks": [
+        "Constant-time polynomial operations",
+        "Secure key generation",
+        "Deterministic signing",
+        "Rejection sampling security"
+      ]
+    },
+    "hqc": {
+      "standard": "NIST Round 4 Submission",
+      "security_level": "Level 1 (128-bit)",
+      "checks": [
+        "Constant-time decoding",
+        "Error vector generation",
+        "Syndrome computation",
+        "Decapsulation failure handling"
+      ]
     }
   },
   "examples": [
     "/security-audit",
-    "/security-audit crypto",
-    "/security-audit network"
+    "/security-audit crypto --depth comprehensive",
+    "/security-audit network --focus timing,side-channel",
+    "/security-audit --module all --depth quick"
   ],
   "output": {
-    "success": "Security audit report with findings and recommendations",
-    "format": [
-      "1. Code Analysis Results",
-      "2. Vulnerability Scan Results",
-      "3. Cryptographic Validation",
-      "4. Side-Channel Analysis",
-      "5. Recommendations"
-    ]
+    "success": {
+      "format": "markdown",
+      "sections": [
+        "## Executive Summary",
+        "### Risk Assessment",
+        "### Key Findings",
+        "## Detailed Analysis",
+        "### 1. Static Analysis Results",
+        "### 2. Vulnerability Scan Results",
+        "### 3. Cryptographic Validation",
+        "### 4. Side-Channel Analysis",
+        "### 5. Memory Safety Verification",
+        "## Recommendations",
+        "### Critical (Immediate Action Required)",
+        "### High (Address Within Sprint)",
+        "### Medium (Plan for Next Release)",
+        "### Low (Best Practices)",
+        "## Compliance Status",
+        "## Appendix: Technical Details"
+      ],
+      "artifacts": [
+        "security_audit_report.md",
+        "vulnerability_findings.json",
+        "remediation_plan.md",
+        "compliance_matrix.csv"
+      ]
+    },
+    "metrics": {
+      "vulnerabilities_by_severity": "object",
+      "code_coverage": "percentage",
+      "unsafe_blocks_reviewed": "number",
+      "crypto_operations_validated": "number",
+      "timing_attack_resistance": "boolean",
+      "memory_safety_verified": "boolean"
+    }
   },
   "error_handling": {
-    "scan_failure": "Error details from security scanning tools",
-    "invalid_module": "List of valid module names",
-    "audit_timeout": "Partial results and retry suggestions"
-  }
+    "scan_failure": {
+      "message": "Security scan failed: {error}",
+      "recovery": "Check tool installation and retry with --verbose flag"
+    },
+    "invalid_module": {
+      "message": "Invalid module: {module}",
+      "recovery": "Valid modules: crypto, network, dag, protocol, all"
+    },
+    "audit_timeout": {
+      "message": "Audit timed out after {duration}",
+      "recovery": "Partial results saved. Retry with --depth quick or specific --focus areas"
+    },
+    "critical_finding": {
+      "message": "CRITICAL: Security vulnerability found",
+      "recovery": "Immediate action required. See remediation plan."
+    }
+  },
+  "post_actions": [
+    "Update security_context.json with findings",
+    "Create GitHub issues for vulnerabilities",
+    "Schedule follow-up audit if issues found",
+    "Update security documentation"
+  ]
 }

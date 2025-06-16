@@ -1,37 +1,192 @@
 {
   "name": "debug-security",
-  "description": "Check security configurations",
+  "description": "Debug and validate security configurations across the system",
+  "agent": "security_agent",
+  "workflow": "security_workflow",
+  "contexts": [
+    "security_context",
+    "test_status",
+    "integration_context"
+  ],
   "parameters": {
     "scope": {
       "type": "string",
-      "description": "Optional security scope to check",
-      "required": false
+      "description": "Security scope to check (crypto, network, memory, config, all)",
+      "required": false,
+      "default": "all",
+      "enum": ["crypto", "network", "memory", "config", "dependencies", "all"]
     },
     "verbose": {
       "type": "boolean",
-      "description": "Enable verbose logging",
+      "description": "Enable verbose logging for detailed diagnostics",
       "required": false,
       "default": false
+    },
+    "fix": {
+      "type": "boolean",
+      "description": "Attempt to auto-fix configuration issues",
+      "required": false,
+      "default": false
+    },
+    "report_format": {
+      "type": "string",
+      "description": "Output format for the report",
+      "required": false,
+      "default": "console",
+      "enum": ["console", "json", "markdown"]
+    }
+  },
+  "prompts": {
+    "configuration_check": "Validate security configurations:
+1. Crypto Settings: Check algorithm parameters, key sizes, RNG sources
+   - ML-KEM-768: Verify parameter set (k=3, n=256, q=3329)
+   - ML-DSA-65: Check signature parameters and key sizes
+   - HQC: Validate error correction parameters
+   - ChaCha20Rng: Ensure CSPRNG is properly seeded
+2. Network Security: Verify TLS settings, port configurations, firewall rules
+3. Memory Protection: Check allocator settings, stack protection, ASLR
+   - Zeroization: Verify secure memory cleanup
+   - Constant-time: Check timing-safe operations
+4. Build Configuration: Verify security flags, dependencies, feature gates
+5. Runtime Settings: Check security policies, access controls, logging",
+    "diagnostics": "Run security diagnostics:
+- Check for outdated dependencies with known vulnerabilities
+- Verify security feature flags are enabled
+- Validate cryptographic library configurations
+  - pqcrypto-mlkem768: Check version and patches
+  - pqcrypto-mldsa65: Verify implementation correctness
+  - hqc-rust: Validate custom implementation
+- Test security module initialization
+- Verify audit logging is functional
+- Check for exposed debug endpoints
+- Validate secure communication channels
+- Test quantum-resistant crypto operations:
+  - ML-KEM encapsulation/decapsulation
+  - ML-DSA signing/verification
+  - HQC encryption/decryption",
+    "remediation": "For each issue found:
+1. Identify root cause
+2. Assess security impact
+3. Provide fix recommendation
+4. Apply auto-fix if requested and safe
+5. Verify fix effectiveness"
+  },
+  "crypto_diagnostics": {
+    "ml_kem": {
+      "checks": [
+        "Parameter validation (k, n, q values)",
+        "Matrix operation timing consistency",
+        "RNG entropy quality",
+        "Ciphertext format validation",
+        "Shared secret derivation"
+      ],
+      "test_vectors": "core/crypto/tests/.test_vectors/mlkem768_*.txt"
+    },
+    "ml_dsa": {
+      "checks": [
+        "Signature parameter validation",
+        "Polynomial operation timing",
+        "Rejection sampling bounds",
+        "Deterministic nonce generation",
+        "Public key validation"
+      ],
+      "test_vectors": "core/crypto/tests/.test_vectors/mldsa65_*.txt"
+    },
+    "hqc": {
+      "checks": [
+        "Error vector weight validation",
+        "Syndrome computation correctness",
+        "Decoder timing consistency",
+        "Parameter set validation",
+        "Ciphertext integrity"
+      ],
+      "test_vectors": "core/crypto/tests/.test_vectors/hqc_*.txt"
     }
   },
   "examples": [
     "/debug-security",
-    "/debug-security --scope crypto",
-    "/debug-security --verbose"
+    "/debug-security --scope crypto --verbose",
+    "/debug-security --scope network --fix",
+    "/debug-security --report_format json > security_config.json"
   ],
   "output": {
-    "success": "Security configuration analysis",
-    "format": [
-      "1. Security Settings",
-      "2. Configuration Issues",
-      "3. Risk Assessment",
-      "4. Compliance Status",
-      "5. Recommendations"
-    ]
+    "success": {
+      "format": "structured",
+      "sections": [
+        "## Security Configuration Report",
+        "### System Information",
+        "- Platform: {platform}",
+        "- Rust Version: {rust_version}",
+        "- Security Features: {features}",
+        "### 1. Security Settings",
+        "#### 1.1 Cryptographic Configuration",
+        "- Algorithm Suite: {algorithms}",
+        "- Key Management: {key_status}",
+        "- RNG Source: {rng_type}",
+        "#### 1.2 Network Security",
+        "- TLS Version: {tls_version}",
+        "- Cipher Suites: {ciphers}",
+        "- Certificate Validation: {cert_status}",
+        "#### 1.3 Memory Protection",
+        "- Stack Protection: {stack_guard}",
+        "- ASLR Status: {aslr}",
+        "- Secure Allocator: {allocator}",
+        "### 2. Configuration Issues",
+        "#### Critical Issues",
+        "#### Warnings",
+        "#### Informational",
+        "### 3. Risk Assessment",
+        "- Overall Risk Level: {risk_level}",
+        "- Attack Surface: {attack_surface}",
+        "- Mitigation Status: {mitigation_percentage}%",
+        "### 4. Compliance Status",
+        "- Security Requirements: {compliance_status}",
+        "- Policy Violations: {violations}",
+        "- Audit Readiness: {audit_ready}",
+        "### 5. Recommendations",
+        "#### Immediate Actions",
+        "#### Configuration Changes",
+        "#### Security Hardening"
+      ],
+      "diagnostics": {
+        "checks_performed": "number",
+        "issues_found": "number",
+        "auto_fixed": "number",
+        "manual_fixes_required": "number"
+      }
+    },
+    "json_output": {
+      "timestamp": "ISO-8601",
+      "scope": "string",
+      "findings": "array of finding objects",
+      "recommendations": "array of recommendation objects",
+      "compliance": "compliance status object"
+    }
   },
   "error_handling": {
-    "invalid_scope": "Scope validation error",
-    "check_failure": "Security check failure",
-    "critical_issue": "Critical security issue found"
-  }
+    "invalid_scope": {
+      "message": "Invalid scope: {scope}",
+      "recovery": "Valid scopes: crypto, network, memory, config, dependencies, all"
+    },
+    "check_failure": {
+      "message": "Security check failed: {component} - {error}",
+      "recovery": "Run with --verbose for detailed error information"
+    },
+    "critical_issue": {
+      "message": "CRITICAL: Security misconfiguration detected",
+      "recovery": "Review findings immediately. Do not deploy.",
+      "details": "See security report for detailed remediation steps"
+    },
+    "permission_denied": {
+      "message": "Permission denied accessing {resource}",
+      "recovery": "Run with appropriate permissions or check access controls"
+    }
+  },
+  "post_actions": [
+    "Log diagnostic results to security audit trail",
+    "Update security_context.json with current status",
+    "Generate compliance report if requested",
+    "Create remediation tasks for findings",
+    "Schedule follow-up validation"
+  ]
 }

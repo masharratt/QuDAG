@@ -1,23 +1,68 @@
 {
   "name": "performance-benchmark",
   "description": "Run all benchmarks and generate performance reports",
+  "workflow": "workflow/performance_workflow.md",
+  "agent": "agents/performance_agent.md",
   "parameters": {
     "module": {
       "type": "string",
       "description": "Optional module name to benchmark specifically",
-      "required": false
+      "required": false,
+      "values": ["crypto", "dag", "network", "protocol", "all"]
     },
     "criteria": {
       "type": "string",
       "description": "Optional specific performance criteria to test",
-      "required": false
+      "required": false,
+      "values": ["throughput", "latency", "memory", "cpu", "scalability"]
+    },
+    "baseline": {
+      "type": "boolean",
+      "description": "Compare against baseline benchmarks",
+      "required": false,
+      "default": true
+    },
+    "profile": {
+      "type": "boolean",
+      "description": "Generate detailed profiling data",
+      "required": false,
+      "default": false
     }
   },
   "examples": [
     "/performance-benchmark",
     "/performance-benchmark crypto",
-    "/performance-benchmark network --criteria throughput"
+    "/performance-benchmark network --criteria throughput",
+    "/performance-benchmark --baseline --profile",
+    "/performance-benchmark dag --criteria scalability"
   ],
+  "benchmark_templates": {
+    "throughput": {
+      "metrics": ["messages/second", "transactions/second", "operations/second"],
+      "targets": {"baseline": 10000, "optimal": 50000}
+    },
+    "latency": {
+      "metrics": ["p50", "p95", "p99", "max"],
+      "targets": {"p99": "<1s", "max": "<5s"}
+    },
+    "memory": {
+      "metrics": ["heap_usage", "peak_memory", "allocations/sec"],
+      "targets": {"base_node": "<100MB", "full_node": "<500MB"}
+    },
+    "scalability": {
+      "metrics": ["linear_factor", "saturation_point", "degradation_rate"],
+      "targets": {"linear_factor": ">0.8", "saturation": ">1000 nodes"}
+    }
+  },
+  "regression_tracking": {
+    "threshold": "5%",
+    "history_file": ".claude/performance_history.json",
+    "alerts": {
+      "critical": ">10% degradation",
+      "warning": ">5% degradation",
+      "improvement": ">10% improvement"
+    }
+  },
   "output": {
     "success": "Detailed benchmark results and performance analysis",
     "format": [
@@ -25,9 +70,25 @@
       "2. Latency Analysis",
       "3. Resource Usage Statistics",
       "4. Comparative Analysis",
-      "5. Optimization Recommendations"
-    ]
+      "5. Optimization Recommendations",
+      "6. Regression Detection Results",
+      "7. Performance Trends",
+      "8. Bottleneck Identification"
+    ],
+    "reports": {
+      "summary": "PERFORMANCE_REPORT.md",
+      "detailed": ".claude/reports/performance_detailed.json",
+      "regression": ".claude/reports/regression_analysis.md"
+    }
   },
+  "optimization_strategies": [
+    "async_parallelization",
+    "memory_pooling",
+    "lock_free_structures",
+    "simd_vectorization",
+    "cache_optimization",
+    "allocation_reduction"
+  ],
   "error_handling": {
     "benchmark_failure": "Error details with system state",
     "invalid_criteria": "List of valid benchmark criteria",

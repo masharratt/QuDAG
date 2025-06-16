@@ -1,6 +1,8 @@
 {
   "name": "create-test",
-  "description": "Generate test skeleton for new feature",
+  "description": "Generate test skeleton for new feature following TDD workflow",
+  "agent": "agents/integration_agent.md",
+  "context": "contexts/integration_context.md",
   "parameters": {
     "path": {
       "type": "string",
@@ -11,25 +13,228 @@
       "type": "string",
       "description": "Description of the feature to test",
       "required": true
+    },
+    "test_type": {
+      "type": "string",
+      "description": "Type of test (unit, integration, security, performance, multi-component)",
+      "required": false,
+      "default": "unit"
+    },
+    "components": {
+      "type": "array",
+      "description": "Components involved in integration test",
+      "required": false,
+      "items": ["crypto", "dag", "network", "protocol"]
+    },
+    "tdd_phase": {
+      "type": "string",
+      "description": "TDD phase (red, green, refactor)",
+      "required": false,
+      "default": "red"
+    }
+  },
+  "workflow_reference": "workflow/tdd_workflow.md",
+  "templates": {
+    "unit_test": {
+      "imports": [
+        "use super::*;",
+        "use proptest::prelude::*;",
+        "use test_case::test_case;"
+      ],
+      "structure": [
+        "#[cfg(test)]",
+        "mod tests {",
+        "    use super::*;",
+        "",
+        "    #[test]",
+        "    fn test_${feature_name}() {",
+        "        // Arrange",
+        "        let input = setup_test_data();",
+        "",
+        "        // Act",
+        "        let result = function_under_test(input);",
+        "",
+        "        // Assert",
+        "        assert!(result.is_ok());",
+        "    }",
+        "}"
+      ]
+    },
+    "integration_test": {
+      "imports": [
+        "use qudag_protocol::*;",
+        "use qudag_crypto::*;",
+        "use qudag_dag::*;",
+        "use qudag_network::*;",
+        "use tokio::test;",
+        "use std::sync::Arc;",
+        "use wiremock::{Mock, ResponseTemplate};"
+      ],
+      "structure": [
+        "#[tokio::test]",
+        "async fn test_${feature_name}_integration() {",
+        "    // Setup multi-component test environment",
+        "    let test_env = TestEnvironment::new().await;",
+        "    ",
+        "    // Initialize components",
+        "    let crypto = Arc::new(CryptoComponent::new());",
+        "    let network = Arc::new(NetworkComponent::new());",
+        "    let dag = Arc::new(DagComponent::new());",
+        "    let protocol = Protocol::new(crypto.clone(), network.clone(), dag.clone());",
+        "",
+        "    // Configure component interactions",
+        "    test_env.configure_integration(&protocol).await;",
+        "",
+        "    // Execute multi-component test scenario",
+        "    let result = protocol.execute_integrated_operation().await;",
+        "",
+        "    // Verify component state consistency",
+        "    assert!(verify_component_states(&crypto, &network, &dag).await);",
+        "    ",
+        "    // Verify integration results",
+        "    assert!(result.is_success());",
+        "    assert_eq!(result.integration_points_tested(), expected_points);",
+        "}",
+        "",
+        "// Helper function for state verification",
+        "async fn verify_component_states(",
+        "    crypto: &Arc<CryptoComponent>,",
+        "    network: &Arc<NetworkComponent>,",
+        "    dag: &Arc<DagComponent>",
+        ") -> bool {",
+        "    // Verify cross-component consistency",
+        "    true",
+        "}"
+      ]
+    },
+    "security_test": {
+      "imports": [
+        "use qudag_crypto::security::*;",
+        "use constant_time_eq::constant_time_eq;",
+        "use zeroize::Zeroize;"
+      ],
+      "structure": [
+        "#[test]",
+        "fn test_${feature_name}_security() {",
+        "    // Test constant-time operations",
+        "    let secret1 = generate_secret();",
+        "    let secret2 = generate_secret();",
+        "    assert!(constant_time_eq(&secret1, &secret2));",
+        "",
+        "    // Test zeroization",
+        "    let mut sensitive_data = SensitiveData::new();",
+        "    sensitive_data.zeroize();",
+        "    assert_eq!(sensitive_data.as_bytes(), &[0u8; 32]);",
+        "}"
+      ]
+    },
+    "performance_test": {
+      "imports": [
+        "use criterion::{black_box, criterion_group, criterion_main, Criterion};",
+        "use qudag_benchmarks::*;"
+      ],
+      "structure": [
+        "fn bench_${feature_name}(c: &mut Criterion) {",
+        "    let mut group = c.benchmark_group(\"${feature_name}\");",
+        "    ",
+        "    group.bench_function(\"baseline\", |b| {",
+        "        b.iter(|| {",
+        "            black_box(function_under_test());",
+        "        });",
+        "    });",
+        "    ",
+        "    group.finish();",
+        "}",
+        "",
+        "criterion_group!(benches, bench_${feature_name});",
+        "criterion_main!(benches);"
+      ]
+    },
+    "multi_component_test": {
+      "imports": [
+        "use qudag_protocol::*;",
+        "use qudag_crypto::*;",
+        "use qudag_dag::*;",
+        "use qudag_network::*;",
+        "use tokio::test;",
+        "use std::sync::Arc;",
+        "use tokio::sync::RwLock;"
+      ],
+      "structure": [
+        "#[tokio::test]",
+        "async fn test_${feature_name}_multi_component() {",
+        "    // Initialize multi-component test harness",
+        "    let harness = MultiComponentHarness::new()",
+        "        .with_crypto()",
+        "        .with_network()",
+        "        .with_dag()",
+        "        .with_protocol()",
+        "        .build()",
+        "        .await;",
+        "",
+        "    // Scenario: ${description}",
+        "    ",
+        "    // Step 1: Initialize components with test configuration",
+        "    harness.initialize_test_scenario().await;",
+        "    ",
+        "    // Step 2: Execute cross-component operations",
+        "    let crypto_result = harness.crypto.generate_keys().await?;",
+        "    let network_result = harness.network.establish_connection().await?;",
+        "    let dag_result = harness.dag.add_transaction(crypto_result.sign()).await?;",
+        "    ",
+        "    // Step 3: Verify component interactions",
+        "    assert!(harness.verify_crypto_network_integration().await);",
+        "    assert!(harness.verify_network_dag_integration().await);",
+        "    assert!(harness.verify_dag_protocol_integration().await);",
+        "    ",
+        "    // Step 4: Test error propagation across components",
+        "    harness.inject_network_failure();",
+        "    let error_result = harness.protocol.process_message().await;",
+        "    assert!(matches!(error_result, Err(ProtocolError::NetworkError(_))));",
+        "    ",
+        "    // Step 5: Verify system recovery",
+        "    harness.recover_network();",
+        "    assert!(harness.verify_system_consistency().await);",
+        "}",
+        "",
+        "struct MultiComponentHarness {",
+        "    crypto: Arc<RwLock<CryptoComponent>>,",
+        "    network: Arc<RwLock<NetworkComponent>>,",
+        "    dag: Arc<RwLock<DagComponent>>,",
+        "    protocol: Arc<RwLock<ProtocolComponent>>,",
+        "}"
+      ]
     }
   },
   "examples": [
-    "/create-test tests/crypto/ml_kem_test.rs \"ML-KEM key generation and encapsulation\"",
-    "/create-test tests/network/peer_test.rs \"Peer discovery and connection handling\""
+    "/create-test tests/crypto/ml_kem_test.rs \"ML-KEM key generation and encapsulation\" --test_type unit",
+    "/create-test tests/integration/protocol_flow_test.rs \"Full protocol message flow\" --test_type integration",
+    "/create-test tests/security/timing_attack_test.rs \"Timing attack resistance\" --test_type security",
+    "/create-test benches/dag_consensus_bench.rs \"DAG consensus performance\" --test_type performance",
+    "/create-test tests/integration/multi_component_test.rs \"Crypto-DAG-Network integration\" --test_type multi-component --components crypto,dag,network"
   ],
   "output": {
-    "success": "Generated test skeleton with basic test cases",
+    "success": "Generated test skeleton following TDD workflow",
     "format": [
-      "1. Test File Creation",
-      "2. Test Structure",
-      "3. Test Cases",
-      "4. Helper Functions",
-      "5. Documentation"
+      "1. Test File Creation (RED phase)",
+      "2. Test Structure with Template",
+      "3. Test Cases with Assertions",
+      "4. Helper Functions and Mocks",
+      "5. Documentation Comments",
+      "6. TDD Workflow Instructions"
     ]
   },
+  "post_actions": [
+    "Run test to verify it fails (RED phase)",
+    "Create minimal implementation stub",
+    "Update test status in .claude/contexts/test_status.md",
+    "Add to test suite configuration"
+  ],
   "error_handling": {
     "invalid_path": "Path validation error and suggestions",
     "file_exists": "Warning and options for existing file",
-    "permission_error": "File system permission details"
+    "permission_error": "File system permission details",
+    "invalid_test_type": "List of valid test types",
+    "template_error": "Template generation failure"
   }
 }

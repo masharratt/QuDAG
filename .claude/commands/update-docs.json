@@ -1,31 +1,209 @@
 {
   "name": "update-docs",
-  "description": "Update documentation for module changes",
+  "description": "Update documentation for module changes following documentation standards",
   "parameters": {
     "module": {
       "type": "string",
       "description": "Module to update documentation for",
       "required": true
+    },
+    "doc_type": {
+      "type": "string",
+      "description": "Type of documentation (api, architecture, security, deployment)",
+      "required": false,
+      "default": "api"
+    },
+    "include_examples": {
+      "type": "boolean",
+      "description": "Include usage examples",
+      "required": false,
+      "default": true
+    }
+  },
+  "workflow_reference": "workflow/documentation_standards.md",
+  "templates": {
+    "api_documentation": {
+      "structure": [
+        "# ${module_name} API Documentation",
+        "",
+        "## Overview",
+        "${module_description}",
+        "",
+        "## Core Types",
+        "```rust",
+        "// Main types and structures",
+        "```",
+        "",
+        "## Public API",
+        "### Functions",
+        "```rust",
+        "// Public function signatures with docs",
+        "```",
+        "",
+        "### Traits",
+        "```rust",
+        "// Public trait definitions",
+        "```",
+        "",
+        "## Usage Examples",
+        "```rust",
+        "// Example code showing common usage patterns",
+        "```",
+        "",
+        "## Error Handling",
+        "- Error types and their meanings",
+        "- Recovery strategies",
+        "",
+        "## Performance Considerations",
+        "- Time complexity",
+        "- Memory usage",
+        "- Optimization tips"
+      ]
+    },
+    "architecture_documentation": {
+      "structure": [
+        "# ${module_name} Architecture",
+        "",
+        "## Design Principles",
+        "- Core design decisions",
+        "- Trade-offs considered",
+        "",
+        "## Component Overview",
+        "```mermaid",
+        "graph TD",
+        "    A[Component A] --> B[Component B]",
+        "    B --> C[Component C]",
+        "```",
+        "",
+        "## Data Flow",
+        "1. Input processing",
+        "2. Core logic",
+        "3. Output generation",
+        "",
+        "## Integration Points",
+        "- External dependencies",
+        "- Internal interfaces",
+        "",
+        "## Scalability",
+        "- Horizontal scaling approach",
+        "- Performance bottlenecks"
+      ]
+    },
+    "security_documentation": {
+      "structure": [
+        "# ${module_name} Security Documentation",
+        "",
+        "## Threat Model",
+        "### Assets",
+        "- What we're protecting",
+        "",
+        "### Threats",
+        "- Potential attack vectors",
+        "",
+        "### Mitigations",
+        "- Security controls in place",
+        "",
+        "## Cryptographic Operations",
+        "- Algorithms used",
+        "- Key management",
+        "- Security parameters",
+        "",
+        "## Security Considerations",
+        "- Side-channel resistance",
+        "- Memory safety",
+        "- Input validation",
+        "",
+        "## Audit Log",
+        "- Previous security reviews",
+        "- Known issues and fixes"
+      ]
+    },
+    "deployment_documentation": {
+      "structure": [
+        "# ${module_name} Deployment Guide",
+        "",
+        "## Requirements",
+        "### System Requirements",
+        "- Hardware specifications",
+        "- Software dependencies",
+        "",
+        "### Network Requirements",
+        "- Port configurations",
+        "- Firewall rules",
+        "",
+        "## Configuration",
+        "```toml",
+        "# Example configuration",
+        "[${module_name}]",
+        "setting = \"value\"",
+        "```",
+        "",
+        "## Deployment Steps",
+        "1. Pre-deployment checklist",
+        "2. Installation process",
+        "3. Configuration steps",
+        "4. Verification procedures",
+        "",
+        "## Monitoring",
+        "- Key metrics to track",
+        "- Alert thresholds",
+        "- Health check endpoints",
+        "",
+        "## Troubleshooting",
+        "- Common issues and solutions",
+        "- Debug procedures"
+      ]
+    }
+  },
+  "documentation_standards": {
+    "rustdoc": {
+      "requirements": [
+        "All public items must have documentation",
+        "Include examples for complex functions",
+        "Document safety requirements",
+        "Specify error conditions"
+      ],
+      "example": "/// Brief description\n/// \n/// # Arguments\n/// \n/// * `param` - Description\n/// \n/// # Returns\n/// \n/// Description of return value\n/// \n/// # Errors\n/// \n/// When this function returns errors\n/// \n/// # Examples\n/// \n/// ```rust\n/// let result = function(param);\n/// ```"
+    },
+    "markdown": {
+      "requirements": [
+        "Use proper heading hierarchy",
+        "Include code examples with syntax highlighting",
+        "Add diagrams where helpful",
+        "Cross-reference related documentation"
+      ]
     }
   },
   "examples": [
-    "/update-docs crypto",
-    "/update-docs network",
-    "/update-docs protocol"
+    "/update-docs crypto --doc_type api",
+    "/update-docs network --doc_type architecture --include_examples true",
+    "/update-docs protocol --doc_type security",
+    "/update-docs dag --doc_type deployment"
   ],
   "output": {
-    "success": "Updated documentation with changes",
+    "success": "Updated documentation with comprehensive coverage",
     "format": [
-      "1. API Documentation",
-      "2. Usage Examples",
+      "1. API Documentation Updates",
+      "2. Architecture Diagrams",
       "3. Security Considerations",
-      "4. Performance Notes",
-      "5. Changelog Updates"
+      "4. Deployment Guidelines",
+      "5. Usage Examples",
+      "6. Cross-references Updated",
+      "7. Changelog Entry Added"
     ]
   },
+  "post_actions": [
+    "Run rustdoc to generate HTML documentation",
+    "Validate markdown syntax",
+    "Check for broken links",
+    "Update documentation index",
+    "Generate documentation coverage report"
+  ],
   "error_handling": {
-    "invalid_module": "List of valid module names",
-    "doc_gen_failure": "Documentation generation errors",
-    "missing_examples": "Missing usage examples warning"
+    "invalid_module": "List of valid module names: crypto, dag, network, protocol",
+    "doc_gen_failure": "Documentation generation errors with file paths",
+    "missing_examples": "List of functions missing examples",
+    "invalid_doc_type": "Valid types: api, architecture, security, deployment",
+    "rustdoc_error": "Rustdoc compilation errors"
   }
 }

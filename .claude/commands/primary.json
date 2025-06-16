@@ -1,39 +1,378 @@
 {
+  "name": "QuDAG Command Registry",
+  "version": "1.0.0",
+  "description": "Primary command registry for QuDAG Protocol development",
   "commands": {
-    "tdd-cycle": {
-      "description": "Execute complete TDD cycle for a feature",
-      "parameters": {
-        "module": "Module name (crypto|network|consensus)",
-        "feature": "Feature name to implement"
+    "primary_development": [
+      {
+        "name": "tdd-cycle",
+        "description": "Execute complete Test-Driven Development cycle for a feature",
+        "workflow_file": "workflow/tdd_workflow.md",
+        "command_file": "tdd-cycle.json",
+        "parameters": {
+          "module": {
+            "type": "string",
+            "description": "Target module (crypto|dag|network|protocol)",
+            "required": true
+          },
+          "feature": {
+            "type": "string",
+            "description": "Feature name to implement",
+            "required": true
+          }
+        },
+        "agent_mapping": {
+          "crypto": "agents/crypto_agent.md",
+          "network": "agents/network_agent.md",
+          "dag": "agents/consensus_agent.md",
+          "protocol": "agents/integration_agent.md"
+        },
+        "example": "/tdd-cycle crypto ml_kem_implementation"
       },
-      "example": "/tdd-cycle crypto ml_kem_implementation",
-      "output": "Test results and implementation status"
-    },
-    "security-audit": {
-      "description": "Comprehensive security analysis",
-      "parameters": {},
-      "example": "/security-audit",
-      "output": "Security audit report"
-    },
-    "performance-benchmark": {
-      "description": "Run all benchmarks",
-      "parameters": {},
-      "example": "/performance-benchmark",
-      "output": "Benchmark results and analysis"
-    },
-    "integration-test": {
-      "description": "Execute integration tests",
-      "parameters": {
-        "component": "Optional component name"
+      {
+        "name": "security-audit",
+        "description": "Comprehensive security analysis and testing",
+        "workflow_file": "workflow/security_workflow.md",
+        "command_file": "security-audit.json",
+        "agent_context": "agents/security_agent.md",
+        "parameters": {
+          "module": {
+            "type": "string",
+            "description": "Optional module to audit (crypto|network|dag|protocol|all)",
+            "required": false,
+            "default": "all"
+          },
+          "depth": {
+            "type": "string",
+            "description": "Audit depth (quick|standard|comprehensive)",
+            "required": false,
+            "default": "comprehensive"
+          }
+        },
+        "contexts": [
+          "contexts/security_context.md",
+          "contexts/test_status.md"
+        ],
+        "example": "/security-audit crypto --depth comprehensive"
       },
-      "example": "/integration-test crypto",
-      "output": "Integration test results"
+      {
+        "name": "performance-benchmark",
+        "description": "Run all benchmarks and generate performance reports",
+        "workflow_file": "workflow/performance_workflow.md",
+        "command_file": "performance-benchmark.json",
+        "agent_context": "agents/performance_agent.md",
+        "parameters": {
+          "module": {
+            "type": "string",
+            "description": "Optional module to benchmark (crypto|dag|network|protocol|all)",
+            "required": false,
+            "default": "all"
+          },
+          "criteria": {
+            "type": "string",
+            "description": "Performance criteria (throughput|latency|memory|scalability)",
+            "required": false
+          },
+          "baseline": {
+            "type": "boolean",
+            "description": "Compare against baseline",
+            "required": false,
+            "default": true
+          }
+        },
+        "contexts": [
+          "contexts/performance_context.md",
+          "contexts/test_status.md"
+        ],
+        "example": "/performance-benchmark network --criteria throughput"
+      },
+      {
+        "name": "integration-test",
+        "description": "Execute full integration test suite",
+        "command_file": "integration-test.json",
+        "agent_context": "agents/integration_agent.md",
+        "parameters": {
+          "component": {
+            "type": "string",
+            "description": "Optional component to test",
+            "required": false
+          },
+          "scenario": {
+            "type": "string",
+            "description": "Test scenario to run",
+            "required": false
+          }
+        },
+        "contexts": [
+          "contexts/integration_context.md",
+          "contexts/test_status.md"
+        ],
+        "example": "/integration-test crypto"
+      },
+      {
+        "name": "deploy-validate",
+        "description": "Validate deployment configuration and test",
+        "workflow_file": "workflow/deployment_workflow.md",
+        "command_file": "deploy-validate.json",
+        "parameters": {
+          "environment": {
+            "type": "string",
+            "description": "Target environment (dev|staging|prod)",
+            "required": false,
+            "default": "dev"
+          },
+          "checks": {
+            "type": "array",
+            "description": "Specific validation checks to run",
+            "required": false
+          }
+        },
+        "example": "/deploy-validate --environment staging"
+      }
+    ],
+    "development_workflow": [
+      {
+        "name": "create-test",
+        "description": "Generate test skeleton for new feature",
+        "command_file": "create-test.json",
+        "parameters": {
+          "path": {
+            "type": "string",
+            "description": "Test file path",
+            "required": true
+          },
+          "description": {
+            "type": "string",
+            "description": "Test description",
+            "required": true
+          }
+        },
+        "example": "/create-test tests/crypto/ml_kem_test.rs 'ML-KEM key generation'"
+      },
+      {
+        "name": "implement-feature",
+        "description": "Implement feature to pass specified tests",
+        "command_file": "implement-feature.json",
+        "parameters": {
+          "test_path": {
+            "type": "string",
+            "description": "Path to test file",
+            "required": true
+          }
+        },
+        "example": "/implement-feature tests/crypto/ml_kem_test.rs"
+      },
+      {
+        "name": "refactor-optimize",
+        "description": "Refactor module while maintaining test coverage",
+        "command_file": "refactor-optimize.json",
+        "parameters": {
+          "module": {
+            "type": "string",
+            "description": "Module to refactor",
+            "required": true
+          },
+          "focus": {
+            "type": "string",
+            "description": "Optimization focus (performance|readability|security)",
+            "required": false
+          }
+        },
+        "example": "/refactor-optimize crypto --focus performance"
+      },
+      {
+        "name": "review-security",
+        "description": "Security-focused code review",
+        "command_file": "review-security.json",
+        "agent_context": "agents/security_agent.md",
+        "parameters": {
+          "module": {
+            "type": "string",
+            "description": "Module to review",
+            "required": true
+          }
+        },
+        "example": "/review-security crypto"
+      },
+      {
+        "name": "update-docs",
+        "description": "Update documentation for module changes",
+        "command_file": "update-docs.json",
+        "parameters": {
+          "module": {
+            "type": "string",
+            "description": "Module to document",
+            "required": true
+          },
+          "sections": {
+            "type": "array",
+            "description": "Specific sections to update",
+            "required": false
+          }
+        },
+        "example": "/update-docs network --sections api,examples"
+      }
+    ],
+    "specialized": [
+      {
+        "name": "crypto-validate",
+        "description": "Validate cryptographic implementation",
+        "command_file": "crypto-validate.json",
+        "agent_context": "agents/crypto_agent.md",
+        "parameters": {
+          "algorithm": {
+            "type": "string",
+            "description": "Algorithm to validate (ml-kem|ml-dsa|hqc)",
+            "required": true
+          },
+          "compliance": {
+            "type": "boolean",
+            "description": "Check NIST compliance",
+            "required": false,
+            "default": true
+          }
+        },
+        "example": "/crypto-validate ml-kem --compliance"
+      },
+      {
+        "name": "network-simulate",
+        "description": "Run network simulation scenarios",
+        "command_file": "network-simulate.json",
+        "agent_context": "agents/network_agent.md",
+        "parameters": {
+          "scenario": {
+            "type": "string",
+            "description": "Simulation scenario",
+            "required": true
+          },
+          "nodes": {
+            "type": "integer",
+            "description": "Number of nodes",
+            "required": false,
+            "default": 100
+          }
+        },
+        "example": "/network-simulate high-latency --nodes 1000"
+      },
+      {
+        "name": "dag-visualize",
+        "description": "Generate DAG state visualization",
+        "command_file": "dag-visualize.json",
+        "agent_context": "agents/consensus_agent.md",
+        "parameters": {
+          "state": {
+            "type": "string",
+            "description": "DAG state to visualize",
+            "required": false
+          },
+          "format": {
+            "type": "string",
+            "description": "Output format (svg|png|dot)",
+            "required": false,
+            "default": "svg"
+          }
+        },
+        "example": "/dag-visualize --format png"
+      },
+      {
+        "name": "fuzz-test",
+        "description": "Execute fuzzing campaign against target",
+        "command_file": "fuzz-test.json",
+        "parameters": {
+          "target": {
+            "type": "string",
+            "description": "Fuzz target",
+            "required": true
+          },
+          "duration": {
+            "type": "string",
+            "description": "Fuzzing duration",
+            "required": false,
+            "default": "10m"
+          }
+        },
+        "example": "/fuzz-test crypto_parser --duration 1h"
+      }
+    ],
+    "debug": [
+      {
+        "name": "debug-network",
+        "description": "Diagnose networking issues",
+        "command_file": "debug-network.json",
+        "agent_context": "agents/network_agent.md",
+        "example": "/debug-network"
+      },
+      {
+        "name": "debug-consensus",
+        "description": "Analyze consensus state",
+        "command_file": "debug-consensus.json",
+        "agent_context": "agents/consensus_agent.md",
+        "example": "/debug-consensus"
+      },
+      {
+        "name": "debug-performance",
+        "description": "Profile performance bottlenecks",
+        "command_file": "debug-performance.json",
+        "agent_context": "agents/performance_agent.md",
+        "example": "/debug-performance"
+      },
+      {
+        "name": "debug-security",
+        "description": "Check security configurations",
+        "command_file": "debug-security.json",
+        "agent_context": "agents/security_agent.md",
+        "example": "/debug-security"
+      }
+    ]
+  },
+  "global_contexts": [
+    "contexts/test_status.md",
+    "contexts/integration_context.md",
+    "contexts/security_context.md",
+    "contexts/performance_context.md"
+  ],
+  "agent_registry": {
+    "crypto_agent": {
+      "file": "agents/crypto_agent.md",
+      "description": "Handles cryptographic implementations and validations"
     },
-    "deploy-validate": {
-      "description": "Validate deployment config",
-      "parameters": {},
-      "example": "/deploy-validate",
-      "output": "Deployment validation report"
+    "network_agent": {
+      "file": "agents/network_agent.md",
+      "description": "Manages P2P networking and communication protocols"
+    },
+    "consensus_agent": {
+      "file": "agents/consensus_agent.md",
+      "description": "Implements and tests DAG consensus mechanisms"
+    },
+    "security_agent": {
+      "file": "agents/security_agent.md",
+      "description": "Performs security analysis and vulnerability assessment"
+    },
+    "performance_agent": {
+      "file": "agents/performance_agent.md",
+      "description": "Monitors and optimizes system performance"
+    },
+    "integration_agent": {
+      "file": "agents/integration_agent.md",
+      "description": "Coordinates component integration and system testing"
+    }
+  },
+  "workflow_registry": {
+    "tdd_workflow": {
+      "file": "workflow/tdd_workflow.md",
+      "description": "Test-Driven Development workflow"
+    },
+    "security_workflow": {
+      "file": "workflow/security_workflow.md",
+      "description": "Security audit and validation workflow"
+    },
+    "performance_workflow": {
+      "file": "workflow/performance_workflow.md",
+      "description": "Performance benchmarking and optimization workflow"
+    },
+    "deployment_workflow": {
+      "file": "workflow/deployment_workflow.md",
+      "description": "Deployment validation and testing workflow"
     }
   }
 }

@@ -1,32 +1,119 @@
 {
   "name": "integration-test",
-  "description": "Execute full integration test suite",
+  "description": "Execute full integration test suite with multi-component coordination",
+  "agent": "agents/integration_agent.md",
+  "context": "contexts/integration_context.md",
   "parameters": {
     "scope": {
       "type": "string",
-      "description": "Optional test scope (full, quick, specific-module)",
+      "description": "Test scope (full, quick, crypto-network, dag-protocol, network-protocol, end-to-end)",
       "required": false,
       "default": "full"
+    },
+    "components": {
+      "type": "array",
+      "description": "Specific components to test together",
+      "required": false,
+      "items": ["crypto", "dag", "network", "protocol"]
+    },
+    "scenario": {
+      "type": "string",
+      "description": "Integration test scenario (basic, stress, adversarial, performance)",
+      "required": false,
+      "default": "basic"
     }
   },
   "examples": [
     "/integration-test",
     "/integration-test --scope quick",
-    "/integration-test --scope crypto-network"
+    "/integration-test --scope crypto-network --scenario stress",
+    "/integration-test --components crypto,dag,network --scenario adversarial",
+    "/integration-test --scope end-to-end --scenario performance"
   ],
+  "templates": {
+    "multi_component_test": {
+      "structure": [
+        "Component initialization and setup",
+        "Inter-component communication tests",
+        "State synchronization verification",
+        "Error propagation validation",
+        "Resource cleanup and teardown"
+      ]
+    },
+    "end_to_end_test": {
+      "flow": [
+        "1. Initialize all protocol components",
+        "2. Simulate real-world message flow",
+        "3. Verify consensus achievement",
+        "4. Test recovery from failures",
+        "5. Validate performance metrics"
+      ]
+    },
+    "integration_scenarios": {
+      "basic": "Standard component interaction tests",
+      "stress": "High-load multi-component stress testing",
+      "adversarial": "Byzantine behavior and attack scenarios",
+      "performance": "Integration performance benchmarking"
+    }
+  },
+  "coordination": {
+    "agents": [
+      "integration_agent: Primary test coordination",
+      "crypto_agent: Cryptographic integration validation",
+      "network_agent: Network layer integration testing",
+      "consensus_agent: DAG consensus integration",
+      "security_agent: Security validation across components",
+      "performance_agent: Integration performance analysis"
+    ],
+    "workflow": [
+      "1. Load integration context and test history",
+      "2. Coordinate multi-agent test execution",
+      "3. Aggregate results from all components",
+      "4. Analyze inter-component dependencies",
+      "5. Generate comprehensive integration report"
+    ]
+  },
   "output": {
-    "success": "Integration test results with component interaction analysis",
+    "success": "Comprehensive integration test results with multi-component analysis",
     "format": [
-      "1. Test Suite Summary",
-      "2. Component Integration Results",
-      "3. Error Reports (if any)",
-      "4. Coverage Analysis",
-      "5. Integration Validation"
+      "1. Integration Test Summary",
+      "   - Total tests run across components",
+      "   - Success/failure breakdown by component",
+      "   - Integration points tested",
+      "2. Component Interaction Matrix",
+      "   - Component communication paths",
+      "   - Data flow validation",
+      "   - State consistency checks",
+      "3. Test Scenario Results",
+      "   - Per-scenario test outcomes",
+      "   - Performance metrics",
+      "   - Resource utilization",
+      "4. Error Analysis (if any)",
+      "   - Component-specific failures",
+      "   - Integration point failures",
+      "   - Root cause analysis",
+      "5. Coverage Report",
+      "   - Integration path coverage",
+      "   - Component boundary coverage",
+      "   - Scenario coverage",
+      "6. Recommendations",
+      "   - Integration improvements",
+      "   - Test gap identification",
+      "   - Performance optimizations"
     ]
   },
   "error_handling": {
-    "test_failure": "Detailed failure report with component info",
-    "invalid_scope": "List of valid test scopes",
-    "timeout": "Partial results and time-consuming test info"
+    "test_failure": "Detailed failure report with component interaction trace",
+    "invalid_scope": "List of valid test scopes with descriptions",
+    "component_error": "Component-specific error details and recovery suggestions",
+    "timeout": "Partial results with timeout analysis and optimization hints",
+    "coordination_failure": "Multi-agent coordination error with fallback strategy"
+  },
+  "test_categories": {
+    "functional": "Component functionality in integrated context",
+    "interoperability": "Component communication and data exchange",
+    "resilience": "Failure recovery and error handling",
+    "performance": "End-to-end performance characteristics",
+    "security": "Security properties across component boundaries"
   }
 }
