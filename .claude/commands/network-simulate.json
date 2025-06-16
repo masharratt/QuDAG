@@ -1,0 +1,37 @@
+{
+  "name": "network-simulate",
+  "description": "Run network simulation scenarios",
+  "parameters": {
+    "scenario": {
+      "type": "string",
+      "description": "Network scenario to simulate",
+      "required": true
+    },
+    "nodes": {
+      "type": "number",
+      "description": "Number of nodes to simulate",
+      "required": false,
+      "default": 10
+    }
+  },
+  "examples": [
+    "/network-simulate partition",
+    "/network-simulate latency --nodes 20",
+    "/network-simulate byzantine --nodes 50"
+  ],
+  "output": {
+    "success": "Network simulation results and analysis",
+    "format": [
+      "1. Simulation Setup",
+      "2. Network Behavior",
+      "3. Performance Metrics",
+      "4. Error Conditions",
+      "5. Analysis Report"
+    ]
+  },
+  "error_handling": {
+    "invalid_scenario": "List of valid scenarios",
+    "resource_limit": "Resource limitation warning",
+    "simulation_error": "Simulation failure details"
+  }
+}

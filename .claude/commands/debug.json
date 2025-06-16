@@ -1,0 +1,28 @@
+{
+  "commands": {
+    "debug-network": {
+      "description": "Debug network issues",
+      "parameters": {},
+      "example": "/debug-network",
+      "output": "Network diagnostics"
+    },
+    "debug-consensus": {
+      "description": "Debug consensus issues",
+      "parameters": {},
+      "example": "/debug-consensus", 
+      "output": "Consensus diagnostics"
+    },
+    "debug-performance": {
+      "description": "Debug performance issues",
+      "parameters": {},
+      "example": "/debug-performance",
+      "output": "Performance diagnostics"
+    },
+    "debug-security": {
+      "description": "Debug security issues",
+      "parameters": {},
+      "example": "/debug-security",
+      "output": "Security diagnostics"
+    }
+  }
+}

@@ -1,17 +1,20 @@
 [package]
 name = "qudag-protocol"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
 
 [dependencies]
+thiserror.workspace = true
+tracing.workspace = true
+serde.workspace = true
+tokio = { workspace = true, features = ["full"] }
 qudag-crypto = { path = "../crypto" }
 qudag-dag = { path = "../dag" }
 qudag-network = { path = "../network" }
-tokio = { workspace = true }
-serde = { workspace = true }
-tracing = { workspace = true }
-anyhow = { workspace = true }
 
 [dev-dependencies]
+proptest.workspace = true
 tokio-test = "0.4"
-proptest = { workspace = true }

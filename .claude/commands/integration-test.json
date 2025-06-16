@@ -1,0 +1,32 @@
+{
+  "name": "integration-test",
+  "description": "Execute full integration test suite",
+  "parameters": {
+    "scope": {
+      "type": "string",
+      "description": "Optional test scope (full, quick, specific-module)",
+      "required": false,
+      "default": "full"
+    }
+  },
+  "examples": [
+    "/integration-test",
+    "/integration-test --scope quick",
+    "/integration-test --scope crypto-network"
+  ],
+  "output": {
+    "success": "Integration test results with component interaction analysis",
+    "format": [
+      "1. Test Suite Summary",
+      "2. Component Integration Results",
+      "3. Error Reports (if any)",
+      "4. Coverage Analysis",
+      "5. Integration Validation"
+    ]
+  },
+  "error_handling": {
+    "test_failure": "Detailed failure report with component info",
+    "invalid_scope": "List of valid test scopes",
+    "timeout": "Partial results and time-consuming test info"
+  }
+}

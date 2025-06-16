@@ -1,0 +1,32 @@
+{
+  "name": "deploy-validate",
+  "description": "Validate deployment configuration and execute tests",
+  "parameters": {
+    "environment": {
+      "type": "string",
+      "description": "Target environment (dev, staging, prod)",
+      "required": false,
+      "default": "dev"
+    }
+  },
+  "examples": [
+    "/deploy-validate",
+    "/deploy-validate --environment staging",
+    "/deploy-validate --environment prod"
+  ],
+  "output": {
+    "success": "Deployment validation report and test results",
+    "format": [
+      "1. Configuration Validation",
+      "2. Security Check Results",
+      "3. Integration Test Status",
+      "4. Resource Requirements",
+      "5. Deployment Readiness"
+    ]
+  },
+  "error_handling": {
+    "config_error": "Configuration validation errors",
+    "invalid_environment": "List of valid environments",
+    "security_failure": "Security check failures and requirements"
+  }
+}

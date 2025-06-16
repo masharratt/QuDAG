@@ -1,23 +1,49 @@
 use std::collections::{HashMap, HashSet};
 use parking_lot::RwLock;
 use blake3::Hash;
+use dashmap::DashMap;
+use rayon::prelude::*;
+use std::time::Instant;
+use tracing::{debug, warn, info};
 
 use crate::{Node, Edge, Result, DagError};
 
 /// Represents the DAG data structure with nodes and edges
+/// Graph performance metrics
+#[derive(Debug, Default)]
+pub struct GraphMetrics {
+    /// Average vertex processing time in nanoseconds
+    pub avg_vertex_time_ns: u64,
+    /// Number of vertices processed
+    pub vertices_processed: u64,
+    /// Cache hit rate for vertex lookups
+    pub cache_hit_rate: f64,
+}
+
+/// Represents the DAG data structure with high-performance concurrent access
 pub struct Graph {
-    /// Nodes in the DAG indexed by hash
-    nodes: RwLock<HashMap<Hash, Node>>,
-    /// Edges in the DAG
-    edges: RwLock<HashMap<Hash, HashSet<Edge>>>,
+    /// Nodes in the DAG with concurrent access
+    nodes: DashMap<Hash, Node>,
+    /// Edges in the DAG with concurrent access
+    edges: DashMap<Hash, HashSet<Edge>>,
+    /// Performance metrics
+    metrics: RwLock<GraphMetrics>,
 }
 
 impl Graph {
     /// Creates a new empty DAG
     pub fn new() -> Self {
+        // Initialize with reasonable capacity
+        let initial_capacity = 10_000;
+        Self::with_capacity(initial_capacity)
+    }
+
+    /// Creates a new Graph with specified initial capacity
+    pub fn with_capacity(capacity: usize) -> Self {
         Self {
-            nodes: RwLock::new(HashMap::new()),
-            edges: RwLock::new(HashMap::new()),
+            nodes: DashMap::with_capacity(capacity),
+            edges: DashMap::with_capacity(capacity),
+            metrics: RwLock::new(GraphMetrics::default()),
         }
     }
 
@@ -33,56 +59,68 @@ impl Graph {
 
     /// Adds a new node to the DAG
     pub fn add_node(&self, node: Node) -> Result<()> {
+        let start = Instant::now();
         let node_hash = *node.hash();
         
-        // Check if node already exists
-        if self.nodes.read().contains_key(&node_hash) {
+        // Check if node already exists using lockless read
+        if self.nodes.contains_key(&node_hash) {
             return Err(DagError::NodeExists(format!("{:?}", node_hash)));
         }
 
-        // Verify all parents exist
-        for parent in node.parents() {
-            if !self.nodes.read().contains_key(parent) {
-                return Err(DagError::MissingParent(format!("{:?}", parent)));
-            }
+        // Verify all parents exist concurrently
+        let missing_parent = node.parents().par_iter().find_first(|parent| {
+            !self.nodes.contains_key(parent)
+        });
+
+        if let Some(parent) = missing_parent {
+            return Err(DagError::MissingParent(format!("{:?}", parent)));
         }
 
-        // Add node and create edges to parents
-        let mut nodes = self.nodes.write();
-        let mut edges = self.edges.write();
-
-        nodes.insert(node_hash, node);
+        // Add node
+        self.nodes.insert(node_hash, node);
         
-        // Initialize edge set for this node
-        edges.entry(node_hash).or_insert_with(HashSet::new);
+        // Initialize edge set
+        self.edges.entry(node_hash).or_insert_with(HashSet::new);
 
-        // Add edges from parents
-        for parent in nodes[&node_hash].parents() {
+        // Add edges from parents in parallel
+        let node_parents = self.nodes.get(&node_hash).unwrap().parents().to_vec();
+        node_parents.par_iter().for_each(|parent| {
             let edge = Edge::new(*parent, node_hash);
-            edges.get_mut(parent).unwrap().insert(edge);
-        }
+            if let Some(mut parent_edges) = self.edges.get_mut(parent) {
+                parent_edges.insert(edge);
+            }
+        });
+
+        // Update metrics
+        let elapsed = start.elapsed().as_nanos() as u64;
+        let mut metrics = self.metrics.write();
+        metrics.vertices_processed += 1;
+        metrics.avg_vertex_time_ns = 
+            (metrics.avg_vertex_time_ns * (metrics.vertices_processed - 1) + elapsed) / 
+            metrics.vertices_processed;
 
         Ok(())
     }
 
     /// Returns a reference to a node by its hash
     pub fn get_node(&self, hash: &Hash) -> Option<Node> {
-        self.nodes.read().get(hash).cloned()
+        // Fast concurrent lookup
+        self.nodes.get(hash).map(|node| node.clone())
     }
 
     /// Returns all edges connected to a node
     pub fn get_edges(&self, hash: &Hash) -> Option<HashSet<Edge>> {
-        self.edges.read().get(hash).cloned()
+        // Fast concurrent lookup
+        self.edges.get(hash).map(|edges| edges.clone())
     }
 
     /// Updates the state of a node
     pub fn update_node_state(&self, hash: &Hash, new_state: crate::node::NodeState) -> Result<()> {
-        let mut nodes = self.nodes.write();
-        let node = nodes.get_mut(hash).ok_or_else(|| {
-            DagError::NodeNotFound(format!("{:?}", hash))
-        })?;
-        
-        node.update_state(new_state)
+        // Get node with write access
+        let mut entry = self.nodes.get_mut(hash)
+            .ok_or_else(|| DagError::NodeNotFound(format!("{:?}", hash)))?;
+            
+        entry.value_mut().update_state(new_state)
     }
 
     /// Checks if adding an edge would create a cycle

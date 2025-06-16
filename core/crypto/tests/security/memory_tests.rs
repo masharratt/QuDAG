@@ -1,112 +1,231 @@
 use qudag_crypto::{kem::MLKem, signatures::MLDsa, encryption::HQC};
 use zeroize::{Zeroize, Zeroizing};
-use std::mem;
+use std::{mem, sync::atomic::{AtomicU8, Ordering}, alloc::{Layout, alloc, dealloc}};
+use proptest::prelude::*;
+use std::time::Instant;
 
 /// Memory security test suite for cryptographic operations
 #[cfg(test)]
 mod memory_security_tests {
     use super::*;
 
-    /// Helper function to verify memory is properly zeroized
-    fn verify_zeroization<T: AsRef<[u8]>>(data: &T, expected_zeros: usize) {
+    /// Helper to verify memory patterns and zeroization
+    fn verify_memory_patterns<T: AsRef<[u8]>>(data: &T, expected_zeros: usize) {
         let bytes = data.as_ref();
-        assert_eq!(bytes.iter().filter(|&&b| b == 0).count(), expected_zeros,
-            "Memory was not properly zeroized");
+        
+        // Check complete zeroization
+        let zero_count = bytes.iter().filter(|&&b| b == 0).count();
+        assert_eq!(zero_count, expected_zeros, 
+            "Memory not properly zeroized - found {} zeros, expected {}", 
+            zero_count, expected_zeros);
+
+        // Check for residual patterns
+        let ones_count = bytes.iter().filter(|&&b| b == 0xff).count();
+        assert_eq!(ones_count, 0, "Found residual pattern of ones");
+
+        // Check for repeating sequences
+        for window in bytes.windows(4) {
+            assert_ne!(window.iter().all(|&b| b == window[0]), true,
+                "Found repeating byte pattern");
+        }
+    }
+
+    /// Helper for aligned memory allocation
+    fn allocate_aligned_buffer(size: usize, align: usize) -> (*mut u8, Layout) {
+        let layout = Layout::from_size_align(size, align).unwrap();
+        let ptr = unsafe { alloc(layout) };
+        (ptr, layout)
+    }
+
+    /// Helper to measure operation timing
+    fn measure_constant_time<F>(op: F, iterations: usize) -> bool 
+    where
+        F: Fn() -> ()
+    {
+        let mut timings = Vec::with_capacity(iterations);
+        
+        for _ in 0..iterations {
+            let start = Instant::now();
+            op();
+            timings.push(start.elapsed());
+        }
+
+        // Calculate timing variance
+        let mean = timings.iter().sum::<std::time::Duration>() / iterations as u32;
+        let variance = timings.iter()
+            .map(|t| {
+                let diff = t.as_nanos() as i128 - mean.as_nanos() as i128;
+                diff * diff
+            })
+            .sum::<i128>() / iterations as i128;
+
+        // Variance should be small for constant-time ops
+        variance < 1000
     }
 
     #[test]
     fn test_mlkem_key_lifecycle() {
-        // Test key generation and zeroization
-        let (mut pk, mut sk) = MLKem::keygen();
-        let pk_bytes = pk.to_bytes();
-        let sk_bytes = sk.to_bytes();
+        // Allocate aligned buffers
+        let (pk_ptr, pk_layout) = allocate_aligned_buffer(MLKem::PUBLIC_KEY_SIZE, 32);
+        let (sk_ptr, sk_layout) = allocate_aligned_buffer(MLKem::SECRET_KEY_SIZE, 32);
 
-        // Verify secret key never touches stack memory
-        let sk_ptr = sk.as_ptr();
-        let stack_distance = sk_ptr.wrapping_sub((&pk as *const _) as *const u8);
-        assert!(stack_distance > 1024, "Secret key may be stored on stack");
+        // Test key generation with aligned memory
+        let (mut pk, mut sk) = unsafe {
+            let pk_slice = std::slice::from_raw_parts_mut(pk_ptr, MLKem::PUBLIC_KEY_SIZE);
+            let sk_slice = std::slice::from_raw_parts_mut(sk_ptr, MLKem::SECRET_KEY_SIZE);
+            MLKem::keygen_into(pk_slice, sk_slice).unwrap()
+        };
 
-        // Test automatic zeroization on drop
-        drop(sk);
-        let stack_mem = unsafe { std::slice::from_raw_parts(sk_ptr, sk_bytes.len()) };
-        verify_zeroization(&stack_mem, sk_bytes.len());
+        // Verify key alignment
+        assert_eq!(pk.as_ptr() as usize % 32, 0, "Public key not 32-byte aligned");
+        assert_eq!(sk.as_ptr() as usize % 32, 0, "Secret key not 32-byte aligned");
 
-        // Test explicit zeroization
-        pk.zeroize();
-        assert_ne!(pk.to_bytes(), pk_bytes, "Public key was not properly zeroized");
+        // Verify keys are on different pages
+        let pk_page = pk.as_ptr() as usize / 4096;
+        let sk_page = sk.as_ptr() as usize / 4096;
+        assert_ne!(pk_page, sk_page, "Keys must be on different memory pages");
+
+        // Test constant-time operations
+        let is_constant = measure_constant_time(|| {
+            let _ = MLKem::decapsulate(&[0u8; 32], &sk);
+        }, 100);
+        assert!(is_constant, "Key operations not constant-time");
+
+        // Test zeroization
+        sk.zeroize();
+        verify_memory_patterns(&sk, sk.len());
+
+        // Clean up aligned buffers
+        unsafe {
+            dealloc(pk_ptr, pk_layout);
+            dealloc(sk_ptr, sk_layout);
+        }
     }
 
     #[test]
     fn test_mldsa_signature_security() {
-        let message = b"test message";
-        let (pk, sk) = MLDsa::keygen();
+        // Test with various message sizes
+        proptest!(|(message in prop::collection::vec(any::<u8>(), 1..1024))| {
+            let (pk, mut sk) = MLDsa::keygen();
 
-        // Test signature generation with secure memory
-        let signature = {
-            let mut sig = Zeroizing::new(MLDsa::sign(message, &sk));
-            let sig_copy = sig.clone();
-            // Verify signature is cleared on scope exit
-            sig.zeroize();
-            sig_copy
-        };
+            // Test signature generation with secure memory
+            let signature = {
+                let mut sig = Zeroizing::new(MLDsa::sign(&message, &sk));
+                
+                // Add memory fence to ensure operation ordering
+                std::sync::atomic::fence(Ordering::SeqCst);
+                
+                let sig_copy = sig.clone();
+                sig.zeroize();
+                verify_memory_patterns(&sig, sig.len());
+                sig_copy
+            };
 
-        // Verify signature still valid after secure handling
-        assert!(MLDsa::verify(message, &signature, &pk).is_ok());
+            // Verify signature remains valid
+            assert!(MLDsa::verify(&message, &signature, &pk).is_ok());
 
-        // Test automatic cleanup of temporary buffers
-        let mut temp_buf = vec![0u8; 1024];
-        MLDsa::sign_into(message, &sk, &mut temp_buf);
-        verify_zeroization(&temp_buf, temp_buf.len());
+            // Test cleanup of temporary buffers
+            let mut temp_buf = vec![0u8; 1024];
+            MLDsa::sign_into(&message, &sk, &mut temp_buf);
+            verify_memory_patterns(&temp_buf, temp_buf.len());
+
+            // Ensure secret key cleanup
+            sk.zeroize();
+            verify_memory_patterns(&sk, sk.len());
+        });
     }
 
     #[test]
     fn test_hqc_encryption_memory() {
-        let message = b"secret data";
-        let (pk, sk) = HQC::keygen();
+        // Test with various message sizes
+        proptest!(|(message in prop::collection::vec(any::<u8>(), 1..1024))| {
+            let (pk, mut sk) = HQC::keygen();
 
-        // Test encryption with secure memory handling
-        let ciphertext = {
-            let mut ct = Zeroizing::new(HQC::encrypt(message, &pk).unwrap());
-            let ct_copy = ct.clone();
-            ct.zeroize();
-            ct_copy
-        };
+            // Test encryption with secure memory
+            let ciphertext = {
+                let mut ct = Zeroizing::new(HQC::encrypt(&message, &pk).unwrap());
+                
+                // Memory fence to ensure cleanup ordering
+                std::sync::atomic::fence(Ordering::SeqCst);
+                
+                let ct_copy = ct.clone();
+                ct.zeroize();
+                verify_memory_patterns(&ct, ct.len());
+                ct_copy
+            };
 
-        // Test decryption with secure memory
-        let plaintext = Zeroizing::new(HQC::decrypt(&ciphertext, &sk).unwrap());
-        assert_eq!(plaintext.as_ref(), message);
+            // Test decryption with secure memory
+            let plaintext = {
+                let mut pt = Zeroizing::new(HQC::decrypt(&ciphertext, &sk).unwrap());
+                assert_eq!(pt.as_ref(), &message);
+                
+                // Memory fence before cleanup
+                std::sync::atomic::fence(Ordering::SeqCst);
+                
+                pt.zeroize();
+                verify_memory_patterns(&pt, pt.len());
+                pt
+            };
 
-        // Verify secure cleanup
-        drop(plaintext);
-        let mut stack_check = [0u8; 1024];
-        assert!(stack_check.iter().all(|&b| b == 0),
-            "Stack memory not properly cleaned");
+            // Verify secret key cleanup
+            sk.zeroize();
+            verify_memory_patterns(&sk, sk.len());
+        });
     }
 
     #[test]
     fn test_shared_secret_handling() {
-        // Test ML-KEM shared secret security
-        let (pk, sk) = MLKem::keygen();
-        let (ct, mut ss1) = MLKem::encapsulate(&pk).unwrap();
-        let mut ss2 = MLKem::decapsulate(&ct, &sk).unwrap();
+        // Test with multiple key pairs
+        for _ in 0..10 {
+            let (pk, sk) = MLKem::keygen();
+            
+            // Test encapsulation
+            let (ct, mut ss1) = MLKem::encapsulate(&pk).unwrap();
+            
+            // Test constant-time decapsulation
+            let is_constant = measure_constant_time(|| {
+                let _ = MLKem::decapsulate(&ct, &sk);
+            }, 100);
+            assert!(is_constant, "Decapsulation not constant-time");
 
-        // Verify secrets match before zeroization
-        assert_eq!(ss1, ss2);
+            let mut ss2 = MLKem::decapsulate(&ct, &sk).unwrap();
 
-        // Test proper cleanup
-        ss1.zeroize();
-        ss2.zeroize();
-        verify_zeroization(&ss1, ss1.len());
-        verify_zeroization(&ss2, ss2.len());
+            // Verify secrets match
+            assert_eq!(ss1, ss2);
+
+            // Test cleanup with memory fences
+            std::sync::atomic::fence(Ordering::SeqCst);
+            ss1.zeroize();
+            verify_memory_patterns(&ss1, ss1.len());
+
+            std::sync::atomic::fence(Ordering::SeqCst);
+            ss2.zeroize();
+            verify_memory_patterns(&ss2, ss2.len());
+        }
     }
 
     #[test]
     fn test_memory_alignment() {
-        // Verify key alignment for constant-time operations
-        let (pk, sk) = MLKem::keygen();
-        assert_eq!(mem::align_of_val(&pk) >= 16, true,
-            "Public key not properly aligned for constant-time ops");
-        assert_eq!(mem::align_of_val(&sk) >= 16, true,
-            "Secret key not properly aligned for constant-time ops");
+        // Test alignment for different key sizes
+        proptest!(|(size in 16usize..4096)| {
+            let (ptr, layout) = allocate_aligned_buffer(size, 32);
+            
+            // Verify alignment
+            assert_eq!(ptr as usize % 32, 0, 
+                "Buffer not 32-byte aligned");
+
+            // Test constant-time operations
+            let slice = unsafe { std::slice::from_raw_parts_mut(ptr, size) };
+            let is_constant = measure_constant_time(|| {
+                for i in 0..size {
+                    // Use atomic operations to prevent optimization
+                    let _ = AtomicU8::new(slice[i]).load(Ordering::SeqCst);
+                }
+            }, 100);
+            assert!(is_constant, "Memory access not constant-time");
+
+            // Clean up
+            unsafe { dealloc(ptr, layout); }
+        });
     }
 }

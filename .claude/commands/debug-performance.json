@@ -1,0 +1,37 @@
+{
+  "name": "debug-performance",
+  "description": "Profile performance bottlenecks",
+  "parameters": {
+    "component": {
+      "type": "string",
+      "description": "Optional component to profile",
+      "required": false
+    },
+    "duration": {
+      "type": "string",
+      "description": "Profile duration",
+      "required": false,
+      "default": "60s"
+    }
+  },
+  "examples": [
+    "/debug-performance",
+    "/debug-performance --component crypto",
+    "/debug-performance --duration 300s"
+  ],
+  "output": {
+    "success": "Performance profiling report",
+    "format": [
+      "1. CPU Usage",
+      "2. Memory Profile",
+      "3. I/O Statistics",
+      "4. Hot Spots",
+      "5. Optimization Suggestions"
+    ]
+  },
+  "error_handling": {
+    "invalid_component": "Component validation error",
+    "profile_error": "Profiling failure details",
+    "resource_limit": "Resource limitation warning"
+  }
+}

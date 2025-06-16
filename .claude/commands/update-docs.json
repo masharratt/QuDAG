@@ -1,0 +1,31 @@
+{
+  "name": "update-docs",
+  "description": "Update documentation for module changes",
+  "parameters": {
+    "module": {
+      "type": "string",
+      "description": "Module to update documentation for",
+      "required": true
+    }
+  },
+  "examples": [
+    "/update-docs crypto",
+    "/update-docs network",
+    "/update-docs protocol"
+  ],
+  "output": {
+    "success": "Updated documentation with changes",
+    "format": [
+      "1. API Documentation",
+      "2. Usage Examples",
+      "3. Security Considerations",
+      "4. Performance Notes",
+      "5. Changelog Updates"
+    ]
+  },
+  "error_handling": {
+    "invalid_module": "List of valid module names",
+    "doc_gen_failure": "Documentation generation errors",
+    "missing_examples": "Missing usage examples warning"
+  }
+}

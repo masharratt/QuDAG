@@ -1,0 +1,37 @@
+{
+  "name": "debug-network",
+  "description": "Diagnose networking issues",
+  "parameters": {
+    "node": {
+      "type": "string",
+      "description": "Optional node ID to debug",
+      "required": false
+    },
+    "verbose": {
+      "type": "boolean",
+      "description": "Enable verbose logging",
+      "required": false,
+      "default": false
+    }
+  },
+  "examples": [
+    "/debug-network",
+    "/debug-network --node node-123",
+    "/debug-network --verbose"
+  ],
+  "output": {
+    "success": "Network diagnostic report",
+    "format": [
+      "1. Connection Status",
+      "2. Network Metrics",
+      "3. Error Logs",
+      "4. Peer Information",
+      "5. Recommendations"
+    ]
+  },
+  "error_handling": {
+    "node_offline": "Node connectivity error",
+    "invalid_node": "Node ID validation error",
+    "network_error": "Network diagnostic failure"
+  }
+}

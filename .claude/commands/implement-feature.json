@@ -1,0 +1,30 @@
+{
+  "name": "implement-feature",
+  "description": "Implement feature to pass specified tests",
+  "parameters": {
+    "test-path": {
+      "type": "string",
+      "description": "Path to test file",
+      "required": true
+    }
+  },
+  "examples": [
+    "/implement-feature tests/crypto/ml_kem_test.rs",
+    "/implement-feature tests/network/peer_test.rs"
+  ],
+  "output": {
+    "success": "Feature implementation with passing tests",
+    "format": [
+      "1. Implementation Status",
+      "2. Test Results",
+      "3. Code Coverage",
+      "4. Performance Impact",
+      "5. Documentation Updates"
+    ]
+  },
+  "error_handling": {
+    "test_not_found": "Test file not found error",
+    "implementation_error": "Compilation or runtime errors",
+    "test_failure": "Failed test cases with details"
+  }
+}

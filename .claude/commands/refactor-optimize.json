@@ -1,0 +1,36 @@
+{
+  "name": "refactor-optimize",
+  "description": "Refactor module while maintaining test coverage",
+  "parameters": {
+    "module": {
+      "type": "string",
+      "description": "Module to refactor",
+      "required": true
+    },
+    "focus": {
+      "type": "string",
+      "description": "Optional focus area (performance, security, readability)",
+      "required": false
+    }
+  },
+  "examples": [
+    "/refactor-optimize crypto",
+    "/refactor-optimize network --focus performance",
+    "/refactor-optimize dag --focus security"
+  ],
+  "output": {
+    "success": "Refactoring results and optimization metrics",
+    "format": [
+      "1. Code Changes",
+      "2. Test Coverage",
+      "3. Performance Impact",
+      "4. Security Impact",
+      "5. Documentation Updates"
+    ]
+  },
+  "error_handling": {
+    "invalid_module": "List of valid module names",
+    "test_regression": "Failed tests after refactoring",
+    "performance_regression": "Performance degradation warning"
+  }
+}

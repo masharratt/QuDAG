@@ -1,0 +1,31 @@
+{
+  "name": "review-security",
+  "description": "Security-focused code review",
+  "parameters": {
+    "module": {
+      "type": "string",
+      "description": "Module to review",
+      "required": true
+    }
+  },
+  "examples": [
+    "/review-security crypto",
+    "/review-security network",
+    "/review-security protocol"
+  ],
+  "output": {
+    "success": "Security review report with findings",
+    "format": [
+      "1. Security Analysis",
+      "2. Vulnerability Assessment",
+      "3. Best Practices Review",
+      "4. Risk Assessment",
+      "5. Recommendations"
+    ]
+  },
+  "error_handling": {
+    "invalid_module": "List of valid module names",
+    "scan_failure": "Security scan error details",
+    "high_risk_finding": "Critical security issues found"
+  }
+}

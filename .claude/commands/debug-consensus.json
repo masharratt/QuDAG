@@ -1,0 +1,37 @@
+{
+  "name": "debug-consensus",
+  "description": "Analyze consensus state",
+  "parameters": {
+    "round": {
+      "type": "number",
+      "description": "Optional consensus round number to analyze",
+      "required": false
+    },
+    "verbose": {
+      "type": "boolean",
+      "description": "Enable verbose logging",
+      "required": false,
+      "default": false
+    }
+  },
+  "examples": [
+    "/debug-consensus",
+    "/debug-consensus --round 42",
+    "/debug-consensus --verbose"
+  ],
+  "output": {
+    "success": "Consensus state analysis report",
+    "format": [
+      "1. Consensus Status",
+      "2. Node Votes",
+      "3. DAG State",
+      "4. Finality Info",
+      "5. Performance Metrics"
+    ]
+  },
+  "error_handling": {
+    "invalid_round": "Round number validation error",
+    "consensus_error": "Consensus state error",
+    "data_unavailable": "Required data not available"
+  }
+}

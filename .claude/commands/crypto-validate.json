@@ -1,0 +1,31 @@
+{
+  "name": "crypto-validate",
+  "description": "Validate cryptographic implementation",
+  "parameters": {
+    "algorithm": {
+      "type": "string",
+      "description": "Cryptographic algorithm to validate",
+      "required": true
+    }
+  },
+  "examples": [
+    "/crypto-validate ml-kem",
+    "/crypto-validate ml-dsa",
+    "/crypto-validate hqc"
+  ],
+  "output": {
+    "success": "Cryptographic validation results",
+    "format": [
+      "1. Test Vector Validation",
+      "2. Constant-time Analysis",
+      "3. Memory Safety Check",
+      "4. Known Attack Resistance",
+      "5. Compliance Report"
+    ]
+  },
+  "error_handling": {
+    "invalid_algorithm": "List of supported algorithms",
+    "validation_failure": "Validation error details",
+    "security_concern": "Security warning details"
+  }
+}

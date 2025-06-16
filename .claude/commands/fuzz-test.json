@@ -1,0 +1,37 @@
+{
+  "name": "fuzz-test",
+  "description": "Execute fuzzing campaign against target",
+  "parameters": {
+    "target": {
+      "type": "string",
+      "description": "Component to fuzz test",
+      "required": true
+    },
+    "duration": {
+      "type": "string",
+      "description": "Duration of fuzzing campaign",
+      "required": false,
+      "default": "1h"
+    }
+  },
+  "examples": [
+    "/fuzz-test crypto-input",
+    "/fuzz-test network-messages --duration 2h",
+    "/fuzz-test dag-consensus --duration 30m"
+  ],
+  "output": {
+    "success": "Fuzzing campaign results and findings",
+    "format": [
+      "1. Campaign Summary",
+      "2. Code Coverage",
+      "3. Found Issues",
+      "4. Crash Reports",
+      "5. Recommendations"
+    ]
+  },
+  "error_handling": {
+    "invalid_target": "List of valid fuzz targets",
+    "timeout": "Campaign timeout details",
+    "resource_exhaustion": "Resource limit reached"
+  }
+}

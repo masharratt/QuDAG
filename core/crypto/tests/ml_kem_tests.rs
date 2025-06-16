@@ -59,13 +59,13 @@ fn test_mlkem_invalid_inputs() {
     
     // Test with invalid ciphertext length
     let short_ct = vec![0u8; MlKem768::CIPHERTEXT_SIZE - 1];
-    let result = MlKem768::decapsulate(&sk, &short_ct);
-    assert!(matches!(result, Err(KEMError::InvalidParameters)));
+    let result = MlKem768::decapsulate(&sk, &MlKem768::Ciphertext::from_bytes(&short_ct).unwrap());
+    assert!(matches!(result, Err(KEMError::InvalidLength)));
     
     // Test with random invalid ciphertext
     let mut invalid_ct = vec![0u8; MlKem768::CIPHERTEXT_SIZE];
     rand::thread_rng().fill_bytes(&mut invalid_ct);
-    let result = MlKem768::decapsulate(&sk, &invalid_ct);
+    let result = MlKem768::decapsulate(&sk, &MlKem768::Ciphertext::from_bytes(&invalid_ct).unwrap());
     assert!(matches!(result, Err(KEMError::DecapsulationError)));
 }
 
@@ -75,11 +75,79 @@ proptest! {
         pk_bytes in prop::collection::vec(0u8..255, MlKem768::PUBLIC_KEY_SIZE),
         ct_bytes in prop::collection::vec(0u8..255, MlKem768::CIPHERTEXT_SIZE)
     ) {
-        // Ensure we can handle random/malformed inputs without panicking
+        // Test constant-time behavior with random inputs
         let pk = MlKem768::PublicKey::from_bytes(&pk_bytes).unwrap_or_else(|_| panic!("Failed to create public key"));
         let ct = MlKem768::Ciphertext::from_bytes(&ct_bytes).unwrap_or_else(|_| panic!("Failed to create ciphertext"));
         
-        // Attempt encapsulation with random public key
+        let start = std::time::Instant::now();
         let _ = MlKem768::encapsulate(&pk);
+        let duration1 = start.elapsed();
+
+        let start = std::time::Instant::now();
+        let _ = MlKem768::encapsulate(&pk);
+        let duration2 = start.elapsed();
+
+        // Operations should complete in roughly the same time (within 20% variance)
+        prop_assert!((duration1.as_nanos() as f64 / duration2.as_nanos() as f64 - 1.0).abs() < 0.2);
     }
+}
+
+#[test]
+fn test_constant_time_operations() {
+    let (pk1, sk1) = MlKem768::keygen().expect("Key generation should succeed");
+    let (pk2, sk2) = MlKem768::keygen().expect("Key generation should succeed");
+    
+    // Test constant-time equality comparisons
+    assert!(pk1 != pk2);
+    assert!(sk1 != sk2);
+    
+    let (ct1, ss1) = MlKem768::encapsulate(&pk1).expect("Encapsulation should succeed");
+    let ss2 = MlKem768::decapsulate(&sk1, &ct1).expect("Decapsulation should succeed");
+    
+    // Test shared secret constant-time comparison
+    assert!(ss1 == ss2);
+}
+
+#[test]
+fn test_key_cache_functionality() {
+    let (pk, sk) = MlKem768::keygen().expect("Key generation should succeed");
+    let (ct, _) = MlKem768::encapsulate(&pk).expect("Encapsulation should succeed");
+    
+    // First decapsulation - should miss cache
+    let before = MlKem768::get_metrics();
+    let _ = MlKem768::decapsulate(&sk, &ct).expect("Decapsulation should succeed");
+    let after = MlKem768::get_metrics();
+    
+    assert_eq!(after.key_cache_misses, before.key_cache_misses + 1);
+    
+    // Second decapsulation - should hit cache
+    let _ = MlKem768::decapsulate(&sk, &ct).expect("Decapsulation should succeed");
+    let final_metrics = MlKem768::get_metrics();
+    
+    assert_eq!(final_metrics.key_cache_hits, after.key_cache_hits + 1);
+}
+
+#[test]
+fn test_timing_consistency() {
+    let (pk, sk) = MlKem768::keygen().expect("Key generation should succeed");
+    let (ct, _) = MlKem768::encapsulate(&pk).expect("Encapsulation should succeed");
+    
+    let mut timings = Vec::new();
+    
+    // Multiple decapsulations to get timing data
+    for _ in 0..10 {
+        let start = std::time::Instant::now();
+        let _ = MlKem768::decapsulate(&sk, &ct).expect("Decapsulation should succeed");
+        timings.push(start.elapsed().as_nanos());
+    }
+    
+    // Calculate timing variance
+    let avg = timings.iter().sum::<u128>() as f64 / timings.len() as f64;
+    let variance = timings.iter()
+        .map(|&t| (t as f64 - avg).powi(2))
+        .sum::<f64>() / timings.len() as f64;
+    let std_dev = variance.sqrt();
+    
+    // Standard deviation should be less than 10% of mean
+    assert!(std_dev / avg < 0.1, "Timing variation too high: {std_dev} / {avg}");
 }

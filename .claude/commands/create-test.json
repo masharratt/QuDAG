@@ -1,0 +1,35 @@
+{
+  "name": "create-test",
+  "description": "Generate test skeleton for new feature",
+  "parameters": {
+    "path": {
+      "type": "string",
+      "description": "Path to test file",
+      "required": true
+    },
+    "description": {
+      "type": "string",
+      "description": "Description of the feature to test",
+      "required": true
+    }
+  },
+  "examples": [
+    "/create-test tests/crypto/ml_kem_test.rs \"ML-KEM key generation and encapsulation\"",
+    "/create-test tests/network/peer_test.rs \"Peer discovery and connection handling\""
+  ],
+  "output": {
+    "success": "Generated test skeleton with basic test cases",
+    "format": [
+      "1. Test File Creation",
+      "2. Test Structure",
+      "3. Test Cases",
+      "4. Helper Functions",
+      "5. Documentation"
+    ]
+  },
+  "error_handling": {
+    "invalid_path": "Path validation error and suggestions",
+    "file_exists": "Warning and options for existing file",
+    "permission_error": "File system permission details"
+  }
+}

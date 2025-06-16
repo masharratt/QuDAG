@@ -1,15 +1,30 @@
 [package]
 name = "qudag-crypto"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
+description = "Quantum-resistant cryptographic primitives for QuDAG"
 
 [dependencies]
-pqcrypto = { workspace = true }
-rand = { workspace = true }
-sha3 = { workspace = true }
-thiserror = { workspace = true }
-serde = { workspace = true }
+thiserror.workspace = true
+tracing.workspace = true
+serde.workspace = true
+rand = "0.8"
+subtle = { version = "2.5", features = ["std"] }
+blake3.workspace = true
+zeroize = { version = "1.7", features = ["zeroize_derive"] }
+tokio = { workspace = true, features = ["full"] }
+futures.workspace = true
+lru = "0.12"
+rand_core = "0.6"
 
 [dev-dependencies]
-proptest = { workspace = true }
-criterion = { workspace = true }
+proptest.workspace = true
+criterion = { version = "0.5", features = ["html_reports"] }
+test-log = "0.2"
+
+[[bench]]
+name = "ml_kem_benchmarks"
+harness = false

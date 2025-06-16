@@ -1,0 +1,44 @@
+[package]
+name = "qudag-fuzz"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+arbitrary = { version = "1", features = ["derive"] }
+zeroize = "1.7"
+tracing = "0.1"
+anyhow = "1.0"
+rayon = "1.7"
+
+qudag-crypto = { path = "../core/crypto" }
+qudag-network = { path = "../core/network" }
+qudag-protocol = { path = "../core/protocol" }
+
+[[bin]]
+name = "crypto_fuzz"
+path = "fuzz_targets/crypto_fuzz.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "network_fuzz"
+path = "fuzz_targets/network_fuzz.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "protocol_fuzz"
+path = "fuzz_targets/protocol_fuzz.rs"
+test = false
+doc = false
+
+[[bin]]
+name = "cli_fuzz"
+path = "fuzz_targets/cli_fuzz.rs"
+test = false
+doc = false

@@ -1,0 +1,36 @@
+{
+  "name": "performance-benchmark",
+  "description": "Run all benchmarks and generate performance reports",
+  "parameters": {
+    "module": {
+      "type": "string",
+      "description": "Optional module name to benchmark specifically",
+      "required": false
+    },
+    "criteria": {
+      "type": "string",
+      "description": "Optional specific performance criteria to test",
+      "required": false
+    }
+  },
+  "examples": [
+    "/performance-benchmark",
+    "/performance-benchmark crypto",
+    "/performance-benchmark network --criteria throughput"
+  ],
+  "output": {
+    "success": "Detailed benchmark results and performance analysis",
+    "format": [
+      "1. Throughput Measurements",
+      "2. Latency Analysis",
+      "3. Resource Usage Statistics",
+      "4. Comparative Analysis",
+      "5. Optimization Recommendations"
+    ]
+  },
+  "error_handling": {
+    "benchmark_failure": "Error details with system state",
+    "invalid_criteria": "List of valid benchmark criteria",
+    "resource_exhaustion": "Resource usage warning and termination info"
+  }
+}

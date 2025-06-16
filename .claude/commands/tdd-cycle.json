@@ -1,0 +1,36 @@
+{
+  "name": "tdd-cycle",
+  "description": "Execute complete Test-Driven Development cycle for a feature",
+  "parameters": {
+    "module": {
+      "type": "string",
+      "description": "Target module name (e.g., crypto, dag, network)",
+      "required": true
+    },
+    "feature": {
+      "type": "string", 
+      "description": "Feature name to implement",
+      "required": true
+    }
+  },
+  "examples": [
+    "/tdd-cycle crypto ml_kem_implementation",
+    "/tdd-cycle network peer_discovery",
+    "/tdd-cycle dag consensus_finality"
+  ],
+  "output": {
+    "success": "Test suite passed and feature implementation complete",
+    "format": [
+      "1. Test Creation",
+      "2. Initial Test Failure (RED)",
+      "3. Implementation (GREEN)", 
+      "4. Refactoring",
+      "5. Final Test Status"
+    ]
+  },
+  "error_handling": {
+    "test_failure": "Details of failing tests with suggestions",
+    "invalid_module": "List of valid module names",
+    "compilation_error": "Build errors with debug information"
+  }
+}

@@ -1,0 +1,39 @@
+{
+  "commands": {
+    "tdd-cycle": {
+      "description": "Execute complete TDD cycle for a feature",
+      "parameters": {
+        "module": "Module name (crypto|network|consensus)",
+        "feature": "Feature name to implement"
+      },
+      "example": "/tdd-cycle crypto ml_kem_implementation",
+      "output": "Test results and implementation status"
+    },
+    "security-audit": {
+      "description": "Comprehensive security analysis",
+      "parameters": {},
+      "example": "/security-audit",
+      "output": "Security audit report"
+    },
+    "performance-benchmark": {
+      "description": "Run all benchmarks",
+      "parameters": {},
+      "example": "/performance-benchmark",
+      "output": "Benchmark results and analysis"
+    },
+    "integration-test": {
+      "description": "Execute integration tests",
+      "parameters": {
+        "component": "Optional component name"
+      },
+      "example": "/integration-test crypto",
+      "output": "Integration test results"
+    },
+    "deploy-validate": {
+      "description": "Validate deployment config",
+      "parameters": {},
+      "example": "/deploy-validate",
+      "output": "Deployment validation report"
+    }
+  }
+}

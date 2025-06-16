@@ -1,0 +1,45 @@
+{
+  "commands": {
+    "create-test": {
+      "description": "Generate test skeleton",
+      "parameters": {
+        "path": "Test file path",
+        "description": "Test description"
+      },
+      "example": "/create-test tests/crypto/ml_kem_test.rs",
+      "output": "Generated test file"
+    },
+    "implement-feature": {
+      "description": "Implement feature for test",
+      "parameters": {
+        "test-path": "Path to test file"
+      },
+      "example": "/implement-feature tests/crypto/ml_kem_test.rs",
+      "output": "Implementation status"
+    },
+    "refactor-optimize": {
+      "description": "Refactor and optimize module",
+      "parameters": {
+        "module": "Module to refactor"
+      },
+      "example": "/refactor-optimize crypto",
+      "output": "Refactoring results"
+    },
+    "review-security": {
+      "description": "Security review of module",
+      "parameters": {
+        "module": "Module to review"
+      },
+      "example": "/review-security crypto",
+      "output": "Security review report"
+    },
+    "update-docs": {
+      "description": "Update module docs",
+      "parameters": {
+        "module": "Module to document"
+      },
+      "example": "/update-docs crypto",
+      "output": "Documentation updates"
+    }
+  }
+}

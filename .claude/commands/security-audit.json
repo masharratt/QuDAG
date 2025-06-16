@@ -1,0 +1,31 @@
+{
+  "name": "security-audit",
+  "description": "Perform comprehensive security analysis and testing",
+  "parameters": {
+    "module": {
+      "type": "string",
+      "description": "Optional module name to audit specifically",
+      "required": false
+    }
+  },
+  "examples": [
+    "/security-audit",
+    "/security-audit crypto",
+    "/security-audit network"
+  ],
+  "output": {
+    "success": "Security audit report with findings and recommendations",
+    "format": [
+      "1. Code Analysis Results",
+      "2. Vulnerability Scan Results",
+      "3. Cryptographic Validation",
+      "4. Side-Channel Analysis",
+      "5. Recommendations"
+    ]
+  },
+  "error_handling": {
+    "scan_failure": "Error details from security scanning tools",
+    "invalid_module": "List of valid module names",
+    "audit_timeout": "Partial results and retry suggestions"
+  }
+}

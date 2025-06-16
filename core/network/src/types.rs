@@ -1,29 +1,60 @@
-#![deny(unsafe_code)]
-
-use serde::{Deserialize, Serialize};
+use serde::{Serialize, Deserialize};
 use std::time::Duration;
+use std::net::{IpAddr, Ipv4Addr};
+use thiserror::Error;
 
-/// A message in the network
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct NetworkMessage {
-    /// Unique message ID
-    pub id: String,
-    /// Message source (anonymized)
-    pub source: Vec<u8>,
-    /// Message destination(s)
-    pub destination: Vec<u8>,
-    /// Message payload
-    pub payload: Vec<u8>,
-    /// Message priority
-    pub priority: MessagePriority,
-    /// Time-to-live
-    pub ttl: Duration,
+/// Network address combining IP and port
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct NetworkAddress {
+    /// IP address
+    pub ip: IpAddr,
+    /// Port number
+    pub port: u16,
+}
+
+impl NetworkAddress {
+    /// Create a new network address from IPv4 address parts and port
+    pub fn new(ip_parts: [u8; 4], port: u16) -> Self {
+        Self {
+            ip: IpAddr::V4(Ipv4Addr::new(ip_parts[0], ip_parts[1], ip_parts[2], ip_parts[3])),
+            port,
+        }
+    }
+    
+    /// Create a new network address from IP and port
+    pub fn from_ip_port(ip: IpAddr, port: u16) -> Self {
+        Self { ip, port }
+    }
+    
+    /// Get the socket address as a string
+    pub fn to_socket_addr(&self) -> String {
+        format!("{}:{}", self.ip, self.port)
+    }
+}
+
+/// Network errors
+#[derive(Debug, Error)]
+pub enum NetworkError {
+    #[error("Connection failed: {0}")]
+    ConnectionError(String),
+
+    #[error("Message handling failed: {0}")]
+    MessageError(String),
+
+    #[error("Routing failed: {0}")]
+    RoutingError(String),
+
+    #[error("Encryption failed: {0}")]
+    EncryptionError(String),
+
+    #[error("Internal error: {0}")]
+    Internal(String),
 }
 
 /// Message priority levels
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum MessagePriority {
-    /// High priority messages (consensus critical)
+    /// High priority messages
     High,
     /// Normal priority messages
     Normal,
@@ -32,43 +63,84 @@ pub enum MessagePriority {
 }
 
 /// Message routing strategy
-#[derive(Clone, Debug)]
+#[derive(Debug, Clone)]
 pub enum RoutingStrategy {
-    /// Direct to known peer
+    /// Direct to peer
     Direct(Vec<u8>),
     /// Flood to all peers
     Flood,
     /// Random subset of peers
     RandomSubset(usize),
-    /// Anonymous route through multiple hops
+    /// Anonymous routing
     Anonymous {
-        /// Number of routing hops
+        /// Number of hops
         hops: usize,
+        /// Random seed
+        seed: [u8; 32],
+        /// Routing layers
+        layers: Vec<RoutingLayer>,
     },
 }
 
-/// Connection status
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ConnectionStatus {
-    /// Connection is active
-    Connected,
-    /// Connection is being established
-    Connecting,
-    /// Connection was lost
-    Disconnected,
-    /// Connection failed
-    Failed,
+/// Routing layer for onion routing
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RoutingLayer {
+    /// Next hop
+    pub next_hop: Vec<u8>,
+    /// Encrypted payload
+    pub payload: Vec<u8>,
+    /// Layer metadata
+    pub metadata: LayerMetadata,
+}
+
+/// Routing layer metadata
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LayerMetadata {
+    /// Time-to-live
+    pub ttl: Duration,
+    /// Flags
+    pub flags: u32,
+    /// Layer ID
+    pub id: String,
 }
 
 /// Network metrics
-#[derive(Clone, Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct NetworkMetrics {
-    /// Messages processed per second
+    /// Messages per second
     pub messages_per_second: f64,
-    /// Current connection count
+    /// Current connections
     pub connections: usize,
     /// Average message latency
     pub avg_latency: Duration,
     /// Memory usage in bytes
     pub memory_usage: usize,
+}
+
+/// Message type
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum MessageType {
+    /// Handshake message
+    Handshake {
+        /// Protocol version
+        version: u32,
+        /// Node ID
+        node_id: Vec<u8>,
+    },
+    /// Data message
+    Data {
+        /// Message ID
+        id: String,
+        /// Payload
+        payload: Vec<u8>,
+        /// Priority
+        priority: MessagePriority,
+    },
+    /// Control message
+    Control {
+        /// Command
+        command: String,
+        /// Parameters
+        params: Vec<String>,
+    },
 }

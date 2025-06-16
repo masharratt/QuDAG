@@ -1,0 +1,37 @@
+{
+  "name": "debug-security",
+  "description": "Check security configurations",
+  "parameters": {
+    "scope": {
+      "type": "string",
+      "description": "Optional security scope to check",
+      "required": false
+    },
+    "verbose": {
+      "type": "boolean",
+      "description": "Enable verbose logging",
+      "required": false,
+      "default": false
+    }
+  },
+  "examples": [
+    "/debug-security",
+    "/debug-security --scope crypto",
+    "/debug-security --verbose"
+  ],
+  "output": {
+    "success": "Security configuration analysis",
+    "format": [
+      "1. Security Settings",
+      "2. Configuration Issues",
+      "3. Risk Assessment",
+      "4. Compliance Status",
+      "5. Recommendations"
+    ]
+  },
+  "error_handling": {
+    "invalid_scope": "Scope validation error",
+    "check_failure": "Security check failure",
+    "critical_issue": "Critical security issue found"
+  }
+}

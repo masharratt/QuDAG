@@ -1,0 +1,37 @@
+{
+  "name": "dag-visualize",
+  "description": "Generate DAG state visualization",
+  "parameters": {
+    "state": {
+      "type": "string",
+      "description": "DAG state to visualize",
+      "required": true
+    },
+    "format": {
+      "type": "string",
+      "description": "Output format (svg, png, dot)",
+      "required": false,
+      "default": "svg"
+    }
+  },
+  "examples": [
+    "/dag-visualize current",
+    "/dag-visualize snapshot-123 --format png",
+    "/dag-visualize consensus --format dot"
+  ],
+  "output": {
+    "success": "Generated DAG visualization",
+    "format": [
+      "1. Visualization File",
+      "2. Node Statistics",
+      "3. Edge Statistics",
+      "4. Consensus Status",
+      "5. Performance Metrics"
+    ]
+  },
+  "error_handling": {
+    "invalid_state": "State validation error",
+    "render_failure": "Visualization generation error",
+    "format_error": "Invalid output format"
+  }
+}
