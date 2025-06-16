@@ -12,8 +12,14 @@ const SHARED_SECRET_BYTES: usize = kyber768::shared_secret_bytes();
 #[derive(Clone, ZeroizeOnDrop)]
 pub struct KeyPair {
     pub public_key: Vec<u8>,
-    #[zeroize(skip)]
     pub secret_key: Vec<u8>,
+}
+
+impl Drop for KeyPair {
+    fn drop(&mut self) {
+        // Ensure secret key is zeroized on drop
+        self.secret_key.zeroize();
+    }
 }
 
 #[derive(Clone, ZeroizeOnDrop)]
@@ -32,52 +38,108 @@ impl Drop for SharedSecret {
 }
 
 pub fn generate_keypair<R: RngCore>(rng: &mut R) -> Result<KeyPair, KEMError> {
-    // Generate random seed
-    let mut seed = vec![0u8; 32];
+    // Generate random seed with enough entropy
+    let mut seed = vec![0u8; 64];
     rng.fill_bytes(&mut seed);
     
     // Ensure seed is zeroized after use
-    defer! { seed.zeroize(); }
+    let result = (|| {
+        let (pk, sk) = kyber768::keypair();
+        
+        // Copy keys into new buffers to avoid potential memory leaks
+        let mut public_key = vec![0u8; PUBLIC_KEY_BYTES];
+        let mut secret_key = vec![0u8; SECRET_KEY_BYTES];
+        
+        public_key.copy_from_slice(pk.as_bytes());
+        secret_key.copy_from_slice(sk.as_bytes());
+        
+        // Clear original keys
+        drop(pk);
+        sk.as_bytes().zeroize();
+        drop(sk);
+        
+        Ok(KeyPair { public_key, secret_key })
+    })();
     
-    let (pk, sk) = kyber768::keypair();
+    // Always zeroize seed
+    seed.zeroize();
     
-    Ok(KeyPair {
-        public_key: pk.as_bytes().to_vec(),
-        secret_key: sk.as_bytes().to_vec(),
-    })
+    result
 }
 
 pub fn encapsulate(public_key: &[u8]) -> Result<(SharedSecret, Vec<u8>), KEMError> {
-    if public_key.len() != PUBLIC_KEY_BYTES {
-        return Err(KEMError::EncapsulationError("Invalid public key length".into()));
+    // Validate input length in constant time
+    if !constant_time_compare(
+        &(public_key.len() as u32).to_be_bytes(),
+        &(PUBLIC_KEY_BYTES as u32).to_be_bytes()
+    ).into() {
+        return Err(KEMError::InvalidParameters);
     }
 
-    let pk = kyber768::PublicKey::from_bytes(public_key)
-        .map_err(|e| KEMError::EncapsulationError(e.to_string()))?;
+    let result = (|| {
+        let pk = kyber768::PublicKey::from_bytes(public_key)
+            .map_err(|_| KEMError::EncapsulationError)?;
+            
+        let (ss, ct) = kyber768::encapsulate(&pk);
         
-    let (ss, ct) = kyber768::encapsulate(&pk);
+        // Copy shared secret and ciphertext to new buffers
+        let mut shared_secret = vec![0u8; SHARED_SECRET_BYTES];
+        let mut ciphertext = vec![0u8; CIPHERTEXT_BYTES];
+        
+        shared_secret.copy_from_slice(ss.as_bytes());
+        ciphertext.copy_from_slice(ct.as_bytes());
+        
+        // Clear original values
+        ss.as_bytes().zeroize();
+        drop(ss);
+        drop(ct);
+        
+        Ok((SharedSecret(shared_secret), ciphertext))
+    })();
     
-    Ok((
-        SharedSecret(ss.as_bytes().to_vec()),
-        ct.as_bytes().to_vec()
-    ))
+    result
 }
 
 pub fn decapsulate(secret_key: &[u8], ciphertext: &[u8]) -> Result<SharedSecret, KEMError> {
-    if secret_key.len() != SECRET_KEY_BYTES {
-        return Err(KEMError::DecapsulationError("Invalid secret key length".into()));
-    }
-    if ciphertext.len() != CIPHERTEXT_BYTES {
-        return Err(KEMError::DecapsulationError("Invalid ciphertext length".into()));
+    // Validate lengths in constant time
+    let valid_sk_len = constant_time_compare(
+        &(secret_key.len() as u32).to_be_bytes(),
+        &(SECRET_KEY_BYTES as u32).to_be_bytes()
+    );
+    
+    let valid_ct_len = constant_time_compare(
+        &(ciphertext.len() as u32).to_be_bytes(),
+        &(CIPHERTEXT_BYTES as u32).to_be_bytes()
+    );
+    
+    if !(valid_sk_len & valid_ct_len).into() {
+        return Err(KEMError::InvalidParameters);
     }
 
-    let sk = kyber768::SecretKey::from_bytes(secret_key)
-        .map_err(|e| KEMError::DecapsulationError(e.to_string()))?;
-    let ct = kyber768::Ciphertext::from_bytes(ciphertext)
-        .map_err(|e| KEMError::DecapsulationError(e.to_string()))?;
+    let result = (|| {
+        let sk = kyber768::SecretKey::from_bytes(secret_key)
+            .map_err(|_| KEMError::DecapsulationError)?;
+        let ct = kyber768::Ciphertext::from_bytes(ciphertext)
+            .map_err(|_| KEMError::DecapsulationError)?;
+            
+        let ss = kyber768::decapsulate(&ct, &sk);
         
-    let ss = kyber768::decapsulate(&ct, &sk);
-    Ok(SharedSecret(ss.as_bytes().to_vec()))
+        // Copy shared secret to new buffer
+        let mut shared_secret = vec![0u8; SHARED_SECRET_BYTES];
+        shared_secret.copy_from_slice(ss.as_bytes());
+        
+        // Clear original secret
+        ss.as_bytes().zeroize();
+        drop(ss);
+        
+        // Clear secret key
+        sk.as_bytes().zeroize();
+        drop(sk);
+        
+        Ok(SharedSecret(shared_secret))
+    })();
+    
+    result
 }
 
 /// Performs constant-time comparison of byte arrays
