@@ -14,56 +14,65 @@ QuDAG is the next evolution in anonymous communication, engineered specifically 
 
 ## Use Cases
 
-### 🔐 Secure Communication
-- End-to-end encrypted messaging
-- Secure file transfer
-- Private group communication
-- Data streaming
-
-### 🌐 Network Infrastructure
-- P2P message routing
-- Distributed content storage
-- Secure relay networks
-- Anonymous networking
-- Dark addressing with quantum fingerprints
-
-### 🛡️ Privacy Applications
-- Anonymous messaging
-- Private data transfer
-- Secure group coordination
-- Metadata protection
+| Category | Applications | Description |
+|----------|--------------|-------------|
+| **🔐 Secure Communication** | End-to-end messaging | Quantum-resistant encrypted messaging between peers |
+| | Secure file transfer | Protected file sharing with ML-KEM encryption |
+| | Private group communication | Multi-party secure channels with perfect forward secrecy |
+| | Data streaming | Real-time encrypted data transmission |
+| **🌐 Network Infrastructure** | P2P message routing | Decentralized message relay without central servers |
+| | Distributed content storage | Content-addressed storage with quantum fingerprints |
+| | Secure relay networks | Anonymous relay nodes for traffic obfuscation |
+| | Anonymous networking | Onion routing with quantum-resistant encryption |
+| | Dark addressing | `.dark` domains with quantum fingerprints |
+| **🛡️ Privacy Applications** | Anonymous messaging | Metadata-resistant communication channels |
+| | Private data transfer | Untraceable data exchange between parties |
+| | Secure group coordination | Private collaboration without identity exposure |
+| | Metadata protection | Full protocol-level metadata obfuscation |
 
 ## Core Features
 
 ### 🔐 Quantum-Resistant Cryptography
-- **ML-KEM-768**: NIST Level 3 key encapsulation mechanism
-- **ML-DSA**: Post-quantum digital signatures with constant-time operations
-- **BLAKE3**: Quantum-resistant cryptographic hashing
-- **Quantum Fingerprinting**: Data authentication using ML-DSA
-- **Memory Security**: Automatic zeroization with `ZeroizeOnDrop`
-- **Side-Channel Resistance**: Constant-time implementations
+
+| Feature | Implementation | Security Level |
+|---------|----------------|----------------|
+| **Key Encapsulation** | ML-KEM-768 | NIST Level 3 |
+| **Digital Signatures** | ML-DSA | Post-quantum secure |
+| **Hash Functions** | BLAKE3 | Quantum-resistant |
+| **Data Authentication** | Quantum Fingerprinting | ML-DSA based |
+| **Memory Protection** | `ZeroizeOnDrop` | Automatic secret clearing |
+| **Side-Channel Defense** | Constant-time operations | Timing attack resistant |
 
 ### 📊 DAG Architecture
-- **Asynchronous Processing**: Non-blocking message handling
-- **QR-Avalanche Consensus**: Byzantine fault-tolerant quantum-resistant consensus
-- **Conflict Resolution**: Automatic detection and resolution
-- **Tip Selection**: Optimal parent selection algorithm
-- **Performance Metrics**: Real-time throughput and latency monitoring
-- **State Management**: Atomic state transitions
+
+| Component | Technology | Benefits |
+|-----------|------------|----------|
+| **Message Processing** | Asynchronous handling | Non-blocking, high throughput |
+| **Consensus Algorithm** | QR-Avalanche | Byzantine fault-tolerant |
+| **Conflict Handling** | Automatic resolution | Self-healing network |
+| **Parent Selection** | Optimal tip algorithm | Efficient DAG growth |
+| **Performance Monitoring** | Real-time metrics | Latency & throughput tracking |
+| **State Transitions** | Atomic operations | Consistency guaranteed |
 
 ### 🌐 Network Layer
-- **P2P Networking**: LibP2P-based node implementation
-- **Anonymous Routing**: Onion routing with multiple hops
-- **Traffic Obfuscation**: ChaCha20Poly1305-based disguising
-- **Peer Discovery**: Kademlia DHT for decentralized peer management
-- **Transport Security**: Quantum-resistant TLS with ML-KEM
-- **Connection Management**: Secure handshakes and session management
+
+| Feature | Implementation | Purpose |
+|---------|----------------|---------|
+| **P2P Framework** | LibP2P | Decentralized networking |
+| **Anonymous Routing** | Multi-hop onion routing | Traffic anonymization |
+| **Traffic Protection** | ChaCha20Poly1305 | Message disguising |
+| **Peer Discovery** | Kademlia DHT | Decentralized lookup |
+| **Transport Security** | ML-KEM TLS | Quantum-resistant channels |
+| **Session Management** | Secure handshakes | Authenticated connections |
 
 ### 🌐 Dark Addressing
-- Quantum-resistant `.dark` domains (eg: mysite.dark)
-- Stealth `.shadow` addresses for enhanced privacy
-- Human-readable aliases with quantum fingerprints
-- Decentralized address resolution
+
+| Address Type | Format | Features |
+|--------------|--------|----------|
+| **Dark Domains** | `name.dark` | Quantum-resistant, human-readable |
+| **Shadow Addresses** | `shadow-[id].dark` | Temporary, auto-expiring |
+| **Quantum Fingerprints** | 64-byte hash | ML-DSA authentication |
+| **Resolution System** | Decentralized | No central authority |
 
 ## How It Works
 
