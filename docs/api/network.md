@@ -1,6 +1,49 @@
 # Network Module API
 
-The `qudag_network` module provides networking capabilities with anonymous routing for the QuDAG protocol.
+The `qudag_network` module provides P2P networking layer with anonymous routing, traffic obfuscation, and quantum-resistant transport security for the QuDAG protocol.
+
+## P2P Node Implementation
+
+### P2PNode
+
+Main P2P network node with libp2p integration and traffic obfuscation.
+
+```rust
+pub struct P2PNode {
+    local_peer_id: PeerId,
+    // private fields
+}
+
+impl P2PNode {
+    pub async fn new(config: NetworkConfig) -> Result<Self, NetworkError>;
+    pub async fn start(&mut self) -> Result<(), NetworkError>;
+    pub async fn stop(&mut self) -> Result<(), NetworkError>;
+    pub async fn send_message(&mut self, peer: PeerId, data: Vec<u8>) -> Result<(), NetworkError>;
+    pub async fn broadcast(&mut self, data: Vec<u8>) -> Result<(), NetworkError>;
+    pub fn get_local_peer_id(&self) -> PeerId;
+    pub fn get_connected_peers(&self) -> Vec<PeerId>;
+}
+```
+
+### NetworkConfig
+
+Configuration for P2P network node with security settings.
+
+```rust
+pub struct NetworkConfig {
+    pub listen_addr: String,
+    pub bootstrap_peers: Vec<String>,
+    pub timeout: Duration,
+    pub max_connections: usize,
+    pub obfuscation_key: [u8; 32],
+}
+
+impl Default for NetworkConfig {
+    fn default() -> Self {
+        // Returns secure default configuration
+    }
+}
+```
 
 ## Core Types
 
@@ -71,6 +114,61 @@ impl PeerId {
 }
 ```
 
+## Transport Layer
+
+### Transport
+
+Secure transport with quantum-resistant encryption and traffic obfuscation.
+
+```rust
+pub struct Transport {
+    // private fields
+}
+
+impl Transport {
+    pub fn new(config: TransportConfig) -> Result<Self, TransportError>;
+    pub async fn connect(&self, addr: SocketAddr) -> Result<Connection, TransportError>;
+    pub async fn listen(&self, addr: SocketAddr) -> Result<Listener, TransportError>;
+    pub fn obfuscate_traffic(&self, data: &[u8]) -> Vec<u8>;
+    pub fn deobfuscate_traffic(&self, data: &[u8]) -> Result<Vec<u8>, TransportError>;
+}
+```
+
+### Router
+
+Anonymous routing with onion routing and traffic mixing.
+
+```rust
+pub struct Router {
+    // private fields  
+}
+
+impl Router {
+    pub fn new() -> Self;
+    pub async fn route_message(&self, msg: Message, path: RoutePath) -> Result<(), RoutingError>;
+    pub fn create_onion_route(&self, destination: PeerId, hops: Vec<PeerId>) -> Result<RoutePath, RoutingError>;
+    pub fn add_routing_entry(&mut self, dest: PeerId, next_hop: PeerId);
+    pub fn remove_routing_entry(&mut self, dest: &PeerId);
+}
+```
+
+### RoutePath  
+
+Defines routing path for anonymous message delivery.
+
+```rust
+pub struct RoutePath {
+    pub hops: Vec<PeerId>,
+    pub encrypted_layers: Vec<Vec<u8>>,
+}
+
+impl RoutePath {
+    pub fn new(hops: Vec<PeerId>) -> Self;
+    pub fn peel_layer(&mut self) -> Result<PeerId, RoutingError>;
+    pub fn is_final_hop(&self) -> bool;
+}
+```
+
 ## Core Traits
 
 ### NetworkNode
@@ -129,6 +227,107 @@ pub enum NetworkError {
 ```
 
 ## Example Usage
+
+### Setting Up P2P Node
+
+```rust
+use qudag_network::{P2PNode, NetworkConfig, NetworkError};
+use std::time::Duration;
+
+#[tokio::main]
+async fn main() -> Result<(), NetworkError> {
+    // Configure P2P node
+    let config = NetworkConfig {
+        listen_addr: "/ip4/0.0.0.0/tcp/4001".to_string(),
+        bootstrap_peers: vec![
+            "/ip4/192.168.1.100/tcp/4001/p2p/12D3KooW...".to_string()
+        ],
+        timeout: Duration::from_secs(30),
+        max_connections: 100,
+        obfuscation_key: [0u8; 32], // Use secure random key in production
+    };
+    
+    // Create and start P2P node
+    let mut node = P2PNode::new(config).await?;
+    node.start().await?;
+    
+    println!("P2P node started with ID: {:?}", node.get_local_peer_id());
+    
+    // Send message to peer
+    let peer_id = /* get peer ID */;
+    let message = b"Hello, P2P world!".to_vec();
+    node.send_message(peer_id, message).await?;
+    
+    // Broadcast to all peers
+    node.broadcast(b"Broadcast message".to_vec()).await?;
+    
+    Ok(())
+}
+```
+
+### Anonymous Routing with Onion Routing
+
+```rust
+use qudag_network::{Router, RoutePath, Message, PeerId};
+
+async fn setup_anonymous_communication() -> Result<(), NetworkError> {
+    let router = Router::new();
+    
+    // Create anonymous route with multiple hops
+    let destination = PeerId::random();
+    let hops = vec![
+        PeerId::random(), // Hop 1
+        PeerId::random(), // Hop 2  
+        PeerId::random(), // Hop 3
+        destination,      // Final destination
+    ];
+    
+    let route_path = router.create_onion_route(destination, hops)?;
+    
+    // Send message through anonymous route
+    let message = Message::new(
+        b"Anonymous message".to_vec(),
+        destination,
+        Route::from_path(route_path)
+    );
+    
+    router.route_message(message, route_path).await?;
+    
+    Ok(())
+}
+```
+
+### Traffic Obfuscation
+
+```rust
+use qudag_network::{Transport, TransportConfig};
+
+async fn setup_obfuscated_transport() -> Result<(), NetworkError> {
+    let config = TransportConfig {
+        obfuscation_enabled: true,
+        obfuscation_key: secure_random_key(),
+        quantum_resistant: true,
+    };
+    
+    let transport = Transport::new(config)?;
+    
+    // Connect with traffic obfuscation
+    let connection = transport.connect("127.0.0.1:8080".parse()?).await?;
+    
+    // Send obfuscated data
+    let sensitive_data = b"Sensitive protocol data";
+    let obfuscated = transport.obfuscate_traffic(sensitive_data);
+    connection.send(obfuscated).await?;
+    
+    // Receive and deobfuscate
+    let received = connection.receive().await?;
+    let deobfuscated = transport.deobfuscate_traffic(&received)?;
+    
+    println!("Deobfuscated: {:?}", deobfuscated);
+    
+    Ok(())
+}
+```
 
 ### Basic Message Handling
 

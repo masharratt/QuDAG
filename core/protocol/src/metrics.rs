@@ -1,33 +1,30 @@
-use metrics::{Counter, Gauge, Histogram};
 use std::sync::Arc;
 use parking_lot::RwLock;
 use std::time::{Duration, Instant};
+use std::sync::atomic::{AtomicU64, Ordering};
 
 /// Performance metrics for the QuDAG protocol
 pub struct ProtocolMetrics {
     // Cryptographic metrics
-    pub crypto_operations: Counter,
-    pub key_cache_hits: Counter,
-    pub key_cache_misses: Counter,
-    pub crypto_latency: Histogram,
+    pub crypto_operations: AtomicU64,
+    pub key_cache_hits: AtomicU64,
+    pub key_cache_misses: AtomicU64,
     
     // Network metrics
-    pub messages_processed: Counter,
-    pub message_latency: Histogram,
-    pub active_connections: Gauge,
-    pub connection_errors: Counter,
-    pub route_cache_hits: Counter,
+    pub messages_processed: AtomicU64,
+    pub active_connections: AtomicU64,
+    pub connection_errors: AtomicU64,
+    pub route_cache_hits: AtomicU64,
     
     // Consensus metrics
-    pub consensus_rounds: Counter,
-    pub consensus_latency: Histogram,
-    pub dag_updates: Counter,
-    pub node_count: Gauge,
+    pub consensus_rounds: AtomicU64,
+    pub dag_updates: AtomicU64,
+    pub node_count: AtomicU64,
     
     // Resource metrics
-    pub memory_usage: Gauge,
-    pub thread_count: Gauge,
-    pub queue_depth: Gauge,
+    pub memory_usage: AtomicU64,
+    pub thread_count: AtomicU64,
+    pub queue_depth: AtomicU64,
     
     // Last update timestamp
     last_update: Arc<RwLock<Instant>>,
@@ -39,28 +36,25 @@ impl ProtocolMetrics {
     pub fn new() -> Self {
         Self {
             // Crypto metrics
-            crypto_operations: Counter::new(),
-            key_cache_hits: Counter::new(),
-            key_cache_misses: Counter::new(),
-            crypto_latency: Histogram::new(),
+            crypto_operations: AtomicU64::new(0),
+            key_cache_hits: AtomicU64::new(0),
+            key_cache_misses: AtomicU64::new(0),
             
             // Network metrics
-            messages_processed: Counter::new(),
-            message_latency: Histogram::new(),
-            active_connections: Gauge::new(),
-            connection_errors: Counter::new(),
-            route_cache_hits: Counter::new(),
+            messages_processed: AtomicU64::new(0),
+            active_connections: AtomicU64::new(0),
+            connection_errors: AtomicU64::new(0),
+            route_cache_hits: AtomicU64::new(0),
             
             // Consensus metrics
-            consensus_rounds: Counter::new(),
-            consensus_latency: Histogram::new(),
-            dag_updates: Counter::new(),
-            node_count: Gauge::new(),
+            consensus_rounds: AtomicU64::new(0),
+            dag_updates: AtomicU64::new(0),
+            node_count: AtomicU64::new(0),
             
             // Resource metrics
-            memory_usage: Gauge::new(),
-            thread_count: Gauge::new(),
-            queue_depth: Gauge::new(),
+            memory_usage: AtomicU64::new(0),
+            thread_count: AtomicU64::new(0),
+            queue_depth: AtomicU64::new(0),
             
             // Update tracking
             last_update: Arc::new(RwLock::new(Instant::now())),
@@ -69,43 +63,40 @@ impl ProtocolMetrics {
     }
     
     /// Record cryptographic operation
-    pub fn record_crypto_op(&self, latency: Duration) {
-        self.crypto_operations.increment(1);
-        self.crypto_latency.record(latency);
+    pub fn record_crypto_op(&self, _latency: Duration) {
+        self.crypto_operations.fetch_add(1, Ordering::Relaxed);
         self.maybe_flush_metrics();
     }
     
     /// Record message processing
-    pub fn record_message(&self, latency: Duration) {
-        self.messages_processed.increment(1);
-        self.message_latency.record(latency);
+    pub fn record_message(&self, _latency: Duration) {
+        self.messages_processed.fetch_add(1, Ordering::Relaxed);
         self.maybe_flush_metrics();
     }
     
     /// Record consensus round
-    pub fn record_consensus(&self, latency: Duration) {
-        self.consensus_rounds.increment(1);
-        self.consensus_latency.record(latency);
+    pub fn record_consensus(&self, _latency: Duration) {
+        self.consensus_rounds.fetch_add(1, Ordering::Relaxed);
         self.maybe_flush_metrics();
     }
     
     /// Update resource metrics
     pub fn update_resources(&self, memory: u64, threads: u64, queue: u64) {
-        self.memory_usage.set(memory);
-        self.thread_count.set(threads);
-        self.queue_depth.set(queue);
+        self.memory_usage.store(memory, Ordering::Relaxed);
+        self.thread_count.store(threads, Ordering::Relaxed);
+        self.queue_depth.store(queue, Ordering::Relaxed);
         self.maybe_flush_metrics();
     }
     
     /// Get performance summary
     pub fn get_summary(&self) -> PerformanceSummary {
         PerformanceSummary {
-            messages_per_second: self.messages_processed.get() as f64 / 
+            messages_per_second: self.messages_processed.load(Ordering::Relaxed) as f64 / 
                 self.last_update.read().elapsed().as_secs_f64(),
-            avg_message_latency: self.message_latency.mean(),
-            avg_consensus_latency: self.consensus_latency.mean(),
-            active_connections: self.active_connections.get(),
-            memory_usage: self.memory_usage.get(),
+            avg_message_latency: 0.0, // TODO: Implement proper latency tracking
+            avg_consensus_latency: 0.0, // TODO: Implement proper latency tracking
+            active_connections: self.active_connections.load(Ordering::Relaxed),
+            memory_usage: self.memory_usage.load(Ordering::Relaxed),
         }
     }
     
@@ -113,11 +104,6 @@ impl ProtocolMetrics {
     fn maybe_flush_metrics(&self) {
         let mut last_update = self.last_update.write();
         if last_update.elapsed() >= self.update_interval {
-            // Reset histograms
-            self.crypto_latency.clear();
-            self.message_latency.clear();
-            self.consensus_latency.clear();
-            
             *last_update = Instant::now();
         }
     }

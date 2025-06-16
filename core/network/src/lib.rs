@@ -11,6 +11,7 @@ pub mod dark_resolver;
 pub mod dns;
 pub mod message;
 pub mod routing;
+pub mod router;
 pub mod shadow_address;
 pub mod types;
 
@@ -20,4 +21,6 @@ pub use shadow_address::{
     ShadowAddress, ShadowAddressError, ShadowAddressGenerator, ShadowAddressResolver,
     DefaultShadowAddressHandler, NetworkType, ShadowMetadata
 };
-pub use types::{NetworkAddress, NetworkError};
+pub use types::{NetworkAddress, NetworkError, NetworkMessage, PeerId, MessagePriority, RoutingStrategy};
+pub use message::MessageEnvelope;
+pub use router::{Router, HopInfo};

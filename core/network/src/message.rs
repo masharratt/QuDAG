@@ -141,7 +141,6 @@ impl MessageQueue {
         let low = self.low_priority.lock().await.len();
         high + normal + low
     }
-}
 
     /// Purge expired messages
     pub async fn purge_expired(&self) {

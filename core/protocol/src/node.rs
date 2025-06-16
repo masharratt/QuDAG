@@ -3,7 +3,7 @@ use crate::{
     state::{StateError},
     types::{ProtocolError, ProtocolEvent, ProtocolState},
 };
-use qudag_crypto::KeyEncapsulation;
+use qudag_crypto::{ml_kem::MlKem768, kem::KEMError};
 use qudag_dag::Consensus;
 use qudag_network::Transport;
 use std::path::PathBuf;
@@ -143,12 +143,12 @@ impl Node {
     // Initialize cryptographic keys
     async fn init_keys(&mut self) -> Result<(), ProtocolError> {
         // Generate ML-KEM key pair
-        let (pk, sk) = KeyEncapsulation::keygen()
+        let (pk, sk) = MlKem768::keygen()
             .map_err(|e| ProtocolError::CryptoError(e.to_string()))?;
 
         self.keys = Some(KeyPair {
-            public_key: pk.to_vec(),
-            private_key: sk.to_vec(),
+            public_key: pk.as_bytes().to_vec(),
+            private_key: sk.as_bytes().to_vec(),
         });
 
         Ok(())

@@ -19,5 +19,6 @@ pub mod fingerprint;
 
 pub use error::CryptoError;
 pub use hash::HashFunction;
-pub use kem::{KeyEncapsulation, PublicKey, SecretKey};
+pub use kem::{KEMError, KeyEncapsulation, PublicKey, SecretKey, Ciphertext, SharedSecret};
+pub use ml_kem::{MlKem768, Metrics as MlKemMetrics};
 pub use signature::{DigitalSignature, SignatureError};

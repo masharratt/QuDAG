@@ -1,8 +1,85 @@
 # Protocol Module API
 
-The `qudag_protocol` module serves as the main coordinator for the QuDAG protocol, integrating the cryptographic, DAG consensus, and networking components.
+The `qudag_protocol` module serves as the main coordinator for the QuDAG protocol, integrating the cryptographic, DAG consensus, and networking components with memory management, instrumentation, and validation.
 
 ## Core Types
+
+### Node
+
+Main protocol node implementation with memory tracking and performance instrumentation.
+
+```rust
+pub struct Node {
+    // private fields
+}
+
+impl Node {
+    pub async fn new(config: NodeConfig) -> Result<Self, ProtocolError>;
+    pub async fn start(&mut self) -> Result<(), ProtocolError>;
+    pub async fn stop(&mut self) -> Result<(), ProtocolError>;
+    pub async fn send_message(&self, message: ProtocolMessage) -> Result<(), ProtocolError>;
+    pub async fn get_state(&self) -> NodeState;
+    pub fn get_metrics(&self) -> NodeMetrics;
+    pub fn get_memory_usage(&self) -> MemoryMetrics;
+}
+```
+
+### ProtocolMessage
+
+Core message type with validation and quantum-resistant signatures.
+
+```rust
+pub struct ProtocolMessage {
+    pub id: MessageId,
+    pub payload: Vec<u8>,
+    pub timestamp: u64,
+    pub signature: Option<Vec<u8>>,
+    pub quantum_signature: Option<MlDsaSignature>,
+}
+
+impl ProtocolMessage {
+    pub fn new(payload: Vec<u8>) -> Self;
+    pub fn sign(&mut self, keypair: &MlDsaKeyPair) -> Result<(), ProtocolError>;
+    pub fn verify(&self, public_key: &MlDsaPublicKey) -> Result<bool, ProtocolError>;
+    pub fn validate(&self) -> Result<(), ValidationError>;
+}
+```
+
+### MemoryTracker
+
+Memory usage tracking and optimization.
+
+```rust
+pub struct MemoryTracker {
+    // private fields
+}
+
+impl MemoryTracker {
+    pub fn new() -> Self;
+    pub fn track_allocation(&self, size: usize, category: &str);
+    pub fn track_deallocation(&self, size: usize, category: &str);
+    pub fn get_metrics(&self) -> MemoryMetrics;
+    pub fn optimize(&self) -> Result<(), MemoryError>;
+}
+```
+
+### Allocator
+
+Optimized memory allocator for protocol operations.
+
+```rust
+pub struct Allocator {
+    // private fields
+}
+
+impl Allocator {
+    pub fn new() -> Self;
+    pub fn allocate(&self, size: usize, alignment: usize) -> Result<*mut u8, AllocationError>;
+    pub fn deallocate(&self, ptr: *mut u8, size: usize);
+    pub fn get_total_allocated() -> usize;
+    pub fn get_total_deallocated() -> usize;
+}
+```
 
 ### Coordinator
 

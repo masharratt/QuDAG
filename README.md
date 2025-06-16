@@ -5,10 +5,12 @@
 QuDAG is the next evolution in anonymous communication, engineered specifically for the quantum internet era. By combining post-quantum cryptography with advanced DAG consensus, it creates a new foundation for private messaging infrastructure.
 
 **Key Highlights:**
-- 🔒 Post-quantum cryptography using ML-KEM-768 & ML-DSA-65
-- ⚡ High-performance DAG-based message propagation
-- 🕵️ Multi-path routing with traffic obfuscation
-- 🛡️ Memory-safe implementation in Rust
+- 🔒 Post-quantum cryptography using ML-KEM-768 & ML-DSA with BLAKE3
+- ⚡ High-performance asynchronous DAG with QR-Avalanche consensus
+- 🕵️ Anonymous onion routing with ChaCha20Poly1305 traffic obfuscation
+- 🛡️ Memory-safe Rust implementation with zero unsafe code
+- 🔗 LibP2P-based networking with Kademlia DHT peer discovery
+- 📊 Real-time performance metrics and benchmarking
 
 ## Use Cases
 
@@ -34,22 +36,28 @@ QuDAG is the next evolution in anonymous communication, engineered specifically 
 ## Core Features
 
 ### 🔐 Quantum-Resistant Cryptography
-- ML-KEM-768 for key encapsulation
-- ML-DSA-65 for digital signatures
-- Constant-time implementations
-- Secure memory handling
+- **ML-KEM-768**: NIST Level 3 key encapsulation mechanism
+- **ML-DSA**: Post-quantum digital signatures with constant-time operations
+- **BLAKE3**: Quantum-resistant cryptographic hashing
+- **Quantum Fingerprinting**: Data authentication using ML-DSA
+- **Memory Security**: Automatic zeroization with `ZeroizeOnDrop`
+- **Side-Channel Resistance**: Constant-time implementations
 
 ### 📊 DAG Architecture
-- Parallel message processing
-- Conflict resolution
-- State synchronization
-- Automatic pruning
+- **Asynchronous Processing**: Non-blocking message handling
+- **QR-Avalanche Consensus**: Byzantine fault-tolerant quantum-resistant consensus
+- **Conflict Resolution**: Automatic detection and resolution
+- **Tip Selection**: Optimal parent selection algorithm
+- **Performance Metrics**: Real-time throughput and latency monitoring
+- **State Management**: Atomic state transitions
 
 ### 🌐 Network Layer
-- P2P networking using libp2p
-- Multi-path message routing
-- Traffic obfuscation
-- DHT-based peer discovery
+- **P2P Networking**: LibP2P-based node implementation
+- **Anonymous Routing**: Onion routing with multiple hops
+- **Traffic Obfuscation**: ChaCha20Poly1305-based disguising
+- **Peer Discovery**: Kademlia DHT for decentralized peer management
+- **Transport Security**: Quantum-resistant TLS with ML-KEM
+- **Connection Management**: Secure handshakes and session management
 
 ### 🌐 Dark Addressing
 - Quantum-resistant `.dark` domains (eg: mysite.dark)

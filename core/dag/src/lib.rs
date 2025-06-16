@@ -11,7 +11,7 @@ pub mod vertex;
 pub mod tip_selection;
 pub mod dag;
 
-pub use consensus::{Consensus, ConsensusError, ConsensusStatus};
+pub use consensus::{Consensus, ConsensusError, ConsensusStatus, QRAvalanche};
 pub use vertex::{Vertex, VertexId, VertexError};
 pub use tip_selection::{TipSelection, TipSelectionError};
 pub use dag::{Dag, DagMessage, DagError};

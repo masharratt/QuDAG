@@ -1,13 +1,13 @@
-use super::{KeyEncapsulation, KemError, PublicKey, SecretKey, Ciphertext, SharedSecret};
+use super::{KeyEncapsulation, KEMError, PublicKey, SecretKey, Ciphertext, SharedSecret};
 use subtle::ConstantTimeEq;
-use rand::Rng;
+use rand::{Rng, thread_rng};
 
 /// ML-KEM-768 implementation
 pub struct MlKem768;
 
 impl KeyEncapsulation for MlKem768 {
-    fn keygen() -> Result<(PublicKey, SecretKey), KemError> {
-        let mut rng = rand::thread_rng();
+    fn keygen() -> Result<(PublicKey, SecretKey), KEMError> {
+        let mut rng = thread_rng();
         
         // Generate random keys
         let mut pk = vec![0u8; 1184]; // ML-KEM-768 public key size
@@ -19,8 +19,8 @@ impl KeyEncapsulation for MlKem768 {
         Ok((PublicKey(pk), SecretKey(sk)))
     }
 
-    fn encapsulate(pk: &PublicKey) -> Result<(Ciphertext, SharedSecret), KemError> {
-        let mut rng = rand::thread_rng();
+    fn encapsulate(pk: &PublicKey) -> Result<(Ciphertext, SharedSecret), KEMError> {
+        let mut rng = thread_rng();
         
         // Generate ciphertext and shared secret
         let mut ct = vec![0u8; 1088]; // ML-KEM-768 ciphertext size
@@ -32,8 +32,8 @@ impl KeyEncapsulation for MlKem768 {
         Ok((Ciphertext(ct), SharedSecret(ss)))
     }
 
-    fn decapsulate(sk: &SecretKey, ct: &Ciphertext) -> Result<SharedSecret, KemError> {
-        let mut rng = rand::thread_rng();
+    fn decapsulate(sk: &SecretKey, ct: &Ciphertext) -> Result<SharedSecret, KEMError> {
+        let mut rng = thread_rng();
         
         // Generate shared secret
         let mut ss = vec![0u8; 32]; // ML-KEM-768 shared secret size

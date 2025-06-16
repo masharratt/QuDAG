@@ -2,6 +2,7 @@ use serde::{Serialize, Deserialize};
 use std::time::Duration;
 use std::net::{IpAddr, Ipv4Addr};
 use thiserror::Error;
+use blake3::Hash;
 
 /// Network address combining IP and port
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -75,10 +76,6 @@ pub enum RoutingStrategy {
     Anonymous {
         /// Number of hops
         hops: usize,
-        /// Random seed
-        seed: [u8; 32],
-        /// Routing layers
-        layers: Vec<RoutingLayer>,
     },
 }
 
@@ -143,4 +140,50 @@ pub enum MessageType {
         /// Parameters
         params: Vec<String>,
     },
+}
+
+/// Network message structure
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct NetworkMessage {
+    /// Message identifier
+    pub id: String,
+    /// Source node identifier
+    pub source: Vec<u8>,
+    /// Destination node identifier
+    pub destination: Vec<u8>,
+    /// Message payload
+    pub payload: Vec<u8>,
+    /// Message priority
+    pub priority: MessagePriority,
+    /// Time to live
+    pub ttl: Duration,
+}
+
+/// Peer identification
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct PeerId([u8; 32]);
+
+impl PeerId {
+    /// Generate a random peer ID
+    pub fn random() -> Self {
+        use rand::RngCore;
+        let mut id = [0u8; 32];
+        rand::thread_rng().fill_bytes(&mut id);
+        Self(id)
+    }
+    
+    /// Create a peer ID from bytes
+    pub fn from_bytes(bytes: [u8; 32]) -> Self {
+        Self(bytes)
+    }
+    
+    /// Get the peer ID as bytes
+    pub fn to_bytes(&self) -> [u8; 32] {
+        self.0
+    }
+    
+    /// Get the peer ID as a slice
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.0
+    }
 }

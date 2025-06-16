@@ -4,38 +4,148 @@ mod ml_kem;
 pub use ml_kem::*;
 
 use thiserror::Error;
-use rand::RngCore;
-use zeroize::ZeroizeOnDrop;
+use zeroize::{Zeroize, ZeroizeOnDrop};
+use subtle::ConstantTimeEq;
 
+/// Errors that can occur during KEM operations
 #[derive(Debug, Error)]
 pub enum KEMError {
     #[error("Key generation failed")]
-    KeyGenError,
-    
+    KeyGenerationError,
     #[error("Encapsulation failed")]
     EncapsulationError,
-    
     #[error("Decapsulation failed")]
     DecapsulationError,
-    
-    #[error("Invalid key")]
+    #[error("Invalid length")]
+    InvalidLength,
+    #[error("Invalid key format")]
     InvalidKey,
-    
-    #[error("Invalid parameters")]
-    InvalidParameters,
-    
-    #[error("Operation failed")]
-    OperationFailed,
-    
     #[error("Internal error")]
     InternalError,
 }
 
-// Ensure errors don't leak sensitive information in their Display impl
-impl std::fmt::Display for KEMError {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "KEM operation failed")
+/// ML-KEM public key.
+#[derive(Debug, Clone, Zeroize, ZeroizeOnDrop)]
+pub struct PublicKey(Vec<u8>);
+
+impl PublicKey {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, KEMError> {
+        Ok(Self(bytes.to_vec()))
     }
+    
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl AsRef<[u8]> for PublicKey {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl PartialEq for PublicKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.ct_eq(&other.0).into()
+    }
+}
+
+impl Eq for PublicKey {}
+
+/// ML-KEM secret key.
+#[derive(Debug, Clone, Zeroize, ZeroizeOnDrop)]
+pub struct SecretKey(Vec<u8>);
+
+impl SecretKey {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, KEMError> {
+        Ok(Self(bytes.to_vec()))
+    }
+    
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl AsRef<[u8]> for SecretKey {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl PartialEq for SecretKey {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.ct_eq(&other.0).into()
+    }
+}
+
+impl Eq for SecretKey {}
+
+/// ML-KEM ciphertext.
+#[derive(Debug, Clone, Zeroize, ZeroizeOnDrop)]
+pub struct Ciphertext(Vec<u8>);
+
+impl Ciphertext {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, KEMError> {
+        Ok(Self(bytes.to_vec()))
+    }
+    
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl AsRef<[u8]> for Ciphertext {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl PartialEq for Ciphertext {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.ct_eq(&other.0).into()
+    }
+}
+
+impl Eq for Ciphertext {}
+
+/// ML-KEM shared secret.
+#[derive(Debug, Clone, Zeroize, ZeroizeOnDrop)]
+pub struct SharedSecret(Vec<u8>);
+
+impl SharedSecret {
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self, KEMError> {
+        Ok(Self(bytes.to_vec()))
+    }
+    
+    pub fn as_bytes(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl AsRef<[u8]> for SharedSecret {
+    fn as_ref(&self) -> &[u8] {
+        &self.0
+    }
+}
+
+impl PartialEq for SharedSecret {
+    fn eq(&self, other: &Self) -> bool {
+        self.0.ct_eq(&other.0).into()
+    }
+}
+
+impl Eq for SharedSecret {}
+
+/// ML-KEM key encapsulation trait.
+pub trait KeyEncapsulation {
+    /// Generate a new key pair.
+    fn keygen() -> Result<(PublicKey, SecretKey), KEMError>;
+    
+    /// Encapsulate a shared secret using a public key.
+    fn encapsulate(public_key: &PublicKey) -> Result<(Ciphertext, SharedSecret), KEMError>;
+    
+    /// Decapsulate a shared secret using a secret key and ciphertext.
+    fn decapsulate(secret_key: &SecretKey, ciphertext: &Ciphertext) -> Result<SharedSecret, KEMError>;
 }
 
 /// ML-KEM key pair

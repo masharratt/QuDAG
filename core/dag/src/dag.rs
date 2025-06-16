@@ -2,10 +2,10 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::{RwLock, mpsc, Mutex};
 use thiserror::Error;
-use tracing::{debug, warn, error};
+use tracing::error;
 
 use crate::vertex::{Vertex, VertexId, VertexError};
-use crate::consensus::{Consensus, ConsensusError};
+use crate::consensus::{ConsensusError, QRAvalanche};
 
 /// Errors that can occur during DAG operations
 #[derive(Error, Debug)]
@@ -49,7 +49,7 @@ struct ProcessingState {
 }
 
 /// Main DAG structure for parallel message processing
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Dag {
     /// Vertices in the DAG
     vertices: Arc<RwLock<HashMap<VertexId, Vertex>>>,
@@ -58,7 +58,7 @@ pub struct Dag {
     /// Message processing channel
     msg_tx: mpsc::Sender<DagMessage>,
     /// Consensus mechanism
-    consensus: Arc<Mutex<Consensus>>,
+    consensus: Arc<Mutex<QRAvalanche>>,
     /// Maximum concurrent messages
     max_concurrent: usize,
 }
@@ -66,13 +66,13 @@ pub struct Dag {
 impl Dag {
     /// Creates a new DAG instance
     pub fn new(max_concurrent: usize) -> Self {
-        let (msg_tx, mut msg_rx) = mpsc::channel(1024);
+        let (msg_tx, mut msg_rx) = mpsc::channel::<DagMessage>(1024);
         let vertices = Arc::new(RwLock::new(HashMap::new()));
         let state = Arc::new(RwLock::new(ProcessingState {
             processing: HashSet::new(),
             conflicts: HashMap::new(),
         }));
-        let consensus = Arc::new(Mutex::new(Consensus::new()));
+        let consensus = Arc::new(Mutex::new(QRAvalanche::new()));
         
         let vertices_clone = vertices.clone();
         let state_clone = state.clone();
@@ -122,7 +122,7 @@ impl Dag {
         msg: DagMessage,
         vertices: Arc<RwLock<HashMap<VertexId, Vertex>>>,
         state: Arc<RwLock<ProcessingState>>,
-        consensus: Arc<Mutex<Consensus>>,
+        consensus: Arc<Mutex<QRAvalanche>>,
     ) -> Result<(), DagError> {
         // Validate parents exist
         {
@@ -143,12 +143,12 @@ impl Dag {
         }
         
         // Create new vertex
-        let vertex = Vertex::new(msg.id, msg.payload, msg.parents);
+        let vertex = Vertex::new(msg.id.clone(), msg.payload, msg.parents);
         
         // Add to DAG
         {
             let mut vertices = vertices.write().await;
-            vertices.insert(msg.id, vertex);
+            vertices.insert(msg.id.clone(), vertex);
         }
         
         // Update consensus
@@ -171,7 +171,7 @@ impl Dag {
         // Simple conflict detection based on overlapping parents
         for (id, vertex) in vertices.iter() {
             if vertex.parents().intersection(&msg.parents).count() > 0 {
-                conflicts.insert(*id);
+                conflicts.insert(id.clone());
             }
         }
         
@@ -185,7 +185,7 @@ impl Dag {
         
         for (id, vertex) in other_vertices.iter() {
             if !vertices.contains_key(id) {
-                vertices.insert(*id, vertex.clone());
+                vertices.insert(id.clone(), vertex.clone());
             }
         }
         

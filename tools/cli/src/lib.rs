@@ -1,15 +1,24 @@
 #![deny(unsafe_code)]
 #![warn(missing_docs)]
 
-//! Command-line interface for the QuDAG protocol.
+//! Command-line interface for the QuDAG protocol with performance optimizations.
 //! 
 //! This module provides a comprehensive CLI for managing QuDAG nodes,
 //! including node operations, peer management, network diagnostics,
-//! and DAG visualization capabilities.
+//! and DAG visualization capabilities. Features include:
+//! 
+//! - Fast startup with lazy initialization
+//! - Async operation optimization with timeouts and retries
+//! - Resource management and memory tracking
+//! - Performance monitoring and reporting
+//! - Error propagation optimization
 
+pub mod async_optimizations;
 pub mod commands;
 pub mod config;
 pub mod output;
+pub mod performance;
+pub mod startup;
 
 pub use commands::*;
 

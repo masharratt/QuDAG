@@ -11,10 +11,10 @@ thiserror.workspace = true
 tracing.workspace = true
 serde.workspace = true
 tokio = { workspace = true, features = ["full"] }
+parking_lot.workspace = true
 qudag-crypto = { path = "../crypto" }
 qudag-dag = { path = "../dag" }
 qudag-network = { path = "../network" }
 
 [dev-dependencies]
 proptest.workspace = true
-tokio-test = "0.4"

@@ -7,8 +7,7 @@ use rand::RngCore;
 use subtle::ConstantTimeEq;
 use zeroize::Zeroize;
 
-use crate::error::CryptoError;
-use crate::kem::{KeyEncapsulation, PublicKey, SecretKey};
+use crate::kem::{KEMError, KeyEncapsulation, PublicKey, SecretKey, Ciphertext, SharedSecret};
 
 /// ML-KEM 768 implementation
 pub struct MlKem768;
@@ -30,7 +29,7 @@ impl MlKem768 {
     pub const CACHE_SIZE: usize = 1024;
 
     /// Generate a new keypair
-    pub fn keygen() -> Result<(PublicKey, SecretKey), CryptoError> {
+    pub fn keygen() -> Result<(PublicKey, SecretKey), KEMError> {
         // Placeholder implementation
         let mut rng = rand::thread_rng();
         let mut pk = vec![0u8; Self::PUBLIC_KEY_SIZE];
@@ -44,7 +43,7 @@ impl MlKem768 {
     }
 
     /// Encapsulate a shared secret using a public key
-    pub fn encapsulate(pk: &PublicKey) -> Result<(Ciphertext, SharedSecret), CryptoError> {
+    pub fn encapsulate(pk: &PublicKey) -> Result<(Ciphertext, SharedSecret), KEMError> {
         // Placeholder implementation
         let mut rng = rand::thread_rng();
         let mut ct = vec![0u8; Self::CIPHERTEXT_SIZE];
@@ -58,7 +57,7 @@ impl MlKem768 {
     }
 
     /// Decapsulate a shared secret using a secret key
-    pub fn decapsulate(sk: &SecretKey, ct: &Ciphertext) -> Result<SharedSecret, CryptoError> {
+    pub fn decapsulate(sk: &SecretKey, ct: &Ciphertext) -> Result<SharedSecret, KEMError> {
         // Placeholder implementation
         let mut rng = rand::thread_rng();
         let mut ss = vec![0u8; Self::SHARED_SECRET_SIZE];
@@ -74,47 +73,18 @@ impl MlKem768 {
     }
 }
 
-/// ML-KEM ciphertext
-#[derive(Clone, Debug, Zeroize)]
-pub struct Ciphertext(Vec<u8>);
 
-impl Ciphertext {
-    /// Create a new ciphertext from bytes
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, CryptoError> {
-        if bytes.len() != MlKem768::CIPHERTEXT_SIZE {
-            return Err(CryptoError::InvalidLength);
-        }
-        Ok(Self(bytes.to_vec()))
+impl KeyEncapsulation for MlKem768 {
+    fn keygen() -> Result<(PublicKey, SecretKey), KEMError> {
+        Self::keygen()
     }
-
-    /// Get reference to underlying bytes
-    pub fn as_ref(&self) -> &[u8] {
-        &self.0
+    
+    fn encapsulate(public_key: &PublicKey) -> Result<(Ciphertext, SharedSecret), KEMError> {
+        Self::encapsulate(public_key)
     }
-
-    /// Get mutable reference to underlying bytes
-    pub fn as_mut(&mut self) -> &mut [u8] {
-        &mut self.0
-    }
-}
-
-/// ML-KEM shared secret
-#[derive(Clone, Debug, Zeroize)]
-pub struct SharedSecret(Vec<u8>);
-
-impl SharedSecret {
-    /// Create a new shared secret from bytes
-    pub fn from_bytes(bytes: &[u8]) -> Result<Self, CryptoError> {
-        if bytes.len() != MlKem768::SHARED_SECRET_SIZE {
-            return Err(CryptoError::InvalidLength);
-        }
-        Ok(Self(bytes.to_vec()))
-    }
-}
-
-impl PartialEq for SharedSecret {
-    fn eq(&self, other: &Self) -> bool {
-        bool::from(self.0.ct_eq(&other.0))
+    
+    fn decapsulate(secret_key: &SecretKey, ciphertext: &Ciphertext) -> Result<SharedSecret, KEMError> {
+        Self::decapsulate(secret_key, ciphertext)
     }
 }
 
@@ -123,4 +93,8 @@ impl PartialEq for SharedSecret {
 pub struct Metrics {
     /// Number of key cache misses
     pub key_cache_misses: u64,
+    /// Number of key cache hits
+    pub key_cache_hits: u64,
+    /// Average decapsulation time in nanoseconds
+    pub avg_decap_time_ns: u64,
 }

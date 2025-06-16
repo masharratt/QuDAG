@@ -14,9 +14,7 @@ serde_json.workspace = true
 anyhow.workspace = true
 rand.workspace = true
 metrics.workspace = true
-
-qudag-protocol = { path = "../core/protocol" }
-qudag-simulator = { path = "../tools/simulator" }
+bincode.workspace = true
 
 [dev-dependencies]
 criterion.workspace = true

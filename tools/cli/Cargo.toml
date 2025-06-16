@@ -7,18 +7,21 @@ repository.workspace = true
 license.workspace = true
 
 [dependencies]
-clap = { version = "4.0", features = ["derive"] }
-tokio.workspace = true
-anyhow.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
-tracing-subscriber = "0.3"
 serde.workspace = true
+tokio.workspace = true
+anyhow.workspace = true
+
+# CLI specific dependencies
+clap = { version = "4.0", features = ["derive"] }
+tracing-subscriber = { version = "0.3", features = ["fmt", "std", "env-filter"] }
 
 # Internal dependencies
 qudag-protocol = { path = "../../core/protocol" }
 qudag-network = { path = "../../core/network" }
 qudag-dag = { path = "../../core/dag" }
+qudag-crypto = { path = "../../core/crypto" }
 
 [[bin]]
 name = "qudag"

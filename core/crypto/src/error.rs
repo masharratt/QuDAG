@@ -38,4 +38,13 @@ pub enum CryptoError {
 
     #[error("Internal error: {0}")]
     InternalError(String),
+
+    #[error("Invalid length")]
+    InvalidLength,
+
+    #[error("Encapsulation failed")]
+    EncapsulationError,
+
+    #[error("Decapsulation failed")]
+    DecapsulationError,
 }

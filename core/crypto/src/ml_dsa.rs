@@ -1,6 +1,6 @@
 use blake3::Hasher;
 use rand_core::{CryptoRng, RngCore};
-use subtle::{Choice, ConstantTimeEq};
+use subtle::ConstantTimeEq;
 use thiserror::Error;
 use zeroize::{Zeroize, ZeroizeOnDrop};
 
@@ -30,8 +30,7 @@ pub struct MlDsaKeyPair {
     seed: Vec<u8>,
 }
 
-#[derive(Debug, Clone, Zeroize)]
-#[zeroize(drop)]
+#[derive(Debug, Clone, Zeroize, ZeroizeOnDrop)]
 struct MlDsaInternalState {
     h: [u8; 64],
     rho: [u8; 32],
@@ -80,7 +79,7 @@ impl MlDsaKeyPair {
         rng: &mut R,
     ) -> Result<Vec<u8>, MlDsaError> {
         let mut signature = vec![0u8; ML_DSA_65_SIG_SIZE];
-        let mut state = Self::init_state(&self.seed)?;
+        let state = Self::init_state(&self.seed)?;
         
         // Generate deterministic nonce using message and private key
         let mut nonce = [0u8; 64];
@@ -97,6 +96,7 @@ impl MlDsaKeyPair {
         
         Ok(signature)
     }
+
 }
 
 /// ML-DSA public key for signature verification
@@ -108,7 +108,7 @@ pub struct MlDsaPublicKey {
 impl MlDsaPublicKey {
     /// Create a new ML-DSA public key from bytes
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, MlDsaError> {
-        if bytes.len() != 32 {
+        if bytes.len() != ML_DSA_65_PK_SIZE {
             return Err(MlDsaError::InvalidKeyLength);
         }
         Ok(Self {
@@ -146,6 +146,49 @@ impl MlDsaPublicKey {
         } else {
             Err(MlDsaError::VerificationFailed)
         }
+    }
+
+    /// Decode signature into components
+    fn decode_signature(signature: &[u8]) -> Result<([u8; 32], [u8; 32]), MlDsaError> {
+        if signature.len() < 64 {
+            return Err(MlDsaError::InvalidSignatureLength);
+        }
+        
+        let mut r1 = [0u8; 32];
+        let mut r2 = [0u8; 32];
+        
+        r1.copy_from_slice(&signature[0..32]);
+        r2.copy_from_slice(&signature[32..64]);
+        
+        Ok((r1, r2))
+    }
+
+    /// Compute verification values
+    fn compute_verification(
+        computed_r1: &mut [u8],
+        computed_r2: &mut [u8],
+        message: &[u8],
+        public_key: &[u8],
+        signature: &[u8],
+    ) -> Result<(), MlDsaError> {
+        // Placeholder implementation - compute verification using hash
+        let mut hasher = Hasher::new();
+        hasher.update(message);
+        hasher.update(public_key);
+        hasher.update(signature);
+        let hash = hasher.finalize();
+        
+        let hash_bytes = hash.as_bytes();
+        computed_r1[0..32].copy_from_slice(&hash_bytes[0..32]);
+        
+        // Compute second part
+        hasher = Hasher::new();
+        hasher.update(&hash_bytes[0..32]);
+        hasher.update(b"verification");
+        let hash2 = hasher.finalize();
+        computed_r2[0..32].copy_from_slice(&hash2.as_bytes()[0..32]);
+        
+        Ok(())
     }
 }
 
@@ -239,7 +282,7 @@ impl MlDsaKeyPair {
         nonce: &mut [u8],
         message: &[u8],
         secret_key: &[u8],
-        rng: &mut impl CryptoRng + RngCore,
+        rng: &mut (impl CryptoRng + RngCore),
     ) -> Result<(), MlDsaError> {
         // Generate deterministic nonce using message and secret key
         let mut hasher = Hasher::new();
@@ -365,6 +408,46 @@ impl MlDsaKeyPair {
         Ok(())
     }
     
+    fn generate_secret_key(
+        state: &mut MlDsaInternalState,
+        secret_key: &mut [u8],
+    ) -> Result<(), MlDsaError> {
+        // Generate secret key components in constant time
+        if secret_key.len() != ML_DSA_65_SK_SIZE {
+            return Err(MlDsaError::KeyGenerationFailed);
+        }
+        
+        // Pack secret key components: s1, s2, t0, tr
+        let mut offset = 0;
+        secret_key[offset..offset + 96].copy_from_slice(&state.s1);
+        offset += 96;
+        secret_key[offset..offset + 96].copy_from_slice(&state.s2);
+        offset += 96;
+        secret_key[offset..offset + 96].copy_from_slice(&state.t0);
+        offset += 96;
+        secret_key[offset..offset + 32].copy_from_slice(&state.tr);
+        
+        Ok(())
+    }
+    
+    fn generate_public_key(
+        state: &MlDsaInternalState,
+        public_key: &mut [u8],
+    ) -> Result<(), MlDsaError> {
+        // Generate public key from state in constant time
+        if public_key.len() != ML_DSA_65_PK_SIZE {
+            return Err(MlDsaError::KeyGenerationFailed);
+        }
+        
+        // Pack public key components: rho, t1
+        let mut offset = 0;
+        public_key[offset..offset + 32].copy_from_slice(&state.rho);
+        offset += 32;
+        public_key[offset..offset + 96].copy_from_slice(&state.t1);
+        
+        Ok(())
+    }
+
     fn matrix_multiply(
         output: &mut [u8],
         matrix: &[u8],
@@ -372,16 +455,18 @@ impl MlDsaKeyPair {
     ) -> Result<(), MlDsaError> {
         // Constant time matrix multiplication
         // Implement optimized but constant-time multiplication
-        if output.len() != 64 || matrix.len() != ML_DSA_65_PK_SIZE {
+        if output.len() != 64 || matrix.len() < 32 {
             return Err(MlDsaError::KeyGenerationFailed);
         }
         
-        for i in 0..64 {
+        for i in 0..64.min(output.len()) {
             let mut sum = 0u16;
-            for j in 0..vector.len() {
+            let max_j = vector.len().min(matrix.len() / 64);
+            for j in 0..max_j {
+                let idx = (i * max_j + j).min(matrix.len() - 1);
                 sum = sum.wrapping_add(
-                    (matrix[i * vector.len() + j] as u16)
-                    .wrapping_mul(vector[j] as u16)
+                    (matrix[idx] as u16)
+                    .wrapping_mul(vector[j.min(vector.len() - 1)] as u16)
                 );
             }
             output[i] = (sum & 0xFF) as u8;

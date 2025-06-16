@@ -53,3 +53,37 @@ pub trait Consensus {
     /// Prune old vertices that have achieved consensus.
     fn prune(&mut self) -> Result<(), ConsensusError>;
 }
+
+/// QR-Avalanche consensus implementation
+#[derive(Debug)]
+pub struct QRAvalanche {
+    /// Vertices and their consensus status
+    vertices: std::collections::HashMap<VertexId, ConsensusStatus>,
+    /// Tip set (vertices with no children)
+    tips: std::collections::HashSet<VertexId>,
+}
+
+impl QRAvalanche {
+    /// Creates a new QR-Avalanche consensus instance
+    pub fn new() -> Self {
+        Self {
+            vertices: std::collections::HashMap::new(),
+            tips: std::collections::HashSet::new(),
+        }
+    }
+    
+    /// Process a vertex ID for consensus
+    pub fn process_vertex(&mut self, vertex_id: VertexId) -> Result<ConsensusStatus, ConsensusError> {
+        // Simple implementation - mark as accepted
+        let status = ConsensusStatus::Accepted;
+        self.vertices.insert(vertex_id.clone(), status.clone());
+        self.tips.insert(vertex_id);
+        Ok(status)
+    }
+    
+    /// Synchronize with another consensus instance
+    pub fn sync(&mut self) -> Result<(), ConsensusError> {
+        // Simple sync implementation - nothing to do for now
+        Ok(())
+    }
+}

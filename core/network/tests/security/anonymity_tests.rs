@@ -10,7 +10,8 @@ use qudag_network::{
 use std::time::Duration;
 use ring::signature::Ed25519KeyPair;
 use tracing::info;
-use test_utils::network::*;
+use uuid;
+// use test_utils::network::*;
 
 use test_log::test;
 

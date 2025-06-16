@@ -8,18 +8,29 @@ This document provides comprehensive security documentation for the QuDAG protoc
 
 - **ML-KEM-768**: Key encapsulation mechanism for quantum-resistant key exchange
   - Constant-time implementation with rigorous test vectors
-  - NIST Level 3 security strength
+  - NIST Level 3 security strength (equivalent to AES-256)
   - Secure key generation with proper entropy sources
+  - Performance metrics tracking and cache optimization
+  - Automatic memory zeroization with `ZeroizeOnDrop`
 
 - **ML-DSA**: Digital signature algorithm for quantum-resistant authentication
   - Complete signature lifecycle management
   - Secure key pair generation and storage
   - Constant-time signing and verification operations
+  - Quantum fingerprinting for data authentication
+  - Side-channel attack resistance
 
 - **HQC**: Hybrid quantum-resistant encryption
   - Authenticated encryption for message confidentiality
   - Secure against both classical and quantum attacks
   - Forward secrecy protection
+  - Integration with ML-KEM for hybrid security
+
+- **BLAKE3**: Quantum-resistant cryptographic hashing
+  - Fast hashing with quantum resistance
+  - Keyed hashing for authentication
+  - Parallel processing capabilities
+  - Constant-time implementation
 
 ### 1.2 Cryptographic Implementation Security
 
@@ -33,18 +44,36 @@ This document provides comprehensive security documentation for the QuDAG protoc
 
 ### 2.1 Anonymous Routing
 
-- DAG-based routing for traffic analysis resistance
-- Peer-to-peer network with decentralized topology
-- Multi-hop message routing for anonymity
-- Traffic padding and mixing
+- **Onion Routing**: Multi-layer encryption with peeling layers
+- **DAG-based routing**: Traffic analysis resistance through graph topology
+- **Peer-to-peer network**: Decentralized topology with libp2p
+- **Multi-hop routing**: Variable-length paths for anonymity
+- **Traffic mixing**: Random delays and padding for unlinkability
+- **Route diversity**: Multiple paths between nodes
 
-### 2.2 Protocol Security
+### 2.2 Transport Security
+
+- **Traffic Obfuscation**: ChaCha20Poly1305-based traffic disguising
+- **Quantum-Resistant Transport**: Post-quantum TLS with ML-KEM
+- **Connection Security**: Secure handshakes with identity verification
+- **Message Integrity**: End-to-end authentication with ML-DSA
+- **Forward Secrecy**: Fresh keys for each session
+
+### 2.3 P2P Network Security
+
+- **Peer Authentication**: ML-DSA-based peer identity verification
+- **Connection Management**: Secure peer discovery with Kademlia DHT
+- **DoS Resistance**: Rate limiting and connection management
+- **Sybil Attack Protection**: Identity verification mechanisms
+- **Eclipse Attack Prevention**: Diverse peer selection algorithms
+
+### 2.4 Protocol Security
 
 - Message authentication and integrity verification
-- Replay attack prevention
-- Node identity verification
-- Secure handshake protocols
-- DoS resistance mechanisms
+- Replay attack prevention with nonces
+- Node identity verification with quantum-resistant signatures
+- Secure handshake protocols with ML-KEM
+- DoS resistance mechanisms and rate limiting
 
 ## 3. Memory Safety Considerations
 
