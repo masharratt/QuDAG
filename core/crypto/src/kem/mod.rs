@@ -154,3 +154,23 @@ pub struct KeyPair {
     pub public_key: Vec<u8>,
     pub secret_key: Vec<u8>,
 }
+
+impl KeyPair {
+    /// Create a new key pair (placeholder implementation)
+    pub fn new() -> Self {
+        Self {
+            public_key: vec![0u8; 32], // Placeholder
+            secret_key: vec![0u8; 32], // Placeholder
+        }
+    }
+
+    /// Get public key reference
+    pub fn public_key(&self) -> &[u8] {
+        &self.public_key
+    }
+
+    /// Get secret key reference  
+    pub fn secret_key(&self) -> &[u8] {
+        &self.secret_key
+    }
+}

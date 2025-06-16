@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::Mutex;
-use tracing::{error, info, warn};
+use tracing::{info, warn};
 
 /// Performance metrics for CLI operations
 #[derive(Debug, Clone)]
@@ -359,7 +359,7 @@ pub struct AsyncOptimizer;
 
 impl AsyncOptimizer {
     /// Optimize async task execution with batching
-    pub async fn batch_execute<F, T>(tasks: Vec<F>) -> Vec<Result<T, Box<dyn std::error::Error + Send + Sync>>>
+    pub async fn batch_execute<F, T>(mut tasks: Vec<F>) -> Vec<Result<T, Box<dyn std::error::Error + Send + Sync>>>
     where
         F: std::future::Future<Output = Result<T, Box<dyn std::error::Error + Send + Sync>>> + Send + 'static,
         T: Send + 'static,
@@ -367,7 +367,9 @@ impl AsyncOptimizer {
         let batch_size = std::cmp::min(tasks.len(), 10); // Limit concurrent tasks
         let mut results = Vec::with_capacity(tasks.len());
         
-        for chunk in tasks.chunks(batch_size) {
+        while !tasks.is_empty() {
+            let chunk_len = batch_size.min(tasks.len());
+            let chunk: Vec<_> = tasks.drain(..chunk_len).collect();
             let chunk_results = futures::future::join_all(chunk).await;
             results.extend(chunk_results);
         }
@@ -427,7 +429,7 @@ mod tests {
     
     #[tokio::test]
     async fn test_async_optimizer() {
-        let tasks = vec![
+        let tasks: Vec<Pin<Box<dyn std::future::Future<Output = Result<i32, Box<dyn std::error::Error + Send + Sync>>> + Send>>> = vec![
             Box::pin(async { Ok::<i32, Box<dyn std::error::Error + Send + Sync>>(1) }),
             Box::pin(async { Ok::<i32, Box<dyn std::error::Error + Send + Sync>>(2) }),
             Box::pin(async { Ok::<i32, Box<dyn std::error::Error + Send + Sync>>(3) }),

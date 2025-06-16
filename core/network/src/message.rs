@@ -8,7 +8,29 @@ use anyhow::Result;
 use std::collections::VecDeque;
 use tokio::sync::{mpsc, Mutex};
 use std::sync::Arc;
-use tracing::{debug, error, info, warn};
+
+/// Serializable wrapper for blake3::Hash
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct SerializableHash(pub [u8; 32]);
+
+impl From<Hash> for SerializableHash {
+    fn from(hash: Hash) -> Self {
+        SerializableHash(*hash.as_bytes())
+    }
+}
+
+impl From<SerializableHash> for Hash {
+    fn from(hash: SerializableHash) -> Self {
+        Hash::from(hash.0)
+    }
+}
+
+impl SerializableHash {
+    /// Get the hash as bytes
+    pub fn as_bytes(&self) -> &[u8; 32] {
+        &self.0
+    }
+}
 
 /// High-performance message queue for network messages
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -16,7 +38,7 @@ pub struct MessageEnvelope {
     /// The actual message
     pub message: NetworkMessage,
     /// Message hash for integrity
-    pub hash: Hash,
+    pub hash: SerializableHash,
     /// Timestamp
     pub timestamp: u64,
     /// Signature
@@ -36,7 +58,7 @@ impl MessageEnvelope {
         
         Self {
             message,
-            hash: hasher.finalize(),
+            hash: hasher.finalize().into(),
             timestamp,
             signature: None,
         }
@@ -47,7 +69,7 @@ impl MessageEnvelope {
         hasher.update(&bincode::serialize(&self.message).unwrap());
         hasher.update(&self.timestamp.to_le_bytes());
         
-        self.hash == hasher.finalize()
+        self.hash == hasher.finalize().into()
     }
     
     pub fn sign(&mut self, key: &[u8]) -> Result<(), NetworkError> {

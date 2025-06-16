@@ -11,8 +11,16 @@ pub mod system;
 pub mod scenarios;
 pub mod metrics;
 pub mod utils;
+pub mod baseline;
+pub mod regression;
+pub mod monitoring;
+pub mod guards;
 
 pub use utils::{BenchmarkMetrics, ResourceMonitor};
+pub use baseline::*;
+pub use regression::*;
+pub use monitoring::*;
+pub use guards::*;
 
 /// Re-export commonly used types for benchmarking
 pub use criterion;

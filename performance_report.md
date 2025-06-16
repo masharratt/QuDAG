@@ -17,77 +17,77 @@
 
 ### ml_kem_768_keygen
 
-- Duration: 15.760273ms
-- Throughput: 66.67 ops/sec
+- Duration: 10.075147ms
+- Throughput: 100.00 ops/sec
 - Memory usage: 1.00 MB
 - Status: ✅ PASS
 
 ### ml_kem_768_encapsulate
 
-- Duration: 6.239451ms
-- Throughput: 166.67 ops/sec
+- Duration: 5.071321ms
+- Throughput: 200.00 ops/sec
 - Memory usage: 0.50 MB
 - Status: ✅ PASS
 
 ### blake3_hash_1kb
 
-- Duration: 1.070908ms
+- Duration: 1.738784ms
 - Throughput: 1024000.00 ops/sec
 - Memory usage: 0.00 MB
 - Status: ✅ PASS
 
 ### consensus_round_10_nodes
 
-- Duration: 1.069716ms
+- Duration: 1.094342ms
 - Throughput: 10000.00 ops/sec
 - Memory usage: 0.01 MB
 - Status: ✅ PASS
 
 ### consensus_round_50_nodes
 
-- Duration: 5.067906ms
+- Duration: 5.132665ms
 - Throughput: 10000.00 ops/sec
 - Memory usage: 0.05 MB
 - Status: ✅ PASS
 
 ### consensus_round_100_nodes
 
-- Duration: 10.067733ms
+- Duration: 10.068925ms
 - Throughput: 10000.00 ops/sec
 - Memory usage: 0.10 MB
 - Status: ✅ PASS
 
 ### consensus_round_500_nodes
 
-- Duration: 50.075765ms
+- Duration: 50.665175ms
 - Throughput: 10000.00 ops/sec
 - Memory usage: 0.49 MB
 - Status: ✅ PASS
 
 ### consensus_finality
 
-- Duration: 500.079186ms
+- Duration: 500.125221ms
 - Memory usage: 10.00 MB
 - Status: ✅ PASS
 
 ### message_throughput
 
-- Duration: 5.000071421s
-- Throughput: 19999.71 ops/sec
+- Duration: 5.000074067s
+- Throughput: 19999.70 ops/sec
 - Memory usage: 97.66 MB
 - Status: ✅ PASS
 
 ### anonymous_routing
 
-- Duration: 50.207562ms
+- Duration: 50.070455ms
 - Throughput: 20.00 ops/sec
 - Memory usage: 2.00 MB
 - Status: ✅ PASS
 
 ### connection_management
 
-- Duration: 10.072502ms
-- Throughput: 99280.20 ops/sec
+- Duration: 10.075576ms
+- Throughput: 99249.91 ops/sec
 - Memory usage: 0.98 MB
 - Status: ✅ PASS
 

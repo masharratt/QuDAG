@@ -2,6 +2,22 @@ use std::time::SystemTime;
 use serde::{Serialize, Deserialize};
 use blake3::Hash;
 
+/// Serializable wrapper for blake3::Hash
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct SerializableHash(pub [u8; 32]);
+
+impl From<Hash> for SerializableHash {
+    fn from(hash: Hash) -> Self {
+        SerializableHash(*hash.as_bytes())
+    }
+}
+
+impl From<SerializableHash> for Hash {
+    fn from(hash: SerializableHash) -> Self {
+        Hash::from(hash.0)
+    }
+}
+
 /// Represents the state of a node in the DAG
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum NodeState {
@@ -16,10 +32,28 @@ pub enum NodeState {
 }
 
 /// A node in the DAG containing a transaction or consensus message
+/// 
+/// # Examples
+/// 
+/// ```rust
+/// use qudag_dag::{Node, NodeState};
+/// 
+/// // Create a new node with payload and no parents (genesis node)
+/// let payload = b"Hello, DAG!".to_vec();
+/// let node = Node::new(payload.clone(), vec![]);
+/// 
+/// assert_eq!(node.payload(), &payload);
+/// assert_eq!(node.state(), NodeState::Pending);
+/// assert!(node.parents().is_empty());
+/// 
+/// // Hash is computed deterministically
+/// let hash = node.hash();
+/// assert_eq!(hash.as_bytes().len(), 32);
+/// ```
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Node {
     /// Unique identifier hash for this node
-    hash: Hash,
+    hash: SerializableHash,
     /// Payload contained in this node
     payload: Vec<u8>,
     /// Current state of this node
@@ -27,11 +61,26 @@ pub struct Node {
     /// Timestamp when node was created
     timestamp: SystemTime,
     /// Parent node hashes
-    parents: Vec<Hash>,
+    parents: Vec<SerializableHash>,
 }
 
 impl Node {
     /// Creates a new node with the given payload and parents
+    /// 
+    /// # Examples
+    /// 
+    /// ```rust
+    /// use qudag_dag::Node;
+    /// 
+    /// // Create a genesis node (no parents)
+    /// let payload = b"Genesis block".to_vec();
+    /// let node = Node::new(payload, vec![]);
+    /// 
+    /// // Create a child node
+    /// let parent_hash = node.hash();
+    /// let child_payload = b"Child block".to_vec();
+    /// let child_node = Node::new(child_payload, vec![parent_hash]);
+    /// ```
     pub fn new(payload: Vec<u8>, parents: Vec<Hash>) -> Self {
         let timestamp = SystemTime::now();
         let mut hasher = blake3::Hasher::new();
@@ -42,17 +91,17 @@ impl Node {
         let hash = hasher.finalize();
 
         Self {
-            hash,
+            hash: hash.into(),
             payload,
             state: NodeState::Pending,
             timestamp,
-            parents,
+            parents: parents.into_iter().map(|h| h.into()).collect(),
         }
     }
 
     /// Returns the node's unique hash
-    pub fn hash(&self) -> &Hash {
-        &self.hash
+    pub fn hash(&self) -> Hash {
+        self.hash.clone().into()
     }
 
     /// Returns reference to node's payload
@@ -65,9 +114,9 @@ impl Node {
         self.state  
     }
 
-    /// Returns reference to parent hashes
-    pub fn parents(&self) -> &[Hash] {
-        &self.parents
+    /// Returns reference to parent hashes (converted)
+    pub fn parents(&self) -> Vec<Hash> {
+        self.parents.iter().map(|h| h.clone().into()).collect()
     }
 
     /// Updates node state if transition is valid

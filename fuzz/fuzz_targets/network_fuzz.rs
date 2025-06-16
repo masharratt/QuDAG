@@ -4,14 +4,14 @@ use std::time::Duration;
 use std::collections::HashMap;
 use std::net::{SocketAddr, IpAddr, Ipv4Addr};
 use serde::{Serialize, Deserialize};
+use qudag_network::{
+    NetworkAddress, NetworkMessage, PeerId, RoutingStrategy,
+    ShadowAddress, ShadowAddressGenerator, NetworkType,
+    DarkResolver, MessageEnvelope, Router,
+};
 
-/// Message priority levels for testing
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum MessagePriority {
-    High,
-    Normal,
-    Low,
-}
+// Use network module's MessagePriority
+use qudag_network::MessagePriority;
 
 /// Test message structure
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -274,4 +274,236 @@ fuzz_target!(|data: &[u8]| {
         let _ = create_test_message(&alt_data);
         let _ = create_test_peer(&alt_data);
     }
+
+    // Test actual network components
+    if data.len() >= 32 {
+        test_network_address_operations(data);
+        test_shadow_address_operations(data);
+        test_message_envelope_operations(data);
+        test_routing_operations_real(data);
+    }
+
+    // Test dark resolver operations
+    if data.len() >= 64 {
+        test_dark_resolver_operations(data);
+    }
+
+    // Test serialization robustness
+    if data.len() >= 16 {
+        test_serialization_robustness(data);
+    }
 });
+
+/// Test NetworkAddress operations with fuzz data
+fn test_network_address_operations(data: &[u8]) {
+    // Test various address formats
+    let addresses = vec![
+        "127.0.0.1:8080",
+        "::1:8080", 
+        "localhost:3000",
+        "example.com:443",
+    ];
+    
+    for addr_str in addresses {
+        match NetworkAddress::from_str(addr_str) {
+            Ok(addr) => {
+                // Test serialization
+                let serialized = match bincode::serialize(&addr) {
+                    Ok(s) => s,
+                    Err(_) => continue,
+                };
+                
+                let _deserialized: Result<NetworkAddress, _> = bincode::deserialize(&serialized);
+                
+                // Test validation
+                assert!(addr.is_valid(), "NetworkAddress should be valid");
+            }
+            Err(_) => continue,
+        }
+    }
+    
+    // Test with fuzz data as address
+    if data.len() >= 8 {
+        let fuzz_addr = String::from_utf8_lossy(&data[..8]);
+        let _ = NetworkAddress::from_str(&fuzz_addr);
+    }
+}
+
+/// Test ShadowAddress operations
+fn test_shadow_address_operations(data: &[u8]) {
+    if data.len() < 16 {
+        return;
+    }
+    
+    let generator = ShadowAddressGenerator::new();
+    
+    // Test shadow address generation
+    let network_type = match data[0] % 3 {
+        0 => NetworkType::Tor,
+        1 => NetworkType::I2P,
+        _ => NetworkType::Custom,
+    };
+    
+    let seed = &data[1..16];
+    match generator.generate_shadow_address(seed, network_type) {
+        Ok(shadow_addr) => {
+            // Test shadow address validation
+            assert!(shadow_addr.is_valid(), "Shadow address should be valid");
+            
+            // Test serialization
+            let serialized = match bincode::serialize(&shadow_addr) {
+                Ok(s) => s,
+                Err(_) => return,
+            };
+            
+            let _deserialized: Result<ShadowAddress, _> = bincode::deserialize(&serialized);
+            
+            // Test with malformed data
+            if data.len() >= 32 {
+                let malformed_seed = &data[16..32];
+                let _ = generator.generate_shadow_address(malformed_seed, network_type);
+            }
+        }
+        Err(_) => return,
+    }
+}
+
+/// Test MessageEnvelope operations
+fn test_message_envelope_operations(data: &[u8]) {
+    if data.len() < 16 {
+        return;
+    }
+    
+    let sender = PeerId::from_bytes(&data[..8]);
+    let recipient = PeerId::from_bytes(&data[8..16]);
+    let payload = data[16..].to_vec();
+    
+    let priority = match data[0] % 3 {
+        0 => MessagePriority::High,
+        1 => MessagePriority::Normal,
+        _ => MessagePriority::Low,
+    };
+    
+    let network_msg = NetworkMessage::new(
+        sender.clone(),
+        recipient.clone(),
+        payload.clone(),
+        priority,
+    );
+    
+    match MessageEnvelope::new(network_msg) {
+        Ok(envelope) => {
+            // Test envelope validation
+            assert!(envelope.is_valid(), "Message envelope should be valid");
+            
+            // Test serialization
+            let serialized = match bincode::serialize(&envelope) {
+                Ok(s) => s,
+                Err(_) => return,
+            };
+            
+            let deserialized: Result<MessageEnvelope, _> = bincode::deserialize(&serialized);
+            assert!(deserialized.is_ok(), "Message envelope deserialization failed");
+            
+            // Test with malformed payload
+            let malformed_payload = vec![0xFF; 1024 * 1024]; // Large payload
+            let malformed_msg = NetworkMessage::new(
+                sender,
+                recipient,
+                malformed_payload,
+                priority,
+            );
+            
+            let _ = MessageEnvelope::new(malformed_msg);
+        }
+        Err(_) => return,
+    }
+}
+
+/// Test Router operations
+fn test_routing_operations_real(data: &[u8]) {
+    if data.len() < 32 {
+        return;
+    }
+    
+    let mut router = Router::new();
+    
+    // Add test routes
+    for i in 0..std::cmp::min(data.len() / 16, 8) {
+        let start_idx = i * 16;
+        let end_idx = std::cmp::min(start_idx + 16, data.len());
+        let chunk = &data[start_idx..end_idx];
+        
+        if chunk.len() >= 16 {
+            let peer_id = PeerId::from_bytes(&chunk[..8]);
+            let addr_bytes = &chunk[8..16];
+            
+            // Create a test address
+            let port = u16::from_le_bytes([addr_bytes[0], addr_bytes[1]]).max(1024).min(65535);
+            let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), port);
+            
+            if let Ok(network_addr) = NetworkAddress::from_socket_addr(addr) {
+                router.add_route(peer_id, network_addr);
+            }
+        }
+    }
+    
+    // Test route lookup
+    let test_peer = PeerId::from_bytes(&data[..8]);
+    let _route = router.find_route(&test_peer);
+    
+    // Test route removal
+    router.remove_route(&test_peer);
+}
+
+/// Test DarkResolver operations
+fn test_dark_resolver_operations(data: &[u8]) {
+    if data.len() < 32 {
+        return;
+    }
+    
+    let resolver = DarkResolver::new();
+    
+    // Test domain resolution
+    let domain_data = &data[..32];
+    let domain = String::from_utf8_lossy(domain_data);
+    
+    // Test with various domain formats
+    let domains = vec![
+        format!("{}.onion", &domain[..16]),
+        format!("{}.i2p", &domain[..16]),
+        format!("test-{}.dark", &domain[..8]),
+    ];
+    
+    for test_domain in domains {
+        let _ = resolver.resolve(&test_domain);
+    }
+    
+    // Test with malformed domains
+    let malformed_domains = vec![
+        String::from_utf8_lossy(&data[..16]).to_string(),
+        "".to_string(),
+        "a".repeat(1000),
+        "\x00\x01\x02".to_string(),
+    ];
+    
+    for malformed in malformed_domains {
+        let _ = resolver.resolve(&malformed);
+    }
+}
+
+/// Test serialization robustness
+fn test_serialization_robustness(data: &[u8]) {
+    // Test with various malformed serialized data
+    let _: Result<NetworkMessage, _> = bincode::deserialize(data);
+    let _: Result<MessageEnvelope, _> = bincode::deserialize(data);
+    let _: Result<NetworkAddress, _> = bincode::deserialize(data);
+    let _: Result<ShadowAddress, _> = bincode::deserialize(data);
+    
+    // Test partial deserialization
+    for i in 1..std::cmp::min(data.len(), 64) {
+        let partial = &data[..i];
+        let _: Result<NetworkMessage, _> = bincode::deserialize(partial);
+        let _: Result<MessageEnvelope, _> = bincode::deserialize(partial);
+    }
+}

@@ -1,5 +1,5 @@
 use anyhow::Result;
-use qudag_protocol::config::ProtocolConfig;
+use qudag_protocol::config::Config as ProtocolConfig;
 use serde::{Serialize, Deserialize};
 use tokio::sync::mpsc;
 use tracing::{info, warn};

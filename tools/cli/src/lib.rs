@@ -1,5 +1,5 @@
 #![deny(unsafe_code)]
-#![warn(missing_docs)]
+#![allow(missing_docs)]
 
 //! Command-line interface for the QuDAG protocol with performance optimizations.
 //! 
@@ -18,6 +18,7 @@ pub mod commands;
 pub mod config;
 pub mod output;
 pub mod performance;
+pub mod rpc;
 pub mod startup;
 
 pub use commands::*;

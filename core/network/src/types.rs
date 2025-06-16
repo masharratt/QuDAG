@@ -2,9 +2,26 @@ use serde::{Serialize, Deserialize};
 use std::time::Duration;
 use std::net::{IpAddr, Ipv4Addr};
 use thiserror::Error;
-use blake3::Hash;
 
 /// Network address combining IP and port
+/// 
+/// # Examples
+/// 
+/// ```rust
+/// use qudag_network::types::NetworkAddress;
+/// use std::net::{IpAddr, Ipv4Addr};
+/// 
+/// // Create address from IP parts
+/// let addr1 = NetworkAddress::new([127, 0, 0, 1], 8080);
+/// 
+/// // Create address from IP and port
+/// let ip = IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1));
+/// let addr2 = NetworkAddress::from_ip_port(ip, 3000);
+/// 
+/// // Get socket address string
+/// let socket_str = addr1.to_socket_addr();
+/// assert_eq!(socket_str, "127.0.0.1:8080");
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct NetworkAddress {
     /// IP address
@@ -53,7 +70,7 @@ pub enum NetworkError {
 }
 
 /// Message priority levels
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum MessagePriority {
     /// High priority messages
     High,
@@ -108,6 +125,8 @@ pub struct NetworkMetrics {
     pub messages_per_second: f64,
     /// Current connections
     pub connections: usize,
+    /// Active connections
+    pub active_connections: usize,
     /// Average message latency
     pub avg_latency: Duration,
     /// Memory usage in bytes
@@ -186,4 +205,72 @@ impl PeerId {
     pub fn as_bytes(&self) -> &[u8] {
         &self.0
     }
+}
+
+impl std::fmt::Display for PeerId {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Format as truncated hex string for readability (first 8 bytes)
+        for byte in &self.0[..8] {
+            write!(f, "{:02x}", byte)?;
+        }
+        Ok(())
+    }
+}
+
+/// Connection status
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ConnectionStatus {
+    /// Connection is being established
+    Connecting,
+    /// Connection is active
+    Connected,
+    /// Connection is being closed
+    Disconnecting,
+    /// Connection is closed
+    Disconnected,
+    /// Connection failed
+    Failed(String),
+}
+
+/// Queue performance metrics
+#[derive(Debug, Clone, Default)]
+pub struct QueueMetrics {
+    /// Current queue size
+    pub current_size: usize,
+    /// Maximum queue size
+    pub max_size: usize,
+    /// Queue utilization (0.0 to 1.0)
+    pub utilization: f64,
+    /// High water mark
+    pub high_water_mark: usize,
+    /// Messages processed per second
+    pub messages_per_second: f64,
+}
+
+/// Latency performance metrics
+#[derive(Debug, Clone, Default)]
+pub struct LatencyMetrics {
+    /// Average message latency
+    pub avg_latency: Duration,
+    /// Peak message latency
+    pub peak_latency: Duration,
+    /// 95th percentile latency
+    pub p95_latency: Duration,
+    /// 99th percentile latency
+    pub p99_latency: Duration,
+}
+
+/// Throughput performance metrics
+#[derive(Debug, Clone, Default)]
+pub struct ThroughputMetrics {
+    /// Messages per second
+    pub messages_per_second: f64,
+    /// Bytes per second
+    pub bytes_per_second: f64,
+    /// Peak throughput
+    pub peak_throughput: f64,
+    /// Average throughput
+    pub avg_throughput: f64,
+    /// Total messages processed
+    pub total_messages: u64,
 }

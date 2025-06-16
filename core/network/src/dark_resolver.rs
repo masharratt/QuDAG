@@ -2,8 +2,6 @@ use std::collections::HashMap;
 use std::sync::RwLock;
 use thiserror::Error;
 // Placeholder crypto imports - will be replaced with actual implementation
-use std::convert::TryInto;
-use std::sync::Arc;
 use crate::types::NetworkAddress;
 
 /// Errors that can occur during dark domain operations

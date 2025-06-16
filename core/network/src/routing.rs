@@ -3,6 +3,7 @@ use std::time::Duration;
 use libp2p::PeerId;
 use thiserror::Error;
 use tokio::sync::mpsc;
+use rand::seq::SliceRandom;
 use crate::shadow_address::{ShadowAddress, ShadowAddressError, ShadowAddressResolver};
 
 /// Errors that can occur during routing operations
@@ -78,7 +79,7 @@ impl Router {
     /// Find paths for a shadow address
     fn find_shadow_paths(&self, addr: &ShadowAddress) -> Result<Vec<RoutePath>, RoutingError> {
         // Resolve shadow address to onetime address
-        let resolved = if let Some(resolver) = &self.shadow_resolver {
+        let _resolved = if let Some(resolver) = &self.shadow_resolver {
             resolver.resolve_address(addr)?
         } else {
             return Err(RoutingError::NoRoute);
@@ -201,7 +202,7 @@ impl Router {
 
         // Split message into chunks for multi-path routing
         let chunk_size = message.len() / paths.len();
-        let mut chunks: Vec<Vec<u8>> = message
+        let chunks: Vec<Vec<u8>> = message
             .chunks(chunk_size)
             .map(|chunk| chunk.to_vec())
             .collect();
@@ -212,7 +213,7 @@ impl Router {
             let mut routed_message = Vec::new();
             routed_message.extend_from_slice(&path.hops.len().to_le_bytes());
             for hop in path.hops {
-                routed_message.extend_from_slice(hop.to_bytes());
+                routed_message.extend_from_slice(&hop.to_bytes());
             }
             routed_message.extend_from_slice(&chunk);
 

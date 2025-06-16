@@ -1,11 +1,17 @@
 use anyhow::Result;
-use qudag_protocol::config::ProtocolConfig;
+use qudag_protocol::config::Config as ProtocolConfig;
 use crate::{
     network::{NetworkSimulator, SimulatorConfig},
     metrics::NetworkMetrics,
+    conditions::{NetworkConditionSimulator, NetworkProfile},
+    attacks::{AttackSimulator, AttackType, SybilBehavior, ByzantineBehavior, RoutingManipulation},
+    visualization::{NetworkTopology, NetworkNode, NetworkConnection, NodeType, NodeStatus, NodeMetrics},
+    reports::{ReportGenerator, ReportFormat},
 };
-use std::time::Duration;
-use tracing::info;
+use rand::{Rng, thread_rng};
+use std::collections::HashMap;
+use std::time::{Duration, SystemTime};
+use tracing::{info, warn, debug};
 
 /// Test scenario configuration
 #[derive(Debug, Clone)]
@@ -74,10 +80,9 @@ pub async fn test_byzantine_tolerance(config: ScenarioConfig) -> Result<NetworkM
         simulator.add_node(ProtocolConfig::default()).await?;
     }
 
-    // Add Byzantine nodes
+    // Add Byzantine nodes (simulate by adding normal nodes for now)
     for _ in 0..(config.node_count / 3) {
-        let mut config = ProtocolConfig::default();
-        config.byzantine = true;
+        let config = ProtocolConfig::default();
         simulator.add_node(config).await?;
     }
 

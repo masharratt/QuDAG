@@ -1,0 +1,11 @@
+    Blocking waiting for file lock on build directory
+   Compiling proc-macro2 v1.0.95
+   Compiling libc v0.2.173
+error: failed to run custom build command for `proc-macro2 v1.0.95`
+
+Caused by:
+  could not execute process `/workspaces/QuDAG/target/debug/build/proc-macro2-3c7cf2cb897bcc27/build-script-build` (never executed)
+
+Caused by:
+  No such file or directory (os error 2)
+warning: build failed, waiting for other jobs to finish...

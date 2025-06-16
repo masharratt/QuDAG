@@ -43,7 +43,7 @@ pub trait AsyncTransport: AsyncRead + AsyncWrite + Send + Unpin {}
 /// Network transport trait defining the interface for transport operations.
 pub trait Transport {
     /// Initialize transport with configuration.
-    fn init(config: TransportConfig) -> Result<(), TransportError>;
+    fn init(&mut self, config: TransportConfig) -> Result<(), TransportError>;
     
     /// Create a new connection to a remote peer.
     fn connect(&mut self, addr: SocketAddr) -> Result<Box<dyn AsyncTransport>, TransportError>;

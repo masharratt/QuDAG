@@ -147,43 +147,78 @@ All security measures are continuously validated through:
 
 ## 5. Consensus Security Measures
 
-### 5.1 Quantum-Resistant Verification Method
+### 5.1 QR-Avalanche Consensus Security
 
-- **Blake3-based Vote Aggregation**:
-  - Quantum-resistant hashing of vote data
-  - Constant-time vote processing
-  - Dynamic threshold adjustment based on vote entropy
-  - Prevention of quantum-based voting manipulation
+The QuDAG protocol implements QR-Avalanche consensus with enhanced security measures:
 
-### 5.2 Concurrent Verification Security
+#### Quantum-Resistant Vote Aggregation
+- **BLAKE3-based Vote Hashing**: All vote data is hashed using quantum-resistant BLAKE3
+- **ML-DSA Vote Signatures**: Each vote is signed with post-quantum digital signatures
+- **Constant-Time Vote Processing**: All vote operations run in constant time
+- **Dynamic Threshold Adjustment**: Thresholds adapt based on network conditions
+- **Quantum Attack Prevention**: Resistant to quantum-based consensus manipulation
 
-- **Parallel Method Execution**:
-  - Tokio-based async processing
-  - Race condition prevention
-  - Thread-safe round state management
-  - Atomic operation guarantees
+#### Byzantine Fault Tolerance
+- **Safety Guarantee**: Maintains safety with up to 1/3 Byzantine nodes
+- **Liveness Guarantee**: Ensures progress under network asynchrony
+- **Fork Detection**: Automatic detection and resolution of conflicting vertices
+- **Finality Assurance**: Probabilistic finality with high confidence levels
 
-### 5.3 Vote Validation Requirements
+### 5.2 Concurrent Processing Security
 
-- **Threshold Management**:
-  - Dynamic finality threshold (base: 67%)
-  - Quantum-resistant threshold modulation
-  - Vote weight verification
-  - Double-vote prevention
+#### Asynchronous Operation Safety
+- **Tokio Runtime**: Memory-safe async execution environment
+- **Arc/RwLock Patterns**: Thread-safe shared state management
+- **Atomic Operations**: Lock-free operations where possible
+- **Race Condition Prevention**: Careful synchronization design
 
-### 5.4 State Transition Security
+#### State Management Security
+- **Immutable State Transitions**: Vertices cannot be modified after creation
+- **Atomic Updates**: State changes are applied atomically
+- **Consistency Guarantees**: Strong consistency across all nodes
+- **Conflict Resolution**: Deterministic resolution of state conflicts
 
-- **Strict State Progression**:
-  - Created → Verified → In Consensus → Final/Rejected
-  - Atomic state updates
-  - Race condition prevention
-  - Timeout-based state cleanup
+### 5.3 Vertex Validation Security
 
-- **Round Management**:
-  - 250ms finality timeout
-  - Maximum 1000 concurrent rounds
-  - Secure round cleanup
-  - Memory-safe state tracking
+#### Cryptographic Validation
+- **Signature Verification**: All vertices must have valid ML-DSA signatures
+- **Hash Validation**: Vertex IDs verified against content hashes
+- **Parent Verification**: Parent references validated for existence and consistency
+- **Timestamp Validation**: Monotonic timestamp requirements
+
+#### Consensus Thresholds
+- **Base Threshold**: 80% agreement required for finality (configurable)
+- **Sample Size**: Query at least 20 peers for consensus (configurable)
+- **Confirmation Depth**: Require 4+ confirmations for high confidence
+- **Timeout Management**: 5-second maximum for consensus decisions
+
+### 5.4 DAG Structure Security
+
+#### Graph Integrity
+- **Acyclicity Enforcement**: Strict prevention of cycles in the DAG
+- **Parent Validation**: All parent references must exist before vertex addition
+- **Tip Selection**: Secure algorithm for selecting optimal vertex parents
+- **Conflict Detection**: Automatic identification of double-spending attempts
+
+#### Memory Safety
+- **Bounded Growth**: DAG size limits to prevent memory exhaustion
+- **Cleanup Procedures**: Automatic pruning of old vertices
+- **State Synchronization**: Efficient state sync between nodes
+- **Resource Management**: Careful memory allocation and deallocation
+
+### 5.5 Network Consensus Security
+
+#### Peer Validation
+- **Identity Verification**: ML-DSA-based peer authentication
+- **Reputation System**: Track peer behavior and reliability
+- **Sybil Resistance**: Limit influence of malicious peer clusters
+- **Eclipse Prevention**: Diverse peer selection algorithms
+
+#### Message Security
+- **Authenticated Messages**: All consensus messages signed with ML-DSA
+- **Replay Prevention**: Nonce-based replay attack protection
+- **Message Ordering**: Causal ordering of consensus messages
+- **Integrity Protection**: End-to-end message integrity verification
 
 ## Security Considerations for Developers
 

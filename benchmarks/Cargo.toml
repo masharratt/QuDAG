@@ -5,6 +5,9 @@ edition.workspace = true
 authors.workspace = true
 license.workspace = true
 
+[lints]
+workspace = true
+
 [dependencies]
 thiserror.workspace = true
 tracing.workspace = true
@@ -25,4 +28,8 @@ harness = false
 
 [[bench]]
 name = "dark_addressing_benchmarks"
+harness = false
+
+[[bench]]
+name = "memory_benchmarks"
 harness = false

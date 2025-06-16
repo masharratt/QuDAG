@@ -2,7 +2,7 @@ use crate::types::{NetworkMessage, PeerId, RoutingStrategy, NetworkError};
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::RwLock;
-use rand::seq::SliceRandom;
+use rand::seq::{SliceRandom, IteratorRandom};
 use rand::thread_rng;
 
 /// Information about a hop in a route
@@ -98,7 +98,7 @@ impl Router {
             RoutingStrategy::RandomSubset(count) => {
                 let peers = self.peers.read().await;
                 let mut rng = thread_rng();
-                let selected: Vec<_> = peers.iter().choose_multiple(&mut rng, count).cloned().collect();
+                let selected: Vec<_> = peers.iter().choose_multiple(&mut rng, count).into_iter().cloned().collect();
                 Ok(selected)
             }
         }

@@ -19,6 +19,9 @@ pub enum ProtocolError {
 
     #[error("Internal error: {0}")]
     Internal(String),
+
+    #[error("Invalid message: {0}")]
+    InvalidMessage(String),
 }
 
 /// Protocol events

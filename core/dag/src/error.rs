@@ -14,7 +14,9 @@ pub enum DagError {
     /// Invalid edge - creates a cycle
     #[error("Edge would create cycle between {from} and {to}")]
     CycleDetected {
+        /// Source node of the cycle-creating edge
         from: String,
+        /// Target node of the cycle-creating edge
         to: String,
     },
 

@@ -1,7 +1,7 @@
 //! Protocol state synchronization implementation.
 
 use thiserror::Error;
-use crate::state::State;
+use crate::state::ProtocolState;
 
 /// Errors that can occur during synchronization.
 #[derive(Debug, Error)]
@@ -57,11 +57,11 @@ pub trait StateSynchronization {
     fn stop_sync(&mut self) -> Result<(), SyncError>;
     
     /// Request state from peers.
-    fn request_state(&mut self) -> Result<State, SyncError>;
+    fn request_state(&mut self) -> Result<ProtocolState, SyncError>;
     
     /// Send state to peers.
-    fn send_state(&mut self, state: &State) -> Result<(), SyncError>;
+    fn send_state(&mut self, state: &ProtocolState) -> Result<(), SyncError>;
     
     /// Resolve state conflicts.
-    fn resolve_conflicts(&mut self, states: Vec<State>) -> Result<State, SyncError>;
+    fn resolve_conflicts(&mut self, states: Vec<ProtocolState>) -> Result<ProtocolState, SyncError>;
 }

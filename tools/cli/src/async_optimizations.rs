@@ -6,6 +6,7 @@ use std::task::{Context, Poll};
 use tokio::sync::{RwLock, Semaphore};
 use tokio::time::timeout;
 use tracing::{debug, warn, error};
+use pin_project::pin_project;
 
 /// Async operation optimizer with timeouts and retries
 pub struct AsyncOptimizer {
@@ -125,15 +126,18 @@ impl AsyncOptimizer {
     }
 
     /// Batch execute multiple operations
-    pub async fn batch_execute<F, T>(&self, operations: Vec<F>) -> Vec<Result<T, AsyncError>>
+    pub async fn batch_execute<F, T>(&self, mut operations: Vec<F>) -> Vec<Result<T, AsyncError>>
     where
         F: Future<Output = Result<T, AsyncError>>,
     {
         let chunk_size = self.max_concurrent.available_permits().min(operations.len());
         let mut results = Vec::with_capacity(operations.len());
 
-        for chunk in operations.chunks(chunk_size) {
-            let chunk_futures: Vec<_> = chunk.iter()
+        while !operations.is_empty() {
+            let chunk_len = chunk_size.min(operations.len());
+            let chunk: Vec<_> = operations.drain(..chunk_len).collect();
+            
+            let chunk_futures: Vec<_> = chunk.into_iter()
                 .map(|op| self.execute(op))
                 .collect();
             
@@ -277,7 +281,7 @@ impl TaskPool {
 }
 
 /// Async error types
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Clone, thiserror::Error)]
 pub enum AsyncError {
     #[error("Operation timed out")]
     Timeout,
@@ -288,8 +292,8 @@ pub enum AsyncError {
     #[error("Task cancelled")]
     Cancelled,
     
-    #[error("I/O error: {0}")]
-    Io(#[from] std::io::Error),
+    #[error("IO error: {0}")]
+    Io(String),
     
     #[error("Network error: {0}")]
     Network(String),
@@ -313,7 +317,9 @@ impl AsyncError {
 }
 
 /// Future wrapper for error propagation optimization
+#[pin_project]
 pub struct ErrorPropagationFuture<F> {
+    #[pin]
     inner: F,
     error_handler: Option<Box<dyn Fn(&AsyncError) + Send + Sync>>,
 }
@@ -344,15 +350,14 @@ where
     type Output = Result<T, AsyncError>;
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
-        let this = unsafe { self.get_unchecked_mut() };
-        let inner = unsafe { Pin::new_unchecked(&mut this.inner) };
+        let this = self.project();
         
-        match inner.poll(cx) {
-            Poll::Ready(Err(ref e)) => {
+        match this.inner.poll(cx) {
+            Poll::Ready(Err(e)) => {
                 if let Some(ref handler) = this.error_handler {
-                    handler(e);
+                    handler(&e);
                 }
-                Poll::Ready(Err(e.clone()))
+                Poll::Ready(Err(e))
             }
             poll => poll,
         }

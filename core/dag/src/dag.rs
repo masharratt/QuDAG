@@ -10,18 +10,23 @@ use crate::consensus::{ConsensusError, QRAvalanche};
 /// Errors that can occur during DAG operations
 #[derive(Error, Debug)]
 pub enum DagError {
+    /// Error from vertex operations
     #[error("Vertex error: {0}")]
     VertexError(#[from] VertexError),
     
+    /// Error from consensus operations
     #[error("Consensus error: {0}")]
     ConsensusError(#[from] ConsensusError),
     
+    /// Message processing channel was closed
     #[error("Channel closed")]
     ChannelClosed,
     
+    /// Conflict detected between messages
     #[error("Conflict detected")]
     ConflictDetected,
     
+    /// Failed to synchronize state between DAG instances
     #[error("State sync failed")]
     StateSyncFailed,
 }
@@ -52,7 +57,7 @@ struct ProcessingState {
 #[derive(Debug, Clone)]
 pub struct Dag {
     /// Vertices in the DAG
-    vertices: Arc<RwLock<HashMap<VertexId, Vertex>>>,
+    pub vertices: Arc<RwLock<HashMap<VertexId, Vertex>>>,
     /// Current processing state
     state: Arc<RwLock<ProcessingState>>,
     /// Message processing channel
@@ -86,7 +91,8 @@ impl Dag {
                     // Wait for some messages to complete
                     continue;
                 }
-                state.processing.insert(msg.id);
+                let msg_id = msg.id.clone();
+                state.processing.insert(msg_id.clone());
                 drop(state);
                 
                 let vertices = vertices_clone.clone();
@@ -98,7 +104,7 @@ impl Dag {
                         error!("Message processing failed: {}", e);
                     }
                     let mut state = state.write().await;
-                    state.processing.remove(&msg.id);
+                    state.processing.remove(&msg_id);
                 });
             }
         });

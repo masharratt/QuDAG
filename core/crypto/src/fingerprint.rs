@@ -19,6 +19,31 @@ pub enum FingerprintError {
 }
 
 /// A quantum-resistant fingerprint using ML-DSA signatures
+/// 
+/// # Examples
+/// 
+/// ```rust
+/// use qudag_crypto::fingerprint::Fingerprint;
+/// use rand::thread_rng;
+/// 
+/// fn example() -> Result<(), Box<dyn std::error::Error>> {
+///     let mut rng = thread_rng();
+///     let data = b"some data to fingerprint";
+///     
+///     // Generate a fingerprint
+///     let (fingerprint, public_key) = Fingerprint::generate(data, &mut rng)?;
+///     
+///     // Verify the fingerprint
+///     fingerprint.verify(&public_key)?;
+///     
+///     // Access the fingerprint data
+///     let fp_data = fingerprint.data();
+///     assert_eq!(fp_data.len(), 64); // BLAKE3 outputs 64 bytes in XOF mode
+///     
+///     Ok(())
+/// }
+/// # example().unwrap();
+/// ```
 #[derive(Debug, Zeroize, ZeroizeOnDrop)]
 pub struct Fingerprint {
     /// The actual fingerprint data

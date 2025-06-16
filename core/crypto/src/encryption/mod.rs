@@ -24,4 +24,4 @@ impl fmt::Display for EncryptionError {
 
 impl Error for EncryptionError {}
 
-pub mod hqc;
+// HQC module removed - use the main hqc module in crypto instead
