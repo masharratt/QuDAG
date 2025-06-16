@@ -1,0 +1,25 @@
+[package]
+name = "qudag-network"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+tokio = { version = "1.36", features = ["full"] }
+futures = "0.3"
+thiserror = "1.0"
+tracing = "0.1"
+bytes = "1.5"
+dashmap = "5.5"  # Thread-safe concurrent HashMap
+quinn = "0.10"   # QUIC protocol implementation
+ring = "0.17"    # Cryptographic operations
+rand = "0.8"
+
+[dev-dependencies]
+tokio-test = "0.4"
+criterion = { version = "0.5", features = ["async_tokio"] }
+proptest = "1.4"
+tracing-test = "0.2"
+
+[[bench]]
+name = "throughput"
+harness = false
