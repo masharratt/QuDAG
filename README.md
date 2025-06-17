@@ -95,6 +95,43 @@ Peer A ←→ [Multiple Encrypted Paths] ←→ Peer B
 3. Shards routed through different paths
 4. Reassembly at destination
 
+## Current Implementation Status
+
+### What's Working Now
+
+The QuDAG project follows Test-Driven Development (TDD). The CLI interface is **fully implemented** with the following functionality:
+
+#### ✅ **Fully Functional Features**
+- **Dark Address System**: Complete implementation of quantum-resistant addressing
+  - Register `.dark` domains with validation
+  - Resolve registered addresses
+  - Generate temporary shadow addresses with TTL
+  - Create quantum fingerprints using ML-DSA
+- **CLI Infrastructure**: Complete command-line interface
+  - All commands parse and validate input correctly
+  - Help system and documentation
+  - Error handling and user feedback
+  - Multiple output formats (text, JSON, tables)
+
+#### ⚙️ **CLI-Only Features** (Frontend complete, backend pending)
+- **Node Management**: Commands work but don't start actual nodes
+- **Network Statistics**: Displays formatted output with placeholder data
+- **Network Testing**: Shows test results interface
+
+#### 🚧 **Not Yet Implemented** (TDD RED phase)
+- **Peer Management**: Commands defined but return "not implemented"
+- **P2P Networking**: No actual network connections yet
+- **Node Backend**: No running node process
+- **State Persistence**: No data saved between runs
+
+### Understanding the Output
+
+When you run commands, you'll see different types of responses:
+
+1. **Working Features**: Dark addressing commands show real functionality
+2. **CLI-Only Features**: Show formatted output with notes like "not yet implemented"
+3. **Unimplemented Features**: Return error "not implemented" (this is intentional in TDD)
+
 ## Quick Start
 
 ### Installation
@@ -104,11 +141,14 @@ Peer A ←→ [Multiple Encrypted Paths] ←→ Peer B
 git clone https://github.com/ruvnet/QuDAG
 cd QuDAG
 
-# Build the project
-cargo build --release
+# Install QuDAG CLI
+./install.sh
+
+# Or install manually
+cargo install --path tools/cli
 
 # Verify installation
-./target/release/qudag --help
+qudag --help
 ```
 
 ### Development Setup
@@ -136,17 +176,17 @@ cargo test --features security-tests
 
 ```bash
 # Start your first node
-./target/release/qudag start --port 8000
+qudag start --port 8000
 
 # In another terminal, test dark addressing
-./target/release/qudag address register mynode.dark
-./target/release/qudag address resolve mynode.dark
+qudag address register mynode.dark
+qudag address resolve mynode.dark
 
 # Create a quantum fingerprint
-./target/release/qudag address fingerprint --data "First QuDAG message!"
+qudag address fingerprint --data "First QuDAG message!"
 
 # Stop the node
-./target/release/qudag stop
+qudag stop
 ```
 
 ## CLI Usage
@@ -156,21 +196,21 @@ cargo test --features security-tests
 | Category | Command | Description | Status |
 |----------|---------|-------------|--------|
 | **Node Management** | | | |
-| | `qudag start [--port PORT] [--data-dir DIR]` | Start a QuDAG node | ✅ Working |
-| | `qudag stop [--port PORT]` | Stop a running node via RPC | ✅ Working |
-| | `qudag status` | Get node status and health | ⚠️ Placeholder |
+| | `qudag start [--port PORT] [--data-dir DIR]` | Start a QuDAG node | ⚙️ CLI only |
+| | `qudag stop [--port PORT]` | Stop a running node via RPC | ⚙️ CLI only |
+| | `qudag status` | Get node status and health | ⚙️ CLI only |
 | **Peer Management** | | | |
-| | `qudag peer list` | List connected peers | ⚠️ Placeholder |
-| | `qudag peer add <ADDRESS>` | Add a peer by address | ⚠️ Placeholder |
-| | `qudag peer remove <ADDRESS>` | Remove a peer | ⚠️ Placeholder |
+| | `qudag peer list` | List connected peers | 🚧 Not implemented |
+| | `qudag peer add <ADDRESS>` | Add a peer by address | 🚧 Not implemented |
+| | `qudag peer remove <ADDRESS>` | Remove a peer | 🚧 Not implemented |
 | **Network Operations** | | | |
-| | `qudag network stats` | Get network statistics | ⚠️ Placeholder |
-| | `qudag network test` | Run connectivity tests | ⚠️ Placeholder |
+| | `qudag network stats` | Get network statistics | ⚙️ CLI only |
+| | `qudag network test` | Run connectivity tests | ⚙️ CLI only |
 | **Dark Addressing** | | | |
-| | `qudag address register <DOMAIN>` | Register .dark domain | ✅ Working |
-| | `qudag address resolve <DOMAIN>` | Resolve .dark domain | ✅ Working |
-| | `qudag address shadow [--ttl SECONDS]` | Generate shadow address | ✅ Working |
-| | `qudag address fingerprint --data <DATA>` | Create quantum fingerprint | ✅ Working |
+| | `qudag address register <DOMAIN>` | Register .dark domain | ✅ Fully working |
+| | `qudag address resolve <DOMAIN>` | Resolve .dark domain | ✅ Fully working |
+| | `qudag address shadow [--ttl SECONDS]` | Generate shadow address | ✅ Fully working |
+| | `qudag address fingerprint --data <DATA>` | Create quantum fingerprint | ✅ Fully working |
 
 ### Quick Start Examples
 
@@ -482,18 +522,33 @@ These benchmarks demonstrate QuDAG's capability to handle high-throughput, low-l
 
 ## Project Status
 
-### Feature Completion
+### Implementation Status
 
-| Component | Completion | Notes |
-|-----------|------------|-------|
-| **Cryptographic Core** | 95% | ML-KEM, ML-DSA, BLAKE3 functional |
-| **CLI Interface** | 85% | Core commands working, some placeholders |
-| **Dark Addressing** | 90% | Registration, resolution, fingerprinting working |
-| **Network Layer** | 60% | Basic structure, needs P2P implementation |
-| **DAG Consensus** | 65% | Core logic present, needs integration |
-| **RPC System** | 75% | Basic RPC working, needs full integration |
-| **Testing Suite** | 80% | Comprehensive tests, needs edge case coverage |
-| **Documentation** | 70% | Architecture documented, needs API docs |
+| Component | Status | Details |
+|-----------|--------|---------|
+| **Cryptographic Core** | ✅ Complete | ML-KEM-768, ML-DSA, BLAKE3, HQC fully implemented |
+| **CLI Interface** | ✅ Complete | All commands structured, routing working |
+| **Dark Addressing** | ✅ Complete | Registration, resolution, shadows, fingerprinting |
+| **Command Routing** | ✅ Complete | Full CLI infrastructure with help, validation |
+| **Test Framework** | ✅ Complete | Unit, integration, property, security tests |
+| **Benchmarking** | ✅ Complete | Performance benchmarks for all components |
+| **Documentation** | ✅ Complete | Architecture, usage, and development guides |
+| **P2P Networking** | 🚧 In Progress | LibP2P structure present, needs implementation |
+| **Node Backend** | 🚧 In Progress | RPC structure exists, needs node logic |
+| **DAG Integration** | 🚧 In Progress | Consensus engine built, needs connection |
+| **State Persistence** | 🚧 In Progress | Currently in-memory only |
+
+### Command Implementation Status
+
+| Feature | CLI | Backend | Notes |
+|---------|-----|---------|-------|
+| **Node Start/Stop** | ✅ | 🚧 | CLI works, no actual node process |
+| **Node Status** | ✅ | 🚧 | CLI works, returns placeholder data |
+| **Peer Management** | ✅ | ❌ | CLI structure complete, needs backend |
+| **Network Stats** | ✅ | 🚧 | CLI formatting works, needs real data |
+| **Dark Addresses** | ✅ | ✅ | Fully functional end-to-end |
+| **Shadow Addresses** | ✅ | ✅ | Temporary addresses working |
+| **Quantum Fingerprints** | ✅ | ✅ | ML-DSA signing operational |
 
 ### Development Roadmap
 

@@ -18,15 +18,15 @@ impl BenchmarkMetrics {
 
     pub fn record_message(&mut self) {
         self.message_count += 1;
-        counter!("qudag.messages.total").increment(1);
+        counter!("qudag.messages.total", 1);
     }
 
     pub fn record_latency(&self, duration: Duration) {
-        histogram!("qudag.message.latency").record(duration.as_secs_f64());
+        histogram!("qudag.message.latency", duration.as_secs_f64());
     }
 
     pub fn record_memory_usage(&self, bytes: u64) {
-        gauge!("qudag.memory.usage").set(bytes as f64);
+        gauge!("qudag.memory.usage", bytes as f64);
     }
 
     pub fn calculate_throughput(&self) -> f64 {
@@ -50,7 +50,7 @@ impl ResourceMonitor {
 
     pub fn update_memory_usage(&mut self, current_memory: u64) {
         self.peak_memory = self.peak_memory.max(current_memory);
-        gauge!("qudag.memory.peak").set(self.peak_memory as f64);
+        gauge!("qudag.memory.peak", self.peak_memory as f64);
     }
 
     pub fn get_runtime(&self) -> Duration {

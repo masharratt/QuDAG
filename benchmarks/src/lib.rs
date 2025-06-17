@@ -24,4 +24,6 @@ pub use guards::*;
 
 /// Re-export commonly used types for benchmarking
 pub use criterion;
-pub use metrics;
+
+/// Re-export the external metrics crate for convenience
+pub use metrics as metrics_crate;

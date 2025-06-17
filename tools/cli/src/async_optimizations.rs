@@ -400,7 +400,7 @@ impl ResourceLimiter {
     }
 
     /// Acquire resources
-    pub async fn acquire_resources(&self, memory: usize, tasks: usize) -> Result<ResourceGuard, AsyncError> {
+    pub async fn acquire_resources(self: &Arc<Self>, memory: usize, tasks: usize) -> Result<ResourceGuard, AsyncError> {
         self.check_resources(memory, tasks).await?;
 
         {
@@ -412,7 +412,7 @@ impl ResourceLimiter {
         }
 
         Ok(ResourceGuard {
-            limiter: self,
+            limiter: Arc::clone(self),
             memory,
             tasks,
         })
@@ -429,20 +429,25 @@ impl ResourceLimiter {
 }
 
 /// RAII guard for resources
-pub struct ResourceGuard<'a> {
-    limiter: &'a ResourceLimiter,
+pub struct ResourceGuard {
+    limiter: Arc<ResourceLimiter>,
     memory: usize,
     tasks: usize,
 }
 
-impl<'a> Drop for ResourceGuard<'a> {
+impl Drop for ResourceGuard {
     fn drop(&mut self) {
-        // Use blocking version in drop to avoid async context issues
-        tokio::task::block_in_place(|| {
-            tokio::runtime::Handle::current().block_on(
-                self.limiter.release_resources(self.memory, self.tasks)
-            );
-        });
+        // Spawn a task to release resources asynchronously
+        // This is safe because we don't need to wait for completion
+        let limiter = Arc::clone(&self.limiter);
+        let memory = self.memory;
+        let tasks = self.tasks;
+        
+        if let Ok(handle) = tokio::runtime::Handle::try_current() {
+            handle.spawn(async move {
+                limiter.release_resources(memory, tasks).await;
+            });
+        }
     }
 }
 
@@ -483,7 +488,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_resource_limiter() {
-        let limiter = ResourceLimiter::new(1000, 10);
+        let limiter = Arc::new(ResourceLimiter::new(1000, 10));
         
         // Should succeed
         let _guard = limiter.acquire_resources(500, 5).await.unwrap();

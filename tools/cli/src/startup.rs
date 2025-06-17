@@ -156,7 +156,7 @@ impl CommandExecutor {
 
         // Execute command
         let cmd_tracker = self.resources.performance_tracker
-            .start_command(command_key).await;
+            .start_command(command_key);
         
         let result = match executor.await {
             Ok(result) => {

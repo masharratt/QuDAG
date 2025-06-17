@@ -201,8 +201,8 @@ impl RegressionDetector {
             .filter(|r| r.severity == RegressionSeverity::Major)
             .count();
 
-        let mut worst_regression = None;
-        let mut best_improvement = None;
+        let mut worst_regression: Option<RegressionResult> = None;
+        let mut best_improvement: Option<RegressionResult> = None;
 
         for result in results {
             if result.is_regression {

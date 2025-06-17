@@ -21,7 +21,14 @@ pub mod performance;
 pub mod rpc;
 pub mod startup;
 
-pub use commands::*;
+#[cfg(test)]
+pub mod mocks;
+
+pub use commands::{
+    execute_status_command, StatusArgs, OutputFormat, NodeStatusResponse, NodeState, 
+    PeerStatusInfo, NetworkStatistics, DagStatistics, MemoryUsage, check_node_connectivity,
+    CommandRouter
+};
 
 /// CLI-specific error types
 #[derive(Debug, thiserror::Error)]
@@ -34,4 +41,16 @@ pub enum CliError {
     Visualization(String),
     #[error("Configuration error: {0}")]
     Config(String),
+    #[error("Command error: {0}")]
+    Command(String),
+    #[error("RPC error: {0}")]
+    Rpc(String),
+    #[error("Status error: {0}")]
+    Status(String),
+    #[error("Connection error: {0}")]
+    Connection(String),
+    #[error("Timeout error: {0}")]
+    Timeout(String),
+    #[error("Validation error: {0}")]
+    Validation(String),
 }

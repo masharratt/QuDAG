@@ -11,6 +11,9 @@ use tokio::sync::RwLock;
 use tracing::info;
 use tracing_subscriber::fmt::format::FmtSpan;
 
+// Import the CLI module for peer management
+use qudag_cli;
+
 #[derive(Parser)]
 #[command(name = "qudag")]
 #[command(about = "QuDAG Protocol CLI", long_about = None)]
@@ -68,18 +71,53 @@ enum Commands {
 #[derive(Subcommand)]
 enum PeerCommands {
     /// List connected peers
-    List,
+    List {
+        /// Filter by status
+        #[arg(long)]
+        status: Option<String>,
+        /// Output format (text, json)
+        #[arg(long)]
+        format: Option<String>,
+    },
     
     /// Add a peer
     Add {
         /// Peer address
         address: String,
+        /// Add peers from file
+        #[arg(long)]
+        file: Option<String>,
+        /// Connection timeout in seconds
+        #[arg(long)]
+        timeout: Option<u64>,
     },
     
     /// Remove a peer
     Remove {
+        /// Peer address or ID
+        address: String,
+        /// Force disconnection
+        #[arg(long)]
+        force: bool,
+    },
+    
+    /// Ban a peer
+    Ban {
         /// Peer address
         address: String,
+    },
+    
+    /// Show peer statistics
+    Stats {
+        /// Peer address or ID
+        address: String,
+    },
+    
+    /// Export peer list
+    Export {
+        /// Output file
+        #[arg(long)]
+        output: String,
     },
 }
 
@@ -169,23 +207,41 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         },
         
         Commands::Peer { command } => match command {
-            PeerCommands::List => {
-                info!("Listing peers");
-                println!("Listing connected peers...");
-                println!("No peers currently connected");
-                // TODO: Implement peer listing via RPC
+            PeerCommands::List { status, format } => {
+                match qudag_cli::CommandRouter::handle_peer_list().await {
+                    Ok(()) => {},
+                    Err(e) => {
+                        eprintln!("Error listing peers: {}", e);
+                        std::process::exit(1);
+                    }
+                }
             },
-            PeerCommands::Add { address } => {
-                info!("Adding peer: {}", address);
-                println!("Adding peer: {}", address);
-                println!("Note: Peer management not yet implemented");
-                // TODO: Implement peer addition via RPC
+            PeerCommands::Add { address, file, timeout } => {
+                match qudag_cli::CommandRouter::handle_peer_add(address).await {
+                    Ok(()) => {},
+                    Err(e) => {
+                        eprintln!("Error: {}", e);
+                        std::process::exit(1);
+                    }
+                }
             },
-            PeerCommands::Remove { address } => {
-                info!("Removing peer: {}", address);
-                println!("Removing peer: {}", address);
-                println!("Note: Peer management not yet implemented");
-                // TODO: Implement peer removal via RPC
+            PeerCommands::Remove { address, force } => {
+                match qudag_cli::CommandRouter::handle_peer_remove(address).await {
+                    Ok(()) => {},
+                    Err(e) => {
+                        eprintln!("Error: {}", e);
+                        std::process::exit(1);
+                    }
+                }
+            },
+            PeerCommands::Ban { address } => {
+                println!("Peer ban command not yet implemented for address: {}", address);
+            },
+            PeerCommands::Stats { address } => {
+                println!("Peer stats command not yet implemented for address: {:?}", address);
+            },
+            PeerCommands::Export { output } => {
+                println!("Peer export command not yet implemented for output: {:?}", output);
             },
         },
         

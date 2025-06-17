@@ -1,6 +1,10 @@
 use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId};
-use qudag_protocol::{Protocol, Config};
-use qudag_simulator::NetworkSimulator;
+use qudag_protocol::config::Config as ProtocolConfig;
+use qudag_simulator::{
+    network::{NetworkSimulator, SimulatorConfig},
+    scenarios::{ScenarioConfig, NetworkConditions},
+    metrics::NetworkMetrics,
+};
 use std::time::Duration;
 
 fn throughput_benchmarks(c: &mut Criterion) {
@@ -13,9 +17,23 @@ fn throughput_benchmarks(c: &mut Criterion) {
             BenchmarkId::new("message_throughput", node_count), 
             node_count,
             |b, &n| {
-                let simulator = NetworkSimulator::new(n);
                 b.iter(|| {
-                    simulator.simulate_message_flood(1000); // 1000 messages
+                    let config = ScenarioConfig {
+                        node_count: n,
+                        duration: Duration::from_secs(10),
+                        msg_rate: 1000.0,
+                        network: NetworkConditions {
+                            latency: Duration::from_millis(50),
+                            loss_rate: 0.01,
+                            partition_prob: 0.0,
+                        },
+                    };
+                    tokio::runtime::Runtime::new()
+                        .unwrap()
+                        .block_on(async {
+                            qudag_simulator::scenarios::test_basic_connectivity(config).await
+                        })
+                        .unwrap()
                 });
             }
         );
@@ -33,9 +51,23 @@ fn latency_benchmarks(c: &mut Criterion) {
             BenchmarkId::new("message_latency", node_count),
             node_count,
             |b, &n| {
-                let simulator = NetworkSimulator::new(n);
                 b.iter(|| {
-                    simulator.measure_message_latency();
+                    let config = ScenarioConfig {
+                        node_count: n,
+                        duration: Duration::from_secs(5),
+                        msg_rate: 100.0,
+                        network: NetworkConditions {
+                            latency: Duration::from_millis(10),
+                            loss_rate: 0.0,
+                            partition_prob: 0.0,
+                        },
+                    };
+                    tokio::runtime::Runtime::new()
+                        .unwrap()
+                        .block_on(async {
+                            qudag_simulator::scenarios::test_byzantine_tolerance(config).await
+                        })
+                        .unwrap()
                 });
             }
         );
@@ -53,9 +85,23 @@ fn scalability_benchmarks(c: &mut Criterion) {
             BenchmarkId::new("network_scalability", node_count),
             node_count,
             |b, &n| {
-                let simulator = NetworkSimulator::new(n);
                 b.iter(|| {
-                    simulator.simulate_full_network_load();
+                    let config = ScenarioConfig {
+                        node_count: n,
+                        duration: Duration::from_secs(20),
+                        msg_rate: 500.0,
+                        network: NetworkConditions {
+                            latency: Duration::from_millis(100),
+                            loss_rate: 0.02,
+                            partition_prob: 0.1,
+                        },
+                    };
+                    tokio::runtime::Runtime::new()
+                        .unwrap()
+                        .block_on(async {
+                            qudag_simulator::scenarios::test_network_partition(config).await
+                        })
+                        .unwrap()
                 });
             }
         );
@@ -68,15 +114,28 @@ fn resource_usage_benchmarks(c: &mut Criterion) {
     group.measurement_time(Duration::from_secs(20));
     group.sample_size(10);
 
-    let sizes = [1000, 10000, 100000]; // Number of messages
-    for size in sizes.iter() {
+    let node_counts = [10, 50, 100]; // Number of nodes
+    for node_count in node_counts.iter() {
         group.bench_with_input(
-            BenchmarkId::new("memory_usage", size),
-            size,
-            |b, &s| {
-                let protocol = Protocol::new(Config::default());
+            BenchmarkId::new("memory_usage", node_count),
+            node_count,
+            |b, &n| {
                 b.iter(|| {
-                    protocol.measure_memory_usage(s);
+                    let sim_config = SimulatorConfig {
+                        node_count: n,
+                        latency_ms: 50,
+                        drop_rate: 0.01,
+                        partition_prob: 0.0,
+                    };
+                    tokio::runtime::Runtime::new()
+                        .unwrap()
+                        .block_on(async {
+                            let (mut simulator, _events_rx) = NetworkSimulator::new(sim_config);
+                            for _ in 0..n {
+                                simulator.add_node(ProtocolConfig::default()).await.unwrap();
+                            }
+                            NetworkMetrics::new()
+                        })
                 });
             }
         );

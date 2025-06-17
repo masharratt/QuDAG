@@ -74,15 +74,22 @@ impl PerformanceTracker {
     }
 
     /// Start tracking a command execution
-    pub async fn start_command(&self, command: &str) -> CommandTracker {
-        let mut async_tracker = self.async_tracker.lock().await;
-        async_tracker.total_tasks += 1;
-        async_tracker.pending_tasks += 1;
+    pub fn start_command(self: &Arc<Self>, command: &str) -> CommandTracker {
+        let tracker = Arc::clone(self);
+        
+        tokio::spawn({
+            let async_tracker = Arc::clone(&self.async_tracker);
+            async move {
+                let mut tracker = async_tracker.lock().await;
+                tracker.total_tasks += 1;
+                tracker.pending_tasks += 1;
+            }
+        });
         
         CommandTracker {
             command: command.to_string(),
             start_time: Instant::now(),
-            tracker: Arc::downgrade(&Arc::new(self.clone())),
+            tracker,
         }
     }
 
@@ -323,7 +330,7 @@ impl Default for PerformanceTracker {
 pub struct CommandTracker {
     command: String,
     start_time: Instant,
-    tracker: std::sync::Weak<PerformanceTracker>,
+    tracker: Arc<PerformanceTracker>,
 }
 
 impl CommandTracker {
@@ -331,10 +338,8 @@ impl CommandTracker {
     pub async fn complete(self, success: bool) {
         let duration = self.start_time.elapsed();
         
-        if let Some(tracker) = self.tracker.upgrade() {
-            tracker.record_command_completion(&self.command, duration, success).await;
-            tracker.update_memory_usage().await;
-        }
+        self.tracker.record_command_completion(&self.command, duration, success).await;
+        self.tracker.update_memory_usage().await;
         
         // Log performance for monitoring
         if duration > Duration::from_millis(100) {
@@ -346,10 +351,7 @@ impl CommandTracker {
     
     /// Complete with error
     pub async fn complete_with_error(self, error_type: &str) {
-        if let Some(tracker) = self.tracker.upgrade() {
-            tracker.record_error(error_type).await;
-        }
-        
+        self.tracker.record_error(error_type).await;
         self.complete(false).await;
     }
 }
@@ -415,10 +417,10 @@ mod tests {
     
     #[tokio::test]
     async fn test_performance_tracker() {
-        let tracker = PerformanceTracker::new();
+        let tracker = Arc::new(PerformanceTracker::new());
         
         // Test command tracking
-        let cmd_tracker = tracker.start_command("test_command").await;
+        let cmd_tracker = tracker.start_command("test_command");
         tokio::time::sleep(Duration::from_millis(10)).await;
         cmd_tracker.complete(true).await;
         
@@ -429,6 +431,7 @@ mod tests {
     
     #[tokio::test]
     async fn test_async_optimizer() {
+        use std::pin::Pin;
         let tasks: Vec<Pin<Box<dyn std::future::Future<Output = Result<i32, Box<dyn std::error::Error + Send + Sync>>> + Send>>> = vec![
             Box::pin(async { Ok::<i32, Box<dyn std::error::Error + Send + Sync>>(1) }),
             Box::pin(async { Ok::<i32, Box<dyn std::error::Error + Send + Sync>>(2) }),
