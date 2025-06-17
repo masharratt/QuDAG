@@ -1,17 +1,11 @@
+use crate::{
+    metrics::NetworkMetrics,
+    network::{NetworkSimulator, SimulatorConfig},
+};
 use anyhow::Result;
 use qudag_protocol::config::Config as ProtocolConfig;
-use crate::{
-    network::{NetworkSimulator, SimulatorConfig},
-    metrics::NetworkMetrics,
-    conditions::{NetworkConditionSimulator, NetworkProfile},
-    attacks::{AttackSimulator, AttackType, SybilBehavior, ByzantineBehavior, RoutingManipulation},
-    visualization::{NetworkTopology, NetworkNode, NetworkConnection, NodeType, NodeStatus, NodeMetrics},
-    reports::{ReportGenerator, ReportFormat},
-};
-use rand::{Rng, thread_rng};
-use std::collections::HashMap;
-use std::time::{Duration, SystemTime};
-use tracing::{info, warn, debug};
+use std::time::Duration;
+use tracing::info;
 
 /// Test scenario configuration
 #[derive(Debug, Clone)]
@@ -39,7 +33,10 @@ pub struct NetworkConditions {
 
 /// Basic connectivity test scenario
 pub async fn test_basic_connectivity(config: ScenarioConfig) -> Result<NetworkMetrics> {
-    info!("Running basic connectivity test with {} nodes", config.node_count);
+    info!(
+        "Running basic connectivity test with {} nodes",
+        config.node_count
+    );
 
     let sim_config = SimulatorConfig {
         node_count: config.node_count,
@@ -48,7 +45,7 @@ pub async fn test_basic_connectivity(config: ScenarioConfig) -> Result<NetworkMe
         partition_prob: config.network.partition_prob,
     };
 
-    let (mut simulator, mut events_rx) = NetworkSimulator::new(sim_config);
+    let (mut simulator, _events_rx) = NetworkSimulator::new(sim_config);
 
     // Add nodes
     for _ in 0..config.node_count {
@@ -73,7 +70,7 @@ pub async fn test_byzantine_tolerance(config: ScenarioConfig) -> Result<NetworkM
         partition_prob: config.network.partition_prob,
     };
 
-    let (mut simulator, mut events_rx) = NetworkSimulator::new(sim_config);
+    let (mut simulator, _events_rx) = NetworkSimulator::new(sim_config);
 
     // Add honest nodes
     for _ in 0..(config.node_count * 2 / 3) {
@@ -104,7 +101,7 @@ pub async fn test_network_partition(config: ScenarioConfig) -> Result<NetworkMet
         partition_prob: config.network.partition_prob,
     };
 
-    let (mut simulator, mut events_rx) = NetworkSimulator::new(sim_config);
+    let (mut simulator, _events_rx) = NetworkSimulator::new(sim_config);
 
     // Add nodes
     for _ in 0..config.node_count {

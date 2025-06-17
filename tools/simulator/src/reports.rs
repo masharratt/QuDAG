@@ -1,18 +1,17 @@
 //! Simulation report generation and analysis module.
 
 use crate::{
-    metrics::{NetworkMetrics, LatencyMetrics, ThroughputMetrics, ConsensusMetrics},
-    attacks::{AttackMetrics, AttackImpact, ResilienceMetrics},
+    metrics::NetworkMetrics,
+    attacks::AttackMetrics,
     conditions::NetworkStats,
-    visualization::{NetworkTopology, AttackVisualization},
+    visualization::NetworkTopology,
 };
 use anyhow::Result;
 use csv::WriterBuilder;
 use serde::{Serialize, Deserialize};
 use std::collections::HashMap;
 use std::fs::File;
-use std::path::Path;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, SystemTime};
 use tracing::info;
 
 /// Comprehensive simulation report
@@ -525,7 +524,7 @@ impl ReportGenerator {
     }
 
     /// Generate security analysis
-    fn generate_security_analysis(&self, attack_metrics: &AttackMetrics) -> SecurityAnalysis {
+    fn generate_security_analysis(&self, _attack_metrics: &AttackMetrics) -> SecurityAnalysis {
         SecurityAnalysis {
             crypto_security: CryptoSecurityAnalysis {
                 quantum_resistance: 95.0,
@@ -568,7 +567,7 @@ impl ReportGenerator {
 
     /// Generate attack analysis
     fn generate_attack_analysis(&self, attack_metrics: &AttackMetrics) -> AttackAnalysis {
-        let success_rate = if attack_metrics.total_attacks > 0 {
+        let _success_rate = if attack_metrics.total_attacks > 0 {
             attack_metrics.successful_attacks as f64 / attack_metrics.total_attacks as f64
         } else {
             0.0
@@ -619,8 +618,8 @@ impl ReportGenerator {
     /// Generate recommendations
     fn generate_recommendations(
         &self,
-        network_metrics: &NetworkMetrics,
-        attack_metrics: &AttackMetrics,
+        _network_metrics: &NetworkMetrics,
+        _attack_metrics: &AttackMetrics,
     ) -> Vec<Recommendation> {
         vec![
             Recommendation {
@@ -915,6 +914,7 @@ pub enum ReportFormat {
 mod tests {
     use super::*;
     use crate::metrics::{LatencyMetrics, ThroughputMetrics, ConsensusMetrics};
+    use crate::attacks::ResilienceMetrics;
     use std::time::Duration;
 
     #[test]

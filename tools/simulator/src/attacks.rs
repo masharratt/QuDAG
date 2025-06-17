@@ -290,7 +290,7 @@ impl AttackSimulator {
 
         // Simulate message flooding
         let mut interval = interval(Duration::from_millis(1000 / intensity));
-        let start_time = Instant::now();
+        let _start_time = Instant::now();
         
         while let Some(attack) = self.active_attacks.get(&attack_id) {
             if Instant::now() >= attack.end_time {
@@ -437,7 +437,7 @@ impl AttackSimulator {
 
             // Isolate target by controlling its connections
             if let Some(connections) = self.network_state.connections.get_mut(target) {
-                let original_connections: Vec<_> = connections.iter().cloned().collect();
+                let _original_connections: Vec<_> = connections.iter().cloned().collect();
                 connections.clear();
                 
                 // Only allow connections to malicious nodes
@@ -651,7 +651,7 @@ mod tests {
             targets: vec!["target".to_string()],
         };
         
-        let attack_id = simulator.launch_attack(attack).await?;
+        let _attack_id = simulator.launch_attack(attack).await?;
         
         // Wait for attack to complete
         tokio::time::sleep(Duration::from_millis(150)).await;
@@ -673,7 +673,7 @@ mod tests {
             duration: Duration::from_millis(100),
         };
         
-        let attack_id = simulator.launch_attack(attack).await?;
+        let _attack_id = simulator.launch_attack(attack).await?;
         
         // Wait for attack to complete
         tokio::time::sleep(Duration::from_millis(150)).await;

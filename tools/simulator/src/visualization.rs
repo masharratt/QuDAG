@@ -1,9 +1,7 @@
 //! Visualization module for network topology and simulation metrics.
 
 use crate::{
-    metrics::{NetworkMetrics, LatencyMetrics, ThroughputMetrics, ConsensusMetrics},
-    attacks::{AttackMetrics, AttackImpact},
-    conditions::NetworkStats,
+    metrics::{LatencyMetrics, ThroughputMetrics},
 };
 use anyhow::Result;
 use plotters::prelude::*;
@@ -169,7 +167,8 @@ impl NetworkVisualizer {
         // Create output directory if it doesn't exist
         std::fs::create_dir_all(&self.config.output_dir)?;
         
-        let root = BitMapBackend::new(&output_path, (self.config.width, self.config.height))
+        let output_path_clone = output_path.clone();
+        let root = BitMapBackend::new(&output_path_clone, (self.config.width, self.config.height))
             .into_drawing_area();
         root.fill(&WHITE)?;
 
@@ -212,7 +211,7 @@ impl NetworkVisualizer {
                 NodeType::Malicious => &RED,
                 NodeType::Byzantine => &MAGENTA,
                 NodeType::Sybil => &BLACK,
-                NodeType::Offline => &GRAY,
+                NodeType::Offline => &plotters::style::colors::full_palette::GREY,
             };
 
             let size = match node.status {
@@ -251,7 +250,8 @@ impl NetworkVisualizer {
         let output_path = format!("{}/metrics_timeline.png", self.config.output_dir);
         std::fs::create_dir_all(&self.config.output_dir)?;
 
-        let root = BitMapBackend::new(&output_path, (self.config.width, self.config.height))
+        let output_path_clone = output_path.clone();
+        let root = BitMapBackend::new(&output_path_clone, (self.config.width, self.config.height))
             .into_drawing_area();
         root.fill(&WHITE)?;
 
@@ -310,7 +310,8 @@ impl NetworkVisualizer {
         let output_path = format!("{}/latency_distribution.png", self.config.output_dir);
         std::fs::create_dir_all(&self.config.output_dir)?;
 
-        let root = BitMapBackend::new(&output_path, (self.config.width, self.config.height))
+        let output_path_clone = output_path.clone();
+        let root = BitMapBackend::new(&output_path_clone, (self.config.width, self.config.height))
             .into_drawing_area();
         root.fill(&WHITE)?;
 
@@ -340,7 +341,7 @@ impl NetworkVisualizer {
             latencies
                 .iter()
                 .enumerate()
-                .map(|(i, (name, value))| {
+                .map(|(i, (_name, value))| {
                     Rectangle::new([(i as f64 + 0.1, 0.0), (i as f64 + 0.9, *value)], BLUE.filled())
                 })
         )?;
@@ -373,7 +374,8 @@ impl NetworkVisualizer {
         let output_path = format!("{}/throughput.png", self.config.output_dir);
         std::fs::create_dir_all(&self.config.output_dir)?;
 
-        let root = BitMapBackend::new(&output_path, (self.config.width, self.config.height))
+        let output_path_clone = output_path.clone();
+        let root = BitMapBackend::new(&output_path_clone, (self.config.width, self.config.height))
             .into_drawing_area();
         root.fill(&WHITE)?;
 
@@ -402,7 +404,7 @@ impl NetworkVisualizer {
             .y_desc("Messages per Second")
             .draw()?;
 
-        chart.draw_series(LineSeries::new(time_series, &BLUE.stroke_width(2)))?;
+        chart.draw_series(LineSeries::new(time_series, BLUE.stroke_width(2)))?;
 
         root.present()?;
         Ok(output_path)
@@ -417,7 +419,8 @@ impl NetworkVisualizer {
         let output_path = format!("{}/attack_timeline.png", self.config.output_dir);
         std::fs::create_dir_all(&self.config.output_dir)?;
 
-        let root = BitMapBackend::new(&output_path, (self.config.width, self.config.height))
+        let output_path_clone = output_path.clone();
+        let root = BitMapBackend::new(&output_path_clone, (self.config.width, self.config.height))
             .into_drawing_area();
         root.fill(&WHITE)?;
 
@@ -528,18 +531,18 @@ impl NetworkVisualizer {
 
     /// Generate HTML dashboard
     fn generate_html_dashboard(&self, image_files: &[String]) -> Result<String> {
-        let mut html = String::from(r#"
+        let mut html = format!(r#"
 <!DOCTYPE html>
 <html>
 <head>
     <title>QuDAG Network Simulation Dashboard</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 20px; }
-        .header { background-color: #f0f0f0; padding: 20px; margin-bottom: 20px; }
-        .visualization { margin: 20px 0; text-align: center; }
-        .visualization img { max-width: 100%; height: auto; border: 1px solid #ddd; }
-        .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin: 20px 0; }
-        .stat-box { background-color: #f9f9f9; padding: 15px; border-radius: 5px; }
+        body {{ font-family: Arial, sans-serif; margin: 20px; }}
+        .header {{ background-color: #f0f0f0; padding: 20px; margin-bottom: 20px; }}
+        .visualization {{ margin: 20px 0; text-align: center; }}
+        .visualization img {{ max-width: 100%; height: auto; border: 1px solid #ddd; }}
+        .stats {{ display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin: 20px 0; }}
+        .stat-box {{ background-color: #f9f9f9; padding: 15px; border-radius: 5px; }}
     </style>
 </head>
 <body>

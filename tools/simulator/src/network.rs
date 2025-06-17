@@ -2,7 +2,7 @@ use anyhow::Result;
 use qudag_protocol::config::Config as ProtocolConfig;
 use serde::{Serialize, Deserialize};
 use tokio::sync::mpsc;
-use tracing::{info, warn};
+use tracing::info;
 
 /// Network simulator configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
