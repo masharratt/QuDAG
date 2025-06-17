@@ -151,92 +151,92 @@
   
   "command_mapping": {
     "tdd-cycle": {
-      "file": "tdd-cycle.json",
+      "file": "tdd-cycle.md",
       "workflow": "tdd_workflow",
       "agents": ["crypto_agent", "network_agent", "consensus_agent", "integration_agent"]
     },
     "security-audit": {
-      "file": "security-audit.json",
+      "file": "security-audit.md",
       "workflow": "security_workflow",
       "agents": ["security_agent"]
     },
     "performance-benchmark": {
-      "file": "performance-benchmark.json",
+      "file": "performance-benchmark.md",
       "workflow": "performance_workflow",
       "agents": ["performance_agent"]
     },
     "integration-test": {
-      "file": "integration-test.json",
+      "file": "integration-test.md",
       "workflow": "deployment_workflow",
       "agents": ["integration_agent"]
     },
     "deploy-validate": {
-      "file": "deploy-validate.json",
+      "file": "deploy-validate.md",
       "workflow": "deployment_workflow",
       "agents": ["integration_agent"]
     },
     "create-test": {
-      "file": "create-test.json",
+      "file": "create-test.md",
       "workflow": "tdd_workflow",
       "agents": ["integration_agent"]
     },
     "implement-feature": {
-      "file": "implement-feature.json",
+      "file": "implement-feature.md",
       "workflow": "tdd_workflow",
       "agents": ["integration_agent"]
     },
     "refactor-optimize": {
-      "file": "refactor-optimize.json",
+      "file": "refactor-optimize.md",
       "workflow": "performance_workflow",
       "agents": ["performance_agent"]
     },
     "review-security": {
-      "file": "review-security.json",
+      "file": "review-security.md",
       "workflow": "security_workflow",
       "agents": ["security_agent"]
     },
     "update-docs": {
-      "file": "update-docs.json",
+      "file": "update-docs.md",
       "workflow": "tdd_workflow",
       "agents": ["integration_agent"]
     },
     "crypto-validate": {
-      "file": "crypto-validate.json",
+      "file": "crypto-validate.md",
       "workflow": null,
       "agents": ["crypto_agent"]
     },
     "network-simulate": {
-      "file": "network-simulate.json",
+      "file": "network-simulate.md",
       "workflow": null,
       "agents": ["network_agent"]
     },
     "dag-visualize": {
-      "file": "dag-visualize.json",
+      "file": "dag-visualize.md",
       "workflow": null,
       "agents": ["consensus_agent"]
     },
     "fuzz-test": {
-      "file": "fuzz-test.json",
+      "file": "fuzz-test.md",
       "workflow": "security_workflow",
       "agents": ["security_agent", "crypto_agent"]
     },
     "debug-network": {
-      "file": "debug-network.json",
+      "file": "debug-network.md",
       "workflow": null,
       "agents": ["network_agent"]
     },
     "debug-consensus": {
-      "file": "debug-consensus.json",
+      "file": "debug-consensus.md",
       "workflow": null,
       "agents": ["consensus_agent"]
     },
     "debug-performance": {
-      "file": "debug-performance.json",
+      "file": "debug-performance.md",
       "workflow": "performance_workflow",
       "agents": ["performance_agent"]
     },
     "debug-security": {
-      "file": "debug-security.json",
+      "file": "debug-security.md",
       "workflow": "security_workflow",
       "agents": ["security_agent"]
     }
