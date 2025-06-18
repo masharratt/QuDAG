@@ -65,6 +65,7 @@ struct AdaptiveThresholds {
     current_latency_target: Duration,
     current_batch_size_target: usize,
     load_factor: f64,
+    #[allow(dead_code)]
     pressure_coefficient: f64,
 }
 

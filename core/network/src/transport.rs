@@ -652,6 +652,7 @@ impl Transport for SecureTransport {
 /// TCP transport implementation
 struct TcpTransport {
     stream: TcpStream,
+    #[allow(dead_code)]
     connection_id: String,
     metadata: ConnectionMetadata,
 }

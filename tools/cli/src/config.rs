@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use std::fs;
 use tokio::sync::RwLock;
 use std::sync::Arc;
-use tracing::{debug, info};
+use tracing::info;
 
 /// Node configuration (compatibility with protocol module)
 #[derive(Debug, Clone, Serialize, Deserialize)]

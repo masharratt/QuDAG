@@ -5,6 +5,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 pub struct TrackedAllocator {
     allocated: AtomicUsize,
     deallocated: AtomicUsize,
+    #[allow(dead_code)]
     inner: System,
 }
 

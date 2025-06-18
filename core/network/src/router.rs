@@ -9,6 +9,7 @@ use tokio::sync::{RwLock, Mutex};
 /// Information about a hop in a route
 #[derive(Debug, Clone)]
 pub struct HopInfo {
+    #[allow(dead_code)]
     peer_id: PeerId,
     known_peers: HashSet<PeerId>,
     layer_keys: HashMap<usize, Vec<u8>>,
@@ -214,6 +215,7 @@ impl Router {
     }
 
     /// Update hop knowledge to simulate onion routing properties
+    #[allow(dead_code)]
     async fn update_hop_knowledge(&self, route: &[PeerId]) {
         let mut hop_info = self.hop_info.write().await;
 

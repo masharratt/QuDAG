@@ -214,6 +214,7 @@ pub struct HandshakeCoordinator {
     /// Active handshake sessions
     sessions: HashMap<Uuid, HandshakeSession>,
     /// Our long-term identity keys
+    #[allow(dead_code)]
     identity_keys: HandshakeKeys,
     /// Protocol state machine
     state_machine: ProtocolStateMachine,

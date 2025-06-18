@@ -148,6 +148,7 @@ pub struct RpcServer {
     auth_token: Option<String>,
     rate_limiter: Arc<Mutex<RateLimiter>>,
     auth_keys: Arc<RwLock<HashMap<String, MlDsaPublicKey>>>,
+    #[allow(dead_code)]
     start_time: SystemTime,
 }
 

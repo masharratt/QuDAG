@@ -1,6 +1,5 @@
-use crate::CliError;
 use anyhow::{anyhow, Result};
-use qudag_network::{NetworkConfig, NetworkManager, PeerMetadata as NetworkPeerMetadata};
+use qudag_network::{NetworkConfig, NetworkManager};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs;
@@ -8,7 +7,7 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use tokio::sync::{Mutex, RwLock};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 
 /// Peer information stored persistently
 #[derive(Debug, Clone, Serialize, Deserialize)]

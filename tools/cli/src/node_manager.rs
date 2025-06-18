@@ -1,17 +1,15 @@
-use crate::{CliError, config::NodeConfigManager};
+use crate::config::NodeConfigManager;
 use anyhow::{anyhow, Result};
 use serde::{Deserialize, Serialize};
 use std::fs;
-use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Stdio;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use tokio::io::{AsyncBufReadExt, BufReader};
 use tokio::process::{Child, Command};
 use tokio::signal;
 use tokio::sync::{Mutex, RwLock};
-use tokio::time::{interval, timeout};
-use tracing::{debug, error, info, warn};
+use tokio::time::interval;
+use tracing::{error, info, warn};
 
 /// Process ID file location
 const PID_FILE: &str = "qudag.pid";

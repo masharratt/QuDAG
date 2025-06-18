@@ -3757,6 +3757,7 @@ dependencies = [
  "futures",
  "hex",
  "libc",
+ "libp2p",
  "lru 0.12.5",
  "pin-project",
  "proptest",

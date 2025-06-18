@@ -74,11 +74,13 @@ pub struct RoutePath {
     /// Bandwidth capacity in bytes per second
     bandwidth_capacity: Option<u64>,
     /// Load factor for this route (0.0 to 1.0)
+    #[allow(dead_code)]
     load_factor: f64,
     /// Geographic diversity score
     #[allow(dead_code)]
     geographic_diversity: f64,
     /// Security level (based on encryption and peer reputation)
+    #[allow(dead_code)]
     security_level: SecurityLevel,
     /// Route cost (for optimization algorithms)
     #[allow(dead_code)]

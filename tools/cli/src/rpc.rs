@@ -1,16 +1,13 @@
 use anyhow::{anyhow, Result};
-use qudag_crypto::ml_dsa::{MlDsaKeyPair, MlDsaPublicKey};
-use qudag_network::{NetworkAddress, PeerId};
-use qudag_protocol::{Node, NodeConfig, ProtocolState};
+use qudag_crypto::ml_dsa::MlDsaKeyPair;
+use qudag_protocol::NodeConfig;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
-use std::path::PathBuf;
 use std::sync::Arc;
-use tokio::io::{AsyncReadExt, AsyncWriteExt};
+use tokio::io::AsyncWriteExt;
 use tokio::net::{TcpStream, UnixStream};
-use tokio::sync::{Mutex, RwLock};
+use tokio::sync::Mutex;
 use tokio::time::{timeout, Duration, sleep};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, warn};
 use uuid::Uuid;
 
 /// RPC request
@@ -195,6 +192,7 @@ struct ConnectionPool {
     transport: RpcTransport,
     connections: Arc<Mutex<Vec<TcpStream>>>,
     unix_connections: Arc<Mutex<Vec<UnixStream>>>,
+    #[allow(dead_code)]
     max_connections: usize,
 }
 

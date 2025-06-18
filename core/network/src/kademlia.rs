@@ -28,6 +28,7 @@ use sha2::{Sha256, Digest};
 const MAX_RECORD_SIZE: usize = 1024 * 1024;
 
 /// Maximum number of provider records per key
+#[allow(dead_code)]
 const MAX_PROVIDERS_PER_KEY: usize = 20;
 
 /// Default TTL for records (24 hours)
@@ -236,6 +237,7 @@ pub struct KademliaDHT {
     /// Kademlia instance (commented out - needs libp2p kad feature update)
     // kademlia: Kademlia<MemoryStore>,
     /// DHT configuration
+    #[allow(dead_code)]
     config: DHTConfig,
     /// Bootstrap configuration
     bootstrap_config: BootstrapConfig,
@@ -306,6 +308,7 @@ struct QueryInfo {
 
 /// Query types
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 enum QueryType {
     /// Find node query
     FindNode,
@@ -321,6 +324,7 @@ enum QueryType {
 
 /// Query target
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 enum QueryTarget {
     /// Peer ID target
     PeerId(LibP2PPeerId),
@@ -368,6 +372,7 @@ struct PartitionDetector {
 
 /// Partition information
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 struct PartitionInfo {
     /// Detection time
     detected_at: Instant,
@@ -379,6 +384,7 @@ struct PartitionInfo {
     recovered: bool,
 }
 
+#[allow(dead_code)]
 impl KademliaDHT {
     /// Create new Kademlia DHT instance
     pub fn new(

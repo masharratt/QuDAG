@@ -25,7 +25,7 @@ impl MemoryTracker {
         }
     }
 
-    pub fn track_allocation(&self, size: usize) {
+    pub fn track_allocation(&self, _size: usize) {
         self.allocation_count.fetch_add(1, Ordering::SeqCst);
         let current = super::allocator::get_memory_usage();
         let mut peak = self.peak_usage.load(Ordering::SeqCst);
@@ -42,7 +42,7 @@ impl MemoryTracker {
         }
     }
 
-    pub fn track_deallocation(&self, size: usize) {
+    pub fn track_deallocation(&self, _size: usize) {
         self.deallocation_count.fetch_add(1, Ordering::SeqCst);
     }
 

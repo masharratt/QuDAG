@@ -248,6 +248,7 @@ pub struct P2PNode {
     /// Pending requests
     pending_requests: Arc<RwLock<HashMap<String, oneshot::Sender<QuDagResponse>>>>,
     /// Metrics recorder
+    #[allow(dead_code)]
     metrics: Option<()>, // TODO: Use proper metrics type
     /// Network configuration
     config: NetworkConfig,
@@ -970,7 +971,9 @@ fn extract_peer_id(addr: &Multiaddr) -> Option<LibP2PPeerId> {
 type StreamMuxerBox = libp2p::core::muxing::StreamMuxerBox;
 
 /// Type aliases for missing libp2p types in 0.53
+#[allow(dead_code)]
 type TransactionId = [u8; 12];
+#[allow(dead_code)]
 type Message = Vec<u8>;
 
 #[cfg(test)]

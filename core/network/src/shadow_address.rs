@@ -205,6 +205,7 @@ pub struct ShadowAddressManager {
     rotation_policies: Arc<RwLock<RotationPolicies>>,
     
     /// Cleanup task handle
+    #[allow(dead_code)]
     cleanup_handle: Option<tokio::task::JoinHandle<()>>,
 }
 
@@ -230,9 +231,11 @@ pub struct DefaultShadowAddressHandler {
     network: NetworkType,
 
     /// Master seed for deterministic generation
+    #[allow(dead_code)]
     master_seed: [u8; 32],
     
     /// Current derivation counter
+    #[allow(dead_code)]
     derivation_counter: Mutex<u32>,
 }
 

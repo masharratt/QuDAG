@@ -2,12 +2,9 @@ use clap::{Parser, Subcommand};
 use qudag_crypto::fingerprint::Fingerprint;
 use qudag_network::dark_resolver::{DarkResolver, DarkResolverError};
 use qudag_network::types::NetworkAddress;
-use qudag_protocol::rpc_server::{RpcCommand, RpcServer};
-use qudag_protocol::{Node, NodeConfig};
+use qudag_protocol::NodeConfig;
 use rand::{thread_rng, Rng};
 use std::path::PathBuf;
-use std::sync::Arc;
-use tokio::sync::RwLock;
 use tracing::info;
 use tracing_subscriber::fmt::format::FmtSpan;
 
@@ -366,7 +363,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             };
             
             match command {
-                PeerCommands::List { status, format } => {
+                PeerCommands::List { status: _, format: _ } => {
                     match router.handle_peer_list(None).await {
                         Ok(()) => {}
                         Err(e) => {
@@ -378,7 +375,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 PeerCommands::Add {
                     address,
                     file,
-                    timeout,
+                    timeout: _,
                 } => {
                     if let Some(file_path) = file {
                         // Import peers from file
@@ -501,14 +498,26 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
                 let resolver = DarkResolver::new();
                 let test_address = NetworkAddress::new([127, 0, 0, 1], 8080);
+                let mut rng = thread_rng();
+                
+                // Extract custom name from domain (remove .dark suffix if present)
+                let custom_name = if domain.ends_with(".dark") {
+                    Some(&domain[..domain.len() - 5])
+                } else {
+                    Some(domain.as_str())
+                };
+                
+                // Create test values for registration
+                let addresses = vec![test_address];
+                let alias = Some(format!("Test node at {}", domain));
+                let ttl = 3600; // 1 hour
+                let owner_id = qudag_network::types::PeerId::random();
 
-                match resolver.register_domain(&domain, test_address) {
-                    Ok(()) => {
-                        println!("✓ Successfully registered dark address: {}", domain);
-                        println!(
-                            "  Address format: {}.dark",
-                            domain.trim_end_matches(".dark")
-                        );
+                match resolver.register_domain(custom_name, addresses, alias, ttl, owner_id, &mut rng) {
+                    Ok(dark_address) => {
+                        println!("✓ Successfully registered dark address");
+                        println!("  Domain: {}", dark_address.domain);
+                        println!("  Address: {}", dark_address.address);
                         println!(
                             "  Registration time: {}",
                             std::time::SystemTime::now()
@@ -522,8 +531,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                     Err(DarkResolverError::InvalidDomain) => {
                         println!("✗ Error: Invalid domain format");
-                        println!("  Domain must end with '.dark' and contain only alphanumeric characters and hyphens");
-                        println!("  Examples: 'myservice.dark', 'test-node.dark'");
+                        println!("  Domain must contain only alphanumeric characters and hyphens");
+                        println!("  Examples: 'myservice', 'test-node'");
                     }
                     Err(e) => {
                         println!("✗ Error registering domain: {:?}", e);
@@ -540,13 +549,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     Ok(record) => {
                         println!("✓ Domain found:");
                         println!("  Domain: {}", domain);
-                        println!("  Public key size: {} bytes", record.public_key.len());
-                        println!(
-                            "  Encrypted address size: {} bytes",
-                            record.encrypted_address.len()
-                        );
+                        println!("  Signing public key size: {} bytes", record.signing_public_key.len());
+                        println!("  Encryption public key size: {} bytes", record.encryption_public_key.len());
+                        println!("  Number of addresses: {}", record.addresses.len());
+                        if let Some(alias) = &record.alias {
+                            println!("  Alias: {}", alias);
+                        }
+                        println!("  TTL: {} seconds", record.ttl);
                         println!("  Registered at: {} (Unix timestamp)", record.registered_at);
-                        println!("  Quantum-resistant: ML-KEM encryption");
+                        println!("  Expires at: {} (Unix timestamp)", record.expires_at);
+                        println!("  Owner ID: {}", record.owner_id);
+                        println!("  Quantum-resistant: ML-DSA + ML-KEM encryption");
                     }
                     Err(DarkResolverError::DomainNotFound) => {
                         println!("✗ Domain not found: {}", domain);

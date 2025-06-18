@@ -1326,6 +1326,7 @@ impl Default for HealthCheckConfig {
 
 /// Health check configuration.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct HealthCheckConfig {
     /// Enable ping checks
     enable_ping: bool,
@@ -1341,6 +1342,7 @@ pub struct HealthCheckConfig {
 
 /// Health check result.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct HealthCheckResult {
     /// Overall health status
     is_healthy: bool,
@@ -1386,6 +1388,7 @@ impl PerformanceMonitor {
 
 /// System-wide performance metrics.
 #[derive(Debug, Clone, Default)]
+#[allow(dead_code)]
 pub struct SystemPerformanceMetrics {
     /// Total discovery rate (peers per second)
     discovery_rate: f64,
@@ -1405,6 +1408,7 @@ pub struct SystemPerformanceMetrics {
 
 /// Performance alerts for monitoring critical conditions.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct PerformanceAlert {
     /// Alert timestamp
     timestamp: Instant,

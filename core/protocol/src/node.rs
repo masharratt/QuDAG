@@ -61,16 +61,19 @@ impl Default for NodeConfig {
 /// Protocol node with persistence support
 pub struct Node {
     /// Node configuration
+    #[allow(dead_code)]
     config: NodeConfig,
     /// Protocol state machine
     state_machine: Arc<RwLock<ProtocolStateMachine>>,
     /// Event channels
+    #[allow(dead_code)]
     events: NodeEvents,
     /// Cryptographic keys
     keys: Option<KeyPair>,
     /// Network transport
     transport: Option<Arc<dyn Transport + Send + Sync>>,
     /// Consensus engine
+    #[allow(dead_code)]
     consensus: Option<Arc<dyn Consensus + Send + Sync>>,
     /// Persistence manager
     persistence: Option<PersistenceManager>,
@@ -81,16 +84,20 @@ pub struct Node {
 /// Node event channels
 struct NodeEvents {
     /// Event sender
+    #[allow(dead_code)]
     tx: mpsc::Sender<ProtocolEvent>,
     /// Event receiver
+    #[allow(dead_code)]
     rx: mpsc::Receiver<ProtocolEvent>,
 }
 
 /// Cryptographic key pair
 struct KeyPair {
     /// Public key
+    #[allow(dead_code)]
     public_key: Vec<u8>,
     /// Private key
+    #[allow(dead_code)]
     private_key: Vec<u8>,
 }
 
@@ -143,7 +150,7 @@ impl Node {
             info!("Recovered state from persistence");
             
             // Restore state machine
-            let mut state_machine = node.state_machine.write().await;
+            let _state_machine = node.state_machine.write().await;
             // TODO: Implement proper state restoration
             // For now, just log the recovery
             debug!("Recovered {} peers and {} sessions", 

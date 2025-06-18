@@ -21,10 +21,12 @@ pub struct Coordinator {
     /// Internal node instance
     node: Node,
     /// Protocol configuration  
+    #[allow(dead_code)]
     config: ProtocolConfig,
     /// Current state
     state: Arc<RwLock<ProtocolState>>,
     /// Event channels
+    #[allow(dead_code)]
     events: CoordinatorEvents,
     /// Crypto manager
     crypto: Option<KeyPair>,
@@ -37,8 +39,10 @@ pub struct Coordinator {
 /// Coordinator event channels
 struct CoordinatorEvents {
     /// Event sender
+    #[allow(dead_code)]
     tx: mpsc::Sender<ProtocolEvent>,
     /// Event receiver  
+    #[allow(dead_code)]
     rx: mpsc::Receiver<ProtocolEvent>,
 }
 
@@ -126,7 +130,7 @@ impl Coordinator {
         debug!("Broadcasting message of {} bytes", message.len());
 
         // Create protocol message
-        let mut proto_message =
+        let proto_message =
             Message::new(crate::message::MessageType::Data(message.clone()), vec![]);
 
         // Sign message if crypto is available
