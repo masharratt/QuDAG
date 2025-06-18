@@ -130,7 +130,7 @@ impl Coordinator {
             Message::new(crate::message::MessageType::Data(message.clone()), vec![]);
 
         // Sign message if crypto is available
-        if let Some(ref crypto) = self.crypto {
+        if let Some(ref _crypto) = self.crypto {
             // TODO: Use proper keypair for signing
             // proto_message.sign(&proper_keypair).map_err(|e| ProtocolError::CryptoError(e.to_string()))?;
         }

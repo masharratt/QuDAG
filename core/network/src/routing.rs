@@ -1,13 +1,12 @@
 use crate::discovery::{
     DiscoveredPeer, LoadBalancer, LoadBalancingAlgorithm, PeerSelector, PeerScoringConfig,
-    GeoPreferences, PeerSelectionStrategy, DiscoveryMethod,
+    GeoPreferences,
 };
 use crate::shadow_address::{ShadowAddress, ShadowAddressError, ShadowAddressResolver};
-use crate::types::{NetworkAddress, PeerId};
 use libp2p::PeerId as LibP2PPeerId;
-use rand::{thread_rng, Rng};
+use rand::thread_rng;
 use rand::seq::SliceRandom;
-use std::collections::{HashMap, HashSet, VecDeque, BTreeMap};
+use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use thiserror::Error;
@@ -77,18 +76,23 @@ pub struct RoutePath {
     /// Load factor for this route (0.0 to 1.0)
     load_factor: f64,
     /// Geographic diversity score
+    #[allow(dead_code)]
     geographic_diversity: f64,
     /// Security level (based on encryption and peer reputation)
     security_level: SecurityLevel,
     /// Route cost (for optimization algorithms)
+    #[allow(dead_code)]
     cost: f64,
     /// Route creation timestamp
     created_at: Instant,
     /// Route last used timestamp
+    #[allow(dead_code)]
     last_used: Option<Instant>,
     /// Usage count
+    #[allow(dead_code)]
     usage_count: u64,
     /// Success rate for this route
+    #[allow(dead_code)]
     success_rate: f64,
     /// Dark addressing support
     supports_dark_addressing: bool,
@@ -115,12 +119,15 @@ pub struct RouteSelectionCriteria {
     /// Minimum reliability requirement
     min_reliability: f64,
     /// Required security level
+    #[allow(dead_code)]
     required_security: SecurityLevel,
     /// Bandwidth requirements in bps
     min_bandwidth: Option<u64>,
     /// Geographic constraints
+    #[allow(dead_code)]
     geographic_constraints: GeographicConstraints,
     /// Load balancing preferences
+    #[allow(dead_code)]
     load_balancing_preference: LoadBalancingPreference,
     /// Redundancy requirements
     redundancy_level: RedundancyLevel,
@@ -132,6 +139,7 @@ pub struct RouteSelectionCriteria {
 
 /// Geographic constraints for routing
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct GeographicConstraints {
     /// Preferred regions (ISO country codes)
     preferred_regions: Vec<String>,
@@ -217,18 +225,23 @@ pub struct Router {
 #[derive(Debug, Clone)]
 pub struct RouteOptimizationConfig {
     /// Enable automatic route optimization
+    #[allow(dead_code)]
     enable_optimization: bool,
     /// Optimization interval
+    #[allow(dead_code)]
     optimization_interval: Duration,
     /// Route cache size
+    #[allow(dead_code)]
     cache_size: usize,
     /// Route cache TTL
     cache_ttl: Duration,
     /// Prefer shorter paths
+    #[allow(dead_code)]
     prefer_shorter_paths: bool,
     /// Weight factors for route selection
     weight_factors: RouteWeightFactors,
     /// Enable adaptive routing
+    #[allow(dead_code)]
     enable_adaptive_routing: bool,
 }
 
@@ -256,8 +269,10 @@ pub struct RouteWeightFactors {
     /// Load weight (0.0 to 1.0)
     load_weight: f64,
     /// Security weight (0.0 to 1.0)
+    #[allow(dead_code)]
     security_weight: f64,
     /// Geographic diversity weight (0.0 to 1.0)
+    #[allow(dead_code)]
     diversity_weight: f64,
 }
 
@@ -279,12 +294,16 @@ pub struct DarkAddressingConfig {
     /// Enable dark addressing support
     enabled: bool,
     /// Preferred dark address resolution timeout
+    #[allow(dead_code)]
     resolution_timeout: Duration,
     /// Maximum resolution attempts
+    #[allow(dead_code)]
     max_resolution_attempts: usize,
     /// Cache resolved addresses
+    #[allow(dead_code)]
     enable_caching: bool,
     /// Dark address cache TTL
+    #[allow(dead_code)]
     cache_ttl: Duration,
 }
 
@@ -308,19 +327,24 @@ pub struct RouterPerformanceMetrics {
     /// Successful routings
     successful_routings: u64,
     /// Failed routings
+    #[allow(dead_code)]
     failed_routings: u64,
     /// Average routing latency
+    #[allow(dead_code)]
     avg_routing_latency: Duration,
     /// Route cache hit rate
     cache_hit_rate: f64,
     /// Load balancing effectiveness
+    #[allow(dead_code)]
     load_balancing_score: f64,
     /// Dark addressing usage rate
+    #[allow(dead_code)]
     dark_addressing_usage: f64,
 }
 
 /// Route usage statistics for optimization
 #[derive(Debug, Clone, Default)]
+#[allow(dead_code)]
 pub struct RouteStatistics {
     /// Route usage count
     usage_count: u64,

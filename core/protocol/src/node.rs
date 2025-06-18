@@ -1,7 +1,7 @@
 use crate::{
     message::{Message, MessageError, MessageType},
     persistence::{MemoryBackend, PersistenceError, PersistenceManager, PersistedState, SqliteBackend, StatePersistence, StateProvider},
-    state::{ProtocolStateMachine, SessionInfo, StateMachineMetrics},
+    state::ProtocolStateMachine,
     types::{ProtocolError, ProtocolEvent},
 };
 use async_trait::async_trait;
@@ -14,7 +14,6 @@ use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::{mpsc, RwLock};
 use tracing::{debug, info, warn};
-use uuid::Uuid;
 
 /// Node configuration
 ///
@@ -295,25 +294,25 @@ impl Node {
     }
 
     // Handle handshake message
-    async fn handle_handshake(&mut self, message: Message) -> Result<(), MessageError> {
+    async fn handle_handshake(&mut self, _message: Message) -> Result<(), MessageError> {
         // TODO: Implement handshake
         Ok(())
     }
 
     // Handle data message
-    async fn handle_data(&mut self, message: Message) -> Result<(), MessageError> {
+    async fn handle_data(&mut self, _message: Message) -> Result<(), MessageError> {
         // TODO: Implement data handling
         Ok(())
     }
 
     // Handle control message
-    async fn handle_control(&mut self, message: Message) -> Result<(), MessageError> {
+    async fn handle_control(&mut self, _message: Message) -> Result<(), MessageError> {
         // TODO: Implement control handling
         Ok(())
     }
 
     // Handle sync message
-    async fn handle_sync(&mut self, message: Message) -> Result<(), MessageError> {
+    async fn handle_sync(&mut self, _message: Message) -> Result<(), MessageError> {
         // TODO: Implement sync handling
         Ok(())
     }

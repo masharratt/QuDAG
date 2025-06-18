@@ -60,7 +60,7 @@ impl AsymmetricEncryption for Hqc256 {
     }
 
     fn encrypt(pk: &Self::PublicKey, data: &[u8]) -> Result<Vec<u8>, EncryptionError> {
-        let hqc_pk = hqc::PublicKey::from_bytes(&pk.0)
+        let hqc_pk = hqc::PublicKey::from_bytes_with_params(&pk.0, SecurityParameter::Hqc256)
             .map_err(|_| EncryptionError::EncryptionError)?;
         
         hqc::Hqc256::encrypt(&hqc_pk, data)
@@ -68,25 +68,10 @@ impl AsymmetricEncryption for Hqc256 {
     }
 
     fn decrypt(sk: &Self::SecretKey, ct: &[u8]) -> Result<Vec<u8>, EncryptionError> {
-        let params = hqc::Parameters::new(SecurityParameter::Hqc256);
-        let ct_len = params.ciphertext_len() / 2;
+        let hqc_sk = hqc::SecretKey::from_bytes_with_params(&sk.0, SecurityParameter::Hqc256)
+            .map_err(|_| EncryptionError::DecryptionError)?;
         
-        if ct.len() < ct_len * 2 {
-            return Err(EncryptionError::DecryptionError);
-        }
-        
-        let u = ct[..ct_len].to_vec();
-        let v = ct[ct_len..ct_len * 2].to_vec();
-        let hqc_ct = hqc::Ciphertext { u, v, params: params.clone() };
-        
-        let hqc_sk = hqc::SecretKey {
-            x: sk.0[..ct_len].to_vec(),
-            y: sk.0[ct_len..].to_vec(),
-            params
-        };
-        
-        let hqc_instance = hqc::Hqc::new(SecurityParameter::Hqc256);
-        hqc_instance.decrypt(&hqc_ct, &hqc_sk)
+        hqc::Hqc256::decrypt(&hqc_sk, ct)
             .map_err(|_| EncryptionError::DecryptionError)
     }
 }

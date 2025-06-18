@@ -8,7 +8,7 @@ use anyhow::Result;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use dashmap::DashMap;
 use parking_lot::RwLock as ParkingRwLock;
-use quinn::{Connection, Endpoint, ServerConfig};
+use quinn::{Connection, Endpoint};
 use ring::{aead, agreement, rand as ring_rand};
 use std::net::SocketAddr;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
@@ -16,8 +16,8 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::{mpsc, RwLock as TokioRwLock, Semaphore};
 use tracing::{debug, error, info, warn};
-use tokio::time::{interval, sleep};
-use futures::future::{BoxFuture, Future};
+use tokio::time::sleep;
+use futures::future::Future;
 use async_trait::async_trait;
 
 /// Secure connection configuration
@@ -34,6 +34,7 @@ pub struct SecureConfig {
 /// Transport encryption keys
 pub struct TransportKeys {
     /// Static private key
+    #[allow(dead_code)]
     private_key: agreement::EphemeralPrivateKey,
     /// Static public key
     public_key: Vec<u8>,
@@ -81,8 +82,10 @@ impl TransportKeys {
 /// ```
 pub struct SecureConnection {
     /// QUIC connection
+    #[allow(dead_code)]
     connection: Connection,
     /// Encryption keys
+    #[allow(dead_code)]
     keys: TransportKeys,
     /// Message channels
     channels: ConnectionChannels,
@@ -471,16 +474,19 @@ pub struct ConnectionManager {
     /// Throughput metrics
     throughput_metrics: Arc<ParkingRwLock<ThroughputMetrics>>,
     /// Connection health tracker
+    #[allow(dead_code)]
     health_tracker: Arc<RwLock<ConnectionHealthTracker>>,
     /// Circuit breaker for failing connections
     circuit_breakers: Arc<DashMap<PeerId, CircuitBreaker>>,
     /// Connection quality scores
     quality_scores: Arc<DashMap<PeerId, f64>>,
     /// Connection pool maintenance task handle
+    #[allow(dead_code)]
     maintenance_handle: Option<tokio::task::JoinHandle<()>>,
     /// Global connection limits
     connection_limits: ConnectionLimits,
     /// Performance monitoring interval
+    #[allow(dead_code)]
     monitoring_interval: Duration,
 }
 
@@ -575,6 +581,7 @@ impl ConnectionInfo {
 
 /// Connection health tracking for monitoring and recovery
 #[derive(Debug)]
+#[allow(dead_code)]
 pub struct ConnectionHealthTracker {
     /// Health check interval
     check_interval: Duration,
@@ -588,6 +595,7 @@ pub struct ConnectionHealthTracker {
 
 /// Information about unhealthy connections
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct UnhealthyConnectionInfo {
     /// When the connection became unhealthy
     unhealthy_since: Instant,
@@ -773,6 +781,7 @@ pub struct ConnectionMultiplexer {
     /// Maximum concurrent streams per connection
     max_streams_per_connection: u32,
     /// Stream timeout configuration
+    #[allow(dead_code)]
     stream_timeout: Duration,
 }
 
@@ -1002,6 +1011,7 @@ pub struct WarmingManager {
     /// Warming state per peer
     warming_states: Arc<DashMap<PeerId, WarmingState>>,
     /// Warming tasks
+    #[allow(dead_code)]
     warming_tasks: Arc<DashMap<PeerId, tokio::task::JoinHandle<()>>>,
     /// Warming statistics
     stats: Arc<TokioRwLock<WarmingStats>>,
@@ -1072,6 +1082,7 @@ pub trait HealthCheck: Send + Sync {
 /// Default ping-based health check implementation
 #[derive(Debug)]
 pub struct PingHealthCheck {
+    #[allow(dead_code)]
     timeout: Duration,
 }
 
@@ -1102,7 +1113,6 @@ impl HealthCheck for PingHealthCheck {
     }
 }
 
-use rand::random;
 use std::collections::{HashMap, BTreeMap, VecDeque};
 use tokio::sync::RwLock;
 
@@ -1492,7 +1502,7 @@ impl ConnectionManager {
         
         // Keep circuit breaker for future connection attempts
         // but reset if it was in a good state
-        if let Some(mut circuit_breaker) = self.circuit_breakers.get_mut(peer_id) {
+        if let Some(circuit_breaker) = self.circuit_breakers.get_mut(peer_id) {
             if circuit_breaker.state == CircuitBreakerState::Closed {
                 // Keep the circuit breaker but don't reset it completely
                 // This preserves failure history while allowing new attempts
@@ -1729,8 +1739,8 @@ impl ConnectionManager {
     
     /// Configure connection limits
     pub fn set_connection_limits(&mut self, limits: ConnectionLimits) {
-        self.connection_limits = limits;
         self.max_connections = limits.max_total;
+        self.connection_limits = limits;
     }
     
     /// Get current connection limits
@@ -1980,7 +1990,7 @@ impl ConnectionMultiplexer {
         }
         
         // Acquire stream permit
-        connection.stream_semaphore.acquire().await
+        let _ = connection.stream_semaphore.acquire().await
             .map_err(|_| NetworkError::ConnectionError("Stream semaphore closed".into()))?;
         
         let stream_id = StreamId(connection.next_stream_id);
@@ -2012,7 +2022,7 @@ impl ConnectionMultiplexer {
             .1;
         
         if let Some(mut connection) = self.connections.get_mut(&peer_id) {
-            if let Some(mut stream) = connection.streams.get_mut(&stream_id) {
+            if let Some(stream) = connection.streams.get_mut(&stream_id) {
                 stream.state = StreamState::Closed;
                 stream.last_activity = Instant::now();
             }

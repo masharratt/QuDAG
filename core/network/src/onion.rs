@@ -4,11 +4,11 @@ use ring::rand::{SecureRandom, SystemRandom};
 use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use thiserror::Error;
-use std::collections::{HashMap, VecDeque, BTreeMap};
+use std::collections::HashMap;
 use tokio::sync::Mutex as TokioMutex;
 use std::sync::Arc;
 use qudag_crypto::ml_kem::{MlKem768};
-use qudag_crypto::kem::{KeyEncapsulation, PublicKey as KEMPublicKey, SecretKey as KEMSecretKey};
+use qudag_crypto::kem::{PublicKey as KEMPublicKey, SecretKey as KEMSecretKey};
 
 /// Error types for onion routing operations
 #[derive(Error, Debug)]
@@ -169,6 +169,7 @@ pub struct MLKEMOnionRouter {
     /// Standard layer size for traffic analysis resistance
     standard_layer_size: usize,
     /// Circuit management
+    #[allow(dead_code)]
     circuit_manager: Arc<TokioMutex<CircuitManager>>,
     /// Directory authority client
     directory_client: Arc<DirectoryClient>,
@@ -209,14 +210,13 @@ impl MLKEMOnionRouter {
     /// Derive symmetric key from ML-KEM shared secret using KDF
     fn derive_symmetric_key(&self, shared_secret: &[u8]) -> Result<[u8; 32], OnionError> {
         use ring::hkdf;
-        use ring::digest;
         
         let salt = ring::hkdf::Salt::new(hkdf::HKDF_SHA256, b"QuDAG-Onion-v1");
         let prk = salt.extract(shared_secret);
         
         let mut key = [0u8; 32];
-        let info = [b"symmetric-key"];
-        prk.expand(&info, hkdf::HKDF_SHA256)
+        let info = [&b"symmetric-key"[..]];
+        prk.expand(&info[..], hkdf::HKDF_SHA256)
             .map_err(|_| OnionError::EncryptionError("Key derivation failed".into()))?
             .fill(&mut key)
             .map_err(|_| OnionError::EncryptionError("Key derivation failed".into()))?;
@@ -270,6 +270,7 @@ impl MLKEMOnionRouter {
     }
 
     /// Add timing obfuscation delay
+    #[allow(dead_code)]
     async fn add_timing_obfuscation(&self) {
         // Random delay between 10-100ms to prevent timing analysis
         let delay_ms = (thread_rng().next_u32() % 90) + 10;
@@ -293,8 +294,6 @@ impl MLKEMOnionRouter {
 
         // Build layers from innermost to outermost (reverse order)
         for (i, _hop_pubkey) in route.iter().rev().enumerate() {
-            // Generate symmetric key for this layer
-            let symmetric_key = self.generate_symmetric_key()?;
 
             // Create nonce for this layer
             let mut nonce = [0u8; 12];
@@ -319,7 +318,7 @@ impl MLKEMOnionRouter {
             let hop_info = HopMetadata {
                 circuit_id,
                 hop_number: i as u8,
-                next_hop: if i == 0 { None } else { Some(route[route.len() - i].to_bytes().to_vec()) },
+                next_hop: if i == 0 { None } else { Some(route[route.len() - i].clone()) },
                 flags: LayerFlags::default(),
             };
             let metadata = self.create_metadata(bincode::serialize(&hop_info)
@@ -694,6 +693,7 @@ impl DummyTrafficGenerator {
 
 /// Traffic shaper for maintaining consistent output rates
 #[derive(Debug)]
+#[allow(dead_code)]
 struct TrafficShaper {
     /// Target rate in messages per second
     target_rate: f64,
@@ -1144,7 +1144,7 @@ impl CircuitManager {
 
     /// Cleanup inactive or expired circuits
     pub fn cleanup_inactive_circuits(&mut self) {
-        let now = Instant::now();
+        let _now = Instant::now();
         self.circuits.retain(|_, circuit| {
             match circuit.state {
                 CircuitState::Closed | CircuitState::Failed(_) => false,
@@ -1200,6 +1200,7 @@ pub struct DirectoryClient {
     /// Known nodes with their public keys
     nodes: Arc<TokioMutex<HashMap<Vec<u8>, NodeInfo>>>,
     /// Directory servers
+    #[allow(dead_code)]
     directory_servers: Vec<String>,
     /// Last directory update
     last_update: Arc<TokioMutex<Instant>>,

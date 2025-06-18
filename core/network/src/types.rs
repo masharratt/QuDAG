@@ -70,6 +70,12 @@ pub enum NetworkError {
     #[error("Encryption failed: {0}")]
     EncryptionError(String),
 
+    #[error("Bootstrap failed")]
+    BootstrapFailed,
+
+    #[error("Content too large")]
+    ContentTooLarge,
+
     #[error("Internal error: {0}")]
     Internal(String),
 }

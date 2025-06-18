@@ -291,6 +291,7 @@ impl Graph {
     }
 
     /// Checks if adding an edge would create a cycle
+    #[allow(dead_code)]
     fn would_create_cycle(&self, from: &Hash, to: &Hash, visited: &mut HashSet<Hash>) -> bool {
         if from == to {
             return true;

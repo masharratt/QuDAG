@@ -2,7 +2,7 @@ use libp2p::{
     core::{
         multiaddr::{Multiaddr, Protocol},
         transport::{Boxed, MemoryTransport, Transport as LibP2PTransport},
-        upgrade::{self, SelectUpgrade},
+        upgrade::{self},
     },
     dcutr,
     gossipsub::{self, MessageAuthenticity, ValidationMode, IdentTopic, Config as GossipsubConfig, ConfigBuilder as GossipsubConfigBuilder},
@@ -18,9 +18,10 @@ use libp2p::{
         behaviour::toggle::Toggle, NetworkBehaviour,
         SwarmEvent,
     },
-    SwarmBuilder,
     tcp, websocket, yamux, PeerId as LibP2PPeerId, StreamProtocol,
 };
+use void;
+use either::Either;
 
 /// Combined network behaviour event
 #[derive(Debug)]
@@ -35,16 +36,74 @@ pub enum NetworkBehaviourEvent {
     RequestResponse(request_response::Event<QuDagRequest, QuDagResponse>),
 }
 
+// Implement From traits for all event types
+impl From<kad::Event> for NetworkBehaviourEvent {
+    fn from(event: kad::Event) -> Self {
+        NetworkBehaviourEvent::Kademlia(event)
+    }
+}
+
+impl From<gossipsub::Event> for NetworkBehaviourEvent {
+    fn from(event: gossipsub::Event) -> Self {
+        NetworkBehaviourEvent::Gossipsub(event)
+    }
+}
+
+impl From<mdns::Event> for NetworkBehaviourEvent {
+    fn from(event: mdns::Event) -> Self {
+        NetworkBehaviourEvent::Mdns(event)
+    }
+}
+
+// Handle Toggle<T> event conversion for MDNS
+impl From<Either<mdns::Event, void::Void>> for NetworkBehaviourEvent {
+    fn from(event: Either<mdns::Event, void::Void>) -> Self {
+        match event {
+            Either::Left(mdns_event) => NetworkBehaviourEvent::Mdns(mdns_event),
+            Either::Right(void) => match void {},
+        }
+    }
+}
+
+impl From<ping::Event> for NetworkBehaviourEvent {
+    fn from(event: ping::Event) -> Self {
+        NetworkBehaviourEvent::Ping(event)
+    }
+}
+
+impl From<identify::Event> for NetworkBehaviourEvent {
+    fn from(event: identify::Event) -> Self {
+        NetworkBehaviourEvent::Identify(event)
+    }
+}
+
+impl From<relay::Event> for NetworkBehaviourEvent {
+    fn from(event: relay::Event) -> Self {
+        NetworkBehaviourEvent::Relay(event)
+    }
+}
+
+impl From<dcutr::Event> for NetworkBehaviourEvent {
+    fn from(event: dcutr::Event) -> Self {
+        NetworkBehaviourEvent::Dcutr(event)
+    }
+}
+
+impl From<request_response::Event<QuDagRequest, QuDagResponse>> for NetworkBehaviourEvent {
+    fn from(event: request_response::Event<QuDagRequest, QuDagResponse>) -> Self {
+        NetworkBehaviourEvent::RequestResponse(event)
+    }
+}
+
 use std::{
     collections::{HashMap, HashSet},
     error::Error,
-    io,
     sync::Arc,
     time::Duration,
 };
 use tokio::sync::{mpsc, RwLock};
 use futures::{channel::oneshot, prelude::*, select};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 use chacha20poly1305::{
     aead::{Aead, KeyInit},
     ChaCha20Poly1305, Key, Nonce,
@@ -52,10 +111,7 @@ use chacha20poly1305::{
 use rand::{thread_rng, RngCore};
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    routing::{Router, RoutePath, RoutingError},
-    types::{NetworkError, PeerId},
-};
+use crate::routing::Router;
 
 /// Configuration for the P2P network node
 #[derive(Debug, Clone)]
@@ -275,7 +331,7 @@ impl P2PNode {
         };
 
         // Build the swarm
-        let swarm = SwarmBuilder::with_tokio_executor(transport, behaviour, local_peer_id).build();
+        let swarm = libp2p::Swarm::new(transport, behaviour, local_peer_id, libp2p::swarm::Config::with_tokio_executor());
 
         // Set up channels and state
         let (event_tx, event_rx) = mpsc::unbounded_channel();
@@ -433,7 +489,12 @@ impl P2PNode {
             NetworkBehaviourEvent::RequestResponse(req_res_event) => {
                 self.handle_request_response_event(req_res_event).await?;
             }
-            _ => {}
+            NetworkBehaviourEvent::Relay(relay_event) => {
+                self.handle_relay_event(relay_event).await?;
+            }
+            NetworkBehaviourEvent::Dcutr(dcutr_event) => {
+                self.handle_dcutr_event(dcutr_event).await?;
+            }
         }
         Ok(())
     }
@@ -448,11 +509,11 @@ impl P2PNode {
                 peer, addresses, ..
             } => {
                 debug!("Kademlia routing updated for peer {}", peer);
-                for addr in addresses {
+                for addr in addresses.iter() {
                     self.swarm
                         .behaviour_mut()
                         .kademlia
-                        .add_address(&peer, addr);
+                        .add_address(&peer, addr.clone());
                 }
                 self.event_tx.send(P2PEvent::RoutingTableUpdated)?;
             }
@@ -584,6 +645,79 @@ impl P2PNode {
         Ok(())
     }
 
+    /// Handle relay events
+    async fn handle_relay_event(
+        &mut self,
+        event: relay::Event,
+    ) -> Result<(), Box<dyn Error>> {
+        match event {
+            relay::Event::ReservationReqAccepted {
+                src_peer_id,
+                renewed,
+                ..
+            } => {
+                info!(
+                    "Relay reservation accepted from peer {}: renewed={}",
+                    src_peer_id, renewed
+                );
+            }
+            relay::Event::ReservationReqDenied { src_peer_id, .. } => {
+                warn!("Relay reservation denied by peer {}", src_peer_id);
+            }
+            relay::Event::ReservationTimedOut { src_peer_id, .. } => {
+                warn!("Relay reservation timed out for peer {}", src_peer_id);
+            }
+            #[allow(deprecated)]
+            relay::Event::CircuitReqAcceptFailed { src_peer_id, dst_peer_id, error } => {
+                warn!("Circuit request accept failed from {} to {}: {:?}", src_peer_id, dst_peer_id, error);
+            }
+            relay::Event::CircuitReqDenied { src_peer_id, dst_peer_id, .. } => {
+                warn!("Circuit request denied from {} to {}", src_peer_id, dst_peer_id);
+            }
+            relay::Event::CircuitClosed { src_peer_id, dst_peer_id, error } => {
+                if let Some(error) = error {
+                    warn!("Circuit closed between {} and {}: {:?}", src_peer_id, dst_peer_id, error);
+                } else {
+                    debug!("Circuit closed between {} and {}", src_peer_id, dst_peer_id);
+                }
+            }
+            // Handle other relay events
+            _ => {
+                debug!("Unhandled relay event: {:?}", event);
+            }
+        }
+        Ok(())
+    }
+
+    /// Handle DCUTR events
+    async fn handle_dcutr_event(
+        &mut self,
+        event: dcutr::Event,
+    ) -> Result<(), Box<dyn Error>> {
+        match event {
+            dcutr::Event {
+                remote_peer_id,
+                result,
+            } => {
+                match result {
+                    Ok(connection_id) => {
+                        info!(
+                            "Direct connection upgrade succeeded with peer {} (connection: {:?})",
+                            remote_peer_id, connection_id
+                        );
+                    }
+                    Err(error) => {
+                        warn!(
+                            "Direct connection upgrade failed with {}: {:?}",
+                            remote_peer_id, error
+                        );
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
+
     /// Handle request-response events
     async fn handle_request_response_event(
         &mut self,
@@ -594,19 +728,26 @@ impl P2PNode {
                 request_response::Message::Request {
                     request, channel, ..
                 } => {
-                    let (tx, rx) = oneshot::channel();
+                    // Handle the request and prepare response
+                    let response = QuDagResponse {
+                        request_id: request.request_id.clone(),
+                        payload: vec![],  // TODO: Process request and generate actual response
+                    };
+                    
+                    // Send the response back directly
+                    self.swarm
+                        .behaviour_mut()
+                        .request_response
+                        .send_response(channel, response)
+                        .map_err(|_| "Failed to send response")?;
+                    
+                    // Also emit event for the application layer
+                    let (tx, _rx) = oneshot::channel();
                     self.event_tx.send(P2PEvent::RequestReceived {
                         peer_id: peer,
                         request,
                         channel: tx,
                     })?;
-                    
-                    // Wait for response and send it back
-                    tokio::spawn(async move {
-                        if let Ok(response) = rx.await {
-                            let _ = channel.send(Ok(response));
-                        }
-                    });
                 }
                 request_response::Message::Response {
                     request_id,
@@ -780,8 +921,7 @@ fn build_transport(
     local_key: &Keypair,
     config: &NetworkConfig,
 ) -> Result<Boxed<(LibP2PPeerId, StreamMuxerBox)>, Box<dyn Error>> {
-    let noise_keys = noise::Config::new(local_key)?
-        .into_authenticated();
+    let noise = noise::Config::new(local_key)?;
 
     let yamux_config = yamux::Config::default();
 
@@ -792,25 +932,28 @@ fn build_transport(
     let memory = MemoryTransport::default();
 
     // Combine transports
-    let transport = tcp.or_transport(memory);
+    let base_transport = tcp.or_transport(memory);
 
     // Add WebSocket support if enabled
-    let transport = if config.enable_websocket {
+    let transport: Boxed<(LibP2PPeerId, StreamMuxerBox)> = if config.enable_websocket {
         let ws = websocket::WsConfig::new(tcp::tokio::Transport::new(
             tcp::Config::default().nodelay(true),
         ));
-        transport.or_transport(ws)
+        base_transport
+            .or_transport(ws)
+            .upgrade(upgrade::Version::V1)
+            .authenticate(noise)
+            .multiplex(yamux_config)
+            .timeout(Duration::from_secs(20))
+            .boxed()
     } else {
-        transport
+        base_transport
+            .upgrade(upgrade::Version::V1)
+            .authenticate(noise)
+            .multiplex(yamux_config)
+            .timeout(Duration::from_secs(20))
+            .boxed()
     };
-
-    // Apply multiplexing and encryption
-    let transport = transport
-        .upgrade(upgrade::Version::V1)
-        .authenticate(noise_keys)
-        .multiplex(yamux_config)
-        .timeout(Duration::from_secs(20))
-        .boxed();
 
     Ok(transport)
 }

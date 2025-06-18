@@ -1,4 +1,6 @@
 use thiserror::Error;
+use crate::vertex::VertexError;
+use crate::consensus::ConsensusError;
 
 /// Errors that can occur during DAG operations
 #[derive(Error, Debug)]
@@ -35,4 +37,14 @@ pub enum DagError {
     /// Consensus error
     #[error("Consensus error: {0}")]
     ConsensusError(String),
+
+    /// Vertex error
+    #[error("Vertex error: {0}")]
+    VertexError(#[from] VertexError),
+}
+
+impl From<ConsensusError> for DagError {
+    fn from(err: ConsensusError) -> Self {
+        DagError::ConsensusError(err.to_string())
+    }
 }

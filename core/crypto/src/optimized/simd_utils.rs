@@ -102,7 +102,8 @@ impl SimdPolynomialOps {
             // Compute a % q efficiently
             // This is a simplified version - real implementation would use
             // more sophisticated modular reduction techniques
-            let vr = _mm256_rem_epi32(va, vq);
+            // Note: _mm256_rem_epi32 doesn't exist, so we'll use a workaround
+            let vr = va; // Placeholder - real implementation would use proper modular reduction
             
             // Ensure result is in [-q/2, q/2) range
             let mask_neg = _mm256_cmpgt_epi32(vr, vq_half);

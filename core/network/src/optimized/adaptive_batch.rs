@@ -2,7 +2,6 @@
 
 use std::time::{Duration, Instant};
 use std::collections::VecDeque;
-use crate::types::NetworkMetrics;
 
 /// Adaptive batching configuration
 #[derive(Clone, Debug)]
@@ -165,11 +164,11 @@ impl<T> AdaptiveBatcher<T> {
         }
         
         // Queue pressure-based flushing
-        if self.queue_metrics.load_factor > self.config.load_threshold {
+        if self.adaptive_thresholds.load_factor > self.config.load_threshold {
             // Under high load, flush more aggressively
             let pressure_adjusted_latency = Duration::from_micros(
                 (self.config.base_latency_micros as f64 * 
-                 (1.0 - self.queue_metrics.load_factor * 0.5)) as u64
+                 (1.0 - self.adaptive_thresholds.load_factor * 0.5)) as u64
             );
             
             if current_latency >= pressure_adjusted_latency {
@@ -246,7 +245,7 @@ impl<T> AdaptiveBatcher<T> {
     fn update_adaptive_thresholds(&mut self) {
         // Calculate average latency and throughput
         let avg_latency = self.calculate_average_latency();
-        let avg_throughput = self.calculate_average_throughput();
+        let _avg_throughput = self.calculate_average_throughput();
         
         // Adjust latency target based on current performance
         if avg_latency > self.adaptive_thresholds.current_latency_target {

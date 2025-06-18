@@ -54,23 +54,23 @@
 #![allow(clippy::needless_range_loop)]
 #![allow(clippy::type_complexity)]
 
-use blake3::Hasher;
 use pqcrypto_dilithium::dilithium3::*;
-use pqcrypto_traits::sign::{PublicKey as PqPublicKey, SecretKey as PqSecretKey, SignedMessage as PqSignedMessage};
+use pqcrypto_traits::sign::{PublicKey as PqPublicKeyTrait, SecretKey as PqSecretKeyTrait, SignedMessage as PqSignedMessageTrait};
 use rand_core::{CryptoRng, RngCore};
 use sha3::{Shake128, Shake256, digest::{Update, ExtendableOutput, XofReader}};
 use subtle::ConstantTimeEq;
 use thiserror::Error;
-use zeroize::{Zeroize, ZeroizeOnDrop};
-use std::convert::TryInto;
+use zeroize::Zeroize;
 use rand::Rng;
 
 /// Helper for secure memory cleanup
+#[allow(dead_code)]
 fn secure_zero(data: &mut [u8]) {
     data.zeroize();
 }
 
 /// Constant-time conditional assignment
+#[allow(dead_code)]
 fn conditional_assign(dst: &mut [i32], src: &[i32], condition: bool) {
     let mask = if condition { -1i32 } else { 0i32 };
     for (d, &s) in dst.iter_mut().zip(src.iter()) {
@@ -79,6 +79,7 @@ fn conditional_assign(dst: &mut [i32], src: &[i32], condition: bool) {
 }
 
 /// Constant-time polynomial comparison
+#[allow(dead_code)]
 fn poly_ct_eq(a: &[i32; ML_DSA_N], b: &[i32; ML_DSA_N]) -> bool {
     let mut result = 0i32;
     for i in 0..ML_DSA_N {
@@ -88,6 +89,7 @@ fn poly_ct_eq(a: &[i32; ML_DSA_N], b: &[i32; ML_DSA_N]) -> bool {
 }
 
 /// Side-channel resistant operations
+#[allow(dead_code)]
 mod side_channel_resistant {
     use super::*;
     
@@ -125,6 +127,7 @@ const ML_DSA_Q: i32 = 8380417; // modulus
 // Constants for NTT and polynomial operations
 const ML_DSA_N: usize = 256; // polynomial degree
 const ML_DSA_D: usize = 13; // dropped bits in t1
+#[allow(dead_code)]
 const ML_DSA_ROOT_OF_UNITY: i32 = 1753; // primitive 512-th root of unity mod q
 
 /// Errors that can occur during ML-DSA operations
@@ -206,7 +209,7 @@ impl MlDsaPublicKey {
             });
         }
 
-        let internal_key = PublicKey::from_bytes(bytes)
+        let internal_key = <PublicKey as PqPublicKeyTrait>::from_bytes(bytes)
             .map_err(|_| MlDsaError::InvalidPublicKey("Failed to parse public key".to_string()))?;
 
         Ok(Self {
@@ -236,7 +239,7 @@ impl MlDsaPublicKey {
         signed_message_bytes.extend_from_slice(signature);
         signed_message_bytes.extend_from_slice(message);
         
-        let signed_msg = pqcrypto_dilithium::dilithium3::SignedMessage::from_bytes(&signed_message_bytes)
+        let signed_msg = <SignedMessage as PqSignedMessageTrait>::from_bytes(&signed_message_bytes)
             .map_err(|_| MlDsaError::VerificationFailed)?;
         
         match open(&signed_msg, &self.internal_key) {
@@ -289,6 +292,7 @@ pub struct MlDsaKeyPair {
     /// Secret key bytes
     secret_key: Vec<u8>,
     /// Internal pqcrypto keys
+    #[allow(dead_code)]
     internal_public: PublicKey,
     internal_secret: SecretKey,
 }
@@ -316,12 +320,12 @@ impl MlDsaKeyPair {
     }
 
     /// Generate a new ML-DSA key pair using the provided RNG
-    pub fn generate<R: CryptoRng + RngCore>(rng: &mut R) -> Result<Self, MlDsaError> {
+    pub fn generate<R: CryptoRng + RngCore>(#[allow(unused_variables)] rng: &mut R) -> Result<Self, MlDsaError> {
         // Generate key pair using pqcrypto
         let (internal_public, internal_secret) = keypair();
         
-        let public_key = PqPublicKey::as_bytes(&internal_public).to_vec();
-        let secret_key = PqSecretKey::as_bytes(&internal_secret).to_vec();
+        let public_key = <PublicKey as PqPublicKeyTrait>::as_bytes(&internal_public).to_vec();
+        let secret_key = <SecretKey as PqSecretKeyTrait>::as_bytes(&internal_secret).to_vec();
         
         // Validate key sizes
         if public_key.len() != ML_DSA_PUBLIC_KEY_SIZE {
@@ -358,11 +362,11 @@ impl MlDsaKeyPair {
     pub fn sign<R: CryptoRng + RngCore>(
         &self,
         message: &[u8],
-        rng: &mut R,
+        #[allow(unused_variables)] rng: &mut R,
     ) -> Result<Vec<u8>, MlDsaError> {
         // Use pqcrypto-dilithium's signing which includes rejection sampling
         let signed_msg = sign(message, &self.internal_secret);
-        let signed_bytes = PqSignedMessage::as_bytes(&signed_msg);
+        let signed_bytes = <SignedMessage as PqSignedMessageTrait>::as_bytes(&signed_msg);
         
         // Extract signature portion (everything except the message at the end)
         if signed_bytes.len() >= message.len() {
@@ -377,13 +381,14 @@ impl MlDsaKeyPair {
     pub fn sign_deterministic(&self, message: &[u8]) -> Result<Vec<u8>, MlDsaError> {
         // Use pqcrypto signing which handles deterministic aspects internally
         let signed_msg = sign(message, &self.internal_secret);
-        Ok(signed_msg.as_bytes().to_vec())
+        Ok(<SignedMessage as PqSignedMessageTrait>::as_bytes(&signed_msg).to_vec())
     }
 }
 
 // Internal helper functions for ML-DSA implementation
 
 /// Generate the matrix A from seed rho using SHAKE128
+#[allow(dead_code)]
 fn generate_matrix_a(rho: &[u8; 32]) -> Result<[[[i32; ML_DSA_N]; ML_DSA_L]; ML_DSA_K], MlDsaError> {
     let mut a = [[[0i32; ML_DSA_N]; ML_DSA_L]; ML_DSA_K];
 
@@ -405,6 +410,7 @@ fn generate_matrix_a(rho: &[u8; 32]) -> Result<[[[i32; ML_DSA_N]; ML_DSA_L]; ML_
 }
 
 /// Generate secret vectors s1 and s2 from rhoprime using SHAKE256
+#[allow(dead_code)]
 fn generate_secret_vectors(
     rhoprime: &[u8; 64],
 ) -> Result<([[i32; ML_DSA_N]; ML_DSA_L], [[i32; ML_DSA_N]; ML_DSA_K]), MlDsaError> {
@@ -433,6 +439,7 @@ fn generate_secret_vectors(
 }
 
 /// Generate uniform polynomial using rejection sampling
+#[allow(dead_code)]
 fn generate_uniform_poly(reader: &mut dyn XofReader, poly: &mut [i32; ML_DSA_N]) -> Result<(), MlDsaError> {
     let mut buffer = [0u8; 3];
     let mut pos = 0;
@@ -456,6 +463,7 @@ fn generate_uniform_poly(reader: &mut dyn XofReader, poly: &mut [i32; ML_DSA_N])
 }
 
 /// Generate polynomial with coefficients in [-eta, eta] using rejection sampling
+#[allow(dead_code)]
 fn generate_eta_poly(reader: &mut dyn XofReader, poly: &mut [i32; ML_DSA_N]) -> Result<(), MlDsaError> {
     let mut pos = 0;
     let mut buffer = [0u8; 1];
@@ -493,6 +501,7 @@ fn generate_eta_poly(reader: &mut dyn XofReader, poly: &mut [i32; ML_DSA_N]) -> 
 }
 
 /// Matrix-vector multiplication: t = As1 + s2 using NTT
+#[allow(dead_code)]
 fn matrix_vector_multiply(
     a: &[[[i32; ML_DSA_N]; ML_DSA_L]; ML_DSA_K],
     s1: &[[i32; ML_DSA_N]; ML_DSA_L],
@@ -537,6 +546,7 @@ fn matrix_vector_multiply(
 }
 
 /// Number-Theoretic Transform (NTT) implementation
+#[allow(dead_code)]
 fn ntt(poly: &mut [i32; ML_DSA_N]) {
     let mut k = 1;
     let mut len = 128;
@@ -560,6 +570,7 @@ fn ntt(poly: &mut [i32; ML_DSA_N]) {
 }
 
 /// Inverse Number-Theoretic Transform (INTT) implementation
+#[allow(dead_code)]
 fn invntt(poly: &mut [i32; ML_DSA_N]) {
     let mut k = 127;
     let mut len = 2;
@@ -589,6 +600,7 @@ fn invntt(poly: &mut [i32; ML_DSA_N]) {
 }
 
 /// Decompose t into high and low parts
+#[allow(dead_code)]
 fn decompose_t(
     t: &[[i32; ML_DSA_N]; ML_DSA_K],
 ) -> Result<([[i32; ML_DSA_N]; ML_DSA_K], [[i32; ML_DSA_N]; ML_DSA_K]), MlDsaError> {
@@ -607,6 +619,7 @@ fn decompose_t(
 }
 
 /// Power-of-2 rounding for ML-DSA
+#[allow(dead_code)]
 fn power2round(a: i32) -> (i32, i32) {
     let a = a.rem_euclid(ML_DSA_Q);
     let a1 = (a + (1 << (ML_DSA_D - 1))) >> ML_DSA_D;
@@ -615,6 +628,7 @@ fn power2round(a: i32) -> (i32, i32) {
 }
 
 /// Decompose polynomial coefficients for signature verification
+#[allow(dead_code)]
 fn decompose(a: i32) -> (i32, i32) {
     let a = a.rem_euclid(ML_DSA_Q);
     let a1 = (a + 127) >> 7;
@@ -628,11 +642,13 @@ fn decompose(a: i32) -> (i32, i32) {
 }
 
 /// High-level bounds check for signature components
+#[allow(dead_code)]
 fn check_norm_bound(poly: &[i32; ML_DSA_N], bound: i32) -> bool {
     poly.iter().all(|&coeff| coeff.abs() < bound)
 }
 
 /// Make hint for signature verification
+#[allow(dead_code)]
 fn make_hint(
     z: &[i32; ML_DSA_N],
     r: &[i32; ML_DSA_N],
@@ -654,6 +670,7 @@ fn make_hint(
 }
 
 /// Use hint during verification
+#[allow(dead_code)]
 fn use_hint(
     hint: &[u8],
     hint_len: usize,
@@ -679,6 +696,7 @@ fn use_hint(
 }
 
 /// Expand matrix A from public seed rho
+#[allow(dead_code)]
 fn expand_mat(rho: &[u8; 32]) -> [[[i32; ML_DSA_N]; ML_DSA_L]; ML_DSA_K] {
     let mut a = [[[0i32; ML_DSA_N]; ML_DSA_L]; ML_DSA_K];
     
@@ -736,7 +754,7 @@ fn verify_ml_dsa_signature(
     rho.copy_from_slice(&public_key[0..32]);
     
     // Expand matrix A
-    let a = expand_mat(&rho);
+    let _a = expand_mat(&rho);
     
     // For now, delegate to pqcrypto implementation
     // In a full implementation, this would include:
@@ -750,6 +768,7 @@ fn verify_ml_dsa_signature(
 }
 
 /// Montgomery reduction for NTT operations
+#[allow(dead_code)]
 fn montgomery_reduce(a: i64) -> i32 {
     const QINV: i64 = 58728449; // q^(-1) mod 2^32
     const Q: i64 = ML_DSA_Q as i64;
@@ -759,6 +778,7 @@ fn montgomery_reduce(a: i64) -> i32 {
 }
 
 /// Barrett reduction
+#[allow(dead_code)]
 fn barrett_reduce(a: i32) -> i32 {
     const V: i64 = ((1i64 << 26) + ML_DSA_Q as i64 / 2) / ML_DSA_Q as i64;
     let t = (V * a as i64 + (1i64 << 25)) >> 26;
@@ -766,6 +786,7 @@ fn barrett_reduce(a: i32) -> i32 {
 }
 
 /// NTT multiplication constants (zetas)
+#[allow(dead_code)]
 fn ntt_zetas() -> &'static [i32] {
     // Precomputed NTT constants for Dilithium
     // This is a simplified version - full implementation would have all 256 values
@@ -790,6 +811,7 @@ fn ntt_zetas() -> &'static [i32] {
 }
 
 /// Generate challenge polynomial c from seed using SHAKE256
+#[allow(dead_code)]
 fn sample_in_ball(seed: &[u8]) -> [i32; ML_DSA_N] {
     let mut poly = [0i32; ML_DSA_N];
     let mut shake = Shake256::default();
@@ -828,7 +850,7 @@ fn verify_signature_internal(
     signature: &[u8],
 ) -> Result<(), MlDsaError> {
     // Parse public key
-    let public_key = PublicKey::from_bytes(public_key_bytes)
+    let public_key = <PublicKey as PqPublicKeyTrait>::from_bytes(public_key_bytes)
         .map_err(|_| MlDsaError::InvalidPublicKey("Failed to parse public key".to_string()))?;
     
     // Create signed message format for verification
@@ -836,7 +858,7 @@ fn verify_signature_internal(
     signed_message.extend_from_slice(signature);
     signed_message.extend_from_slice(message);
     
-    let signed_msg = pqcrypto_dilithium::dilithium3::SignedMessage::from_bytes(&signed_message)
+    let signed_msg = <SignedMessage as PqSignedMessageTrait>::from_bytes(&signed_message)
         .map_err(|_| MlDsaError::VerificationFailed)?;
     
     match open(&signed_msg, &public_key) {
@@ -856,7 +878,7 @@ pub struct MlDsa;
 
 impl MlDsa {
     /// Generate a new ML-DSA key pair
-    pub fn keygen<R: CryptoRng + RngCore>(rng: &mut R) -> Result<MlDsaKeyPair, MlDsaError> {
+    pub fn keygen<R: CryptoRng + RngCore>(#[allow(unused_variables)] rng: &mut R) -> Result<MlDsaKeyPair, MlDsaError> {
         MlDsaKeyPair::generate(rng)
     }
 
@@ -864,7 +886,7 @@ impl MlDsa {
     pub fn sign<R: CryptoRng + RngCore>(
         keypair: &MlDsaKeyPair,
         message: &[u8],
-        rng: &mut R,
+        #[allow(unused_variables)] rng: &mut R,
     ) -> Result<Vec<u8>, MlDsaError> {
         keypair.sign(message, rng)
     }

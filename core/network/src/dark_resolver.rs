@@ -1,19 +1,18 @@
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{SystemTime, UNIX_EPOCH};
 use thiserror::Error;
 use serde::{Deserialize, Serialize};
 use blake3::Hasher;
-use base58::{ToBase58, FromBase58};
+use bs58;
 use rand_core::{CryptoRng, RngCore};
 
 // Import crypto primitives from the crypto module
 use qudag_crypto::ml_dsa::{MlDsaKeyPair, MlDsaPublicKey, MlDsaError};
 use qudag_crypto::ml_kem::{MlKem768};
-use qudag_crypto::kem::{KeyEncapsulation};
 
 use crate::types::NetworkAddress;
-use crate::p2p::PeerId;
+use crate::types::PeerId;
 
 /// Errors that can occur during dark domain operations
 #[derive(Error, Debug)]
@@ -231,7 +230,7 @@ impl DarkResolver {
         
         // Take first 20 bytes and encode as base58
         let address_bytes = &hash.as_bytes()[..20];
-        let address = address_bytes.to_base58();
+        let address = bs58::encode(address_bytes).into_string();
         
         // Generate domain name
         let domain = if let Some(name) = custom_name {

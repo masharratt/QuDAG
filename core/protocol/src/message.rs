@@ -1,7 +1,7 @@
 //! Protocol message implementation.
 
 use qudag_crypto::{
-    Ciphertext, MlDsa, MlDsaKeyPair, MlDsaPublicKey, MlKem768, PublicKey, SecretKey,
+    Ciphertext, MlDsaKeyPair, MlDsaPublicKey, MlKem768, PublicKey, SecretKey,
 };
 use qudag_dag::vertex::VertexId;
 use serde::{Deserialize, Serialize};

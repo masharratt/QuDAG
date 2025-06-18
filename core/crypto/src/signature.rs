@@ -28,15 +28,15 @@ pub enum SignatureError {
 
 /// ML-DSA public key.
 #[derive(Debug, Clone)]
-pub struct PublicKey(Vec<u8>);
+pub struct PublicKey(#[allow(dead_code)] Vec<u8>);
 
 /// ML-DSA secret key.
 #[derive(Debug, Clone)]
-pub struct SecretKey(Vec<u8>);
+pub struct SecretKey(#[allow(dead_code)] Vec<u8>);
 
 /// ML-DSA signature.
 #[derive(Debug, Clone)]
-pub struct Signature(Vec<u8>);
+pub struct Signature(#[allow(dead_code)] Vec<u8>);
 
 /// ML-DSA digital signature trait.
 pub trait DigitalSignature {

@@ -1,18 +1,26 @@
-use crate::{Node, NodeConfig, ProtocolError, ProtocolState};
-use qudag_crypto::ml_dsa::{MlDsaKeyPair, MlDsaPublicKey};
-use qudag_dag::{Dag, Vertex};
-use qudag_network::{NetworkAddress, NetworkManager as NetworkManagerTrait, PeerId};
+use crate::ProtocolError;
+use qudag_crypto::ml_dsa::MlDsaPublicKey;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
-use std::thread;
 use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream, UnixListener, UnixStream};
 use tokio::sync::{mpsc, RwLock, Mutex};
 use tokio::time::{timeout, Duration};
 use tracing::{debug, error, info, warn};
 use uuid::Uuid;
+
+/// Extension trait for reading u32 from streams
+trait ReadU32Ext: AsyncReadExt + Unpin {
+    async fn read_u32(&mut self) -> std::io::Result<u32> {
+        let mut buf = [0u8; 4];
+        self.read_exact(&mut buf).await?;
+        Ok(u32::from_be_bytes(buf))
+    }
+}
+
+impl<T: AsyncReadExt + Unpin> ReadU32Ext for T {}
 
 /// RPC request
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -534,7 +542,7 @@ async fn handle_tcp_connection(
     auth_keys: Arc<RwLock<HashMap<String, MlDsaPublicKey>>>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // Read request with timeout
-    let request_len = timeout(Duration::from_secs(30), stream.read_u32()).await??
+    let request_len = timeout(Duration::from_secs(30), ReadU32Ext::read_u32(&mut stream)).await??
         .min(10 * 1024 * 1024); // Max 10MB request
 
     let mut request_data = vec![0u8; request_len as usize];
@@ -547,7 +555,7 @@ async fn handle_tcp_connection(
     ).await;
 
     let response_data = serde_json::to_vec(&response)?;
-    stream.write_u32(response_data.len() as u32).await?;
+    stream.write_all(&(response_data.len() as u32).to_be_bytes()).await?;
     stream.write_all(&response_data).await?;
     stream.flush().await?;
 
@@ -562,7 +570,7 @@ async fn handle_unix_connection(
     auth_token: Option<String>,
     auth_keys: Arc<RwLock<HashMap<String, MlDsaPublicKey>>>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let request_len = timeout(Duration::from_secs(30), stream.read_u32()).await??
+    let request_len = timeout(Duration::from_secs(30), ReadU32Ext::read_u32(&mut stream)).await??
         .min(10 * 1024 * 1024);
 
     let mut request_data = vec![0u8; request_len as usize];
@@ -575,7 +583,7 @@ async fn handle_unix_connection(
     ).await;
 
     let response_data = serde_json::to_vec(&response)?;
-    stream.write_u32(response_data.len() as u32).await?;
+    stream.write_all(&(response_data.len() as u32).to_be_bytes()).await?;
     stream.write_all(&response_data).await?;
     stream.flush().await?;
 
@@ -969,8 +977,6 @@ async fn handle_request(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tokio::net::TcpListener;
-    use tokio::time::{sleep, Duration};
 
     #[test]
     fn test_rpc_request_serialization() {

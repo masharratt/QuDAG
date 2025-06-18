@@ -1,9 +1,7 @@
-use parking_lot::RwLock;
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 /// Queue performance metrics
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct QueueMetrics {
     /// Current queue depth
     pub depth: usize,
@@ -15,6 +13,18 @@ pub struct QueueMetrics {
     pub messages_per_second: f64,
     /// Last metrics update
     pub last_update: Instant,
+}
+
+impl Default for QueueMetrics {
+    fn default() -> Self {
+        Self {
+            depth: 0,
+            peak_depth: 0,
+            total_messages: 0,
+            messages_per_second: 0.0,
+            last_update: Instant::now(),
+        }
+    }
 }
 
 /// Latency metrics
@@ -29,7 +39,7 @@ pub struct LatencyMetrics {
 }
 
 /// Throughput metrics
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct ThroughputMetrics {
     /// Messages per second
     pub messages_per_second: f64,
@@ -41,6 +51,18 @@ pub struct ThroughputMetrics {
     pub total_bytes: u64,
     /// Last update timestamp
     pub last_update: Instant,
+}
+
+impl Default for ThroughputMetrics {
+    fn default() -> Self {
+        Self {
+            messages_per_second: 0.0,
+            bytes_per_second: 0.0,
+            peak_messages_per_second: 0.0,
+            total_bytes: 0,
+            last_update: Instant::now(),
+        }
+    }
 }
 
 /// Network performance metrics

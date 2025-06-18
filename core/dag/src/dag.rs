@@ -59,12 +59,14 @@ pub struct Dag {
     /// Vertices in the DAG
     pub vertices: Arc<RwLock<HashMap<VertexId, Vertex>>>,
     /// Current processing state
+    #[allow(dead_code)]
     state: Arc<RwLock<ProcessingState>>,
     /// Message processing channel
     msg_tx: mpsc::Sender<DagMessage>,
     /// Consensus mechanism
     consensus: Arc<Mutex<QRAvalanche>>,
     /// Maximum concurrent messages
+    #[allow(dead_code)]
     max_concurrent: usize,
 }
 

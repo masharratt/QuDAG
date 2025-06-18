@@ -16,7 +16,6 @@ use uuid::Uuid;
 
 use crate::state::{ProtocolState, SessionInfo, StateMachineMetrics};
 use qudag_dag::vertex::{Vertex, VertexId};
-use qudag_network::types::PeerId;
 
 /// Errors that can occur during persistence operations
 #[derive(Debug, Error)]

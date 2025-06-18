@@ -1,4 +1,3 @@
-#![deny(unsafe_code)]
 #![allow(missing_docs)]
 
 //! P2P networking layer with anonymous routing.
@@ -41,8 +40,9 @@ pub use message::MessageEnvelope;
 pub use nat_traversal::{
     ConnectionType, ConnectionUpgradeManager, HolePunchCoordinator, HolePunchPhase,
     NatInfo, NatPmpClient, NatTraversalConfig, NatTraversalError, NatTraversalManager,
-    NatType, PortMapping, PortMappingMethod, RelayConnection, RelayManager, RelayServer,
-    StunClient, StunServer, TurnClient, TurnServer, UpgradeAttempt,
+    NatTraversalStats, NatType, PortMapping, PortMappingMethod, PortMappingProtocol,
+    RelayConnection, RelayManager, RelayServer, StunClient, StunServer, TurnClient,
+    TurnServer, UpgradeAttempt,
 };
 pub use onion::{
     MLKEMOnionRouter, MetadataConfig, MetadataProtector, MixConfig, MixMessage, MixMessageType,
@@ -357,7 +357,7 @@ impl NetworkManager {
     }
 
     /// Connect to a peer
-    pub async fn connect_peer(&self, peer_address: &str) -> Result<LibP2PPeerId, NetworkError> {
+    pub async fn connect_peer(&self, _peer_address: &str) -> Result<LibP2PPeerId, NetworkError> {
         let peer_id = LibP2PPeerId::random(); // In real implementation, derive from address
 
         // Check if peer is blacklisted

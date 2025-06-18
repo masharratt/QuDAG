@@ -6,79 +6,50 @@ authors.workspace = true
 repository.workspace = true
 license.workspace = true
 
-[lints]
-workspace = true
-
 [dependencies]
-qudag-crypto = { path = "../crypto" }
 thiserror.workspace = true
 tracing.workspace = true
 serde.workspace = true
-anyhow.workspace = true
-rand.workspace = true
-uuid.workspace = true
-bincode.workspace = true
-serde_json = "1.0"
 tokio.workspace = true
 futures.workspace = true
+serde_json.workspace = true
+anyhow.workspace = true
+parking_lot.workspace = true
+metrics.workspace = true
+lru.workspace = true
 blake3.workspace = true
-quinn = "0.10"
-quinn-proto = "0.10"
-rustls = { version = "0.21", features = ["dangerous_configuration"] }
-ring = "0.17"
-bytes = "1.5"
-reqwest = { version = "0.11", features = ["json"] }
-libp2p = { version = "0.53", features = ["tcp", "dns", "identify", "ping", "mdns", "noise", "yamux", "gossipsub", "kad", "websocket", "quic", "request-response", "relay", "dcutr", "metrics", "autonat", "macros", "tokio", "cbor"] }
-chacha20poly1305 = "0.10"
-zeroize = { version = "1.7", features = ["zeroize_derive"] }
-subtle = "2.5"
-dashmap = "5.5"
-parking_lot = "0.12"
-async-trait = "0.1"
-tokio-rustls = "0.24"
-rustls-pemfile = "1.0"
-webpki-roots = "0.25"
-lazy_static = "1.4"
-sha2 = "0.10"
-curve25519-dalek = "4.1"
-x25519-dalek = "2.0"
-base58 = "0.2"
-rand_core = "0.6"
+uuid.workspace = true
+bincode.workspace = true
+rand.workspace = true
+rand_core.workspace = true
+
+# Networking
+libp2p = { version = "0.53", features = ["tcp", "noise", "yamux", "gossipsub", "kad", "identify", "ping", "mdns", "request-response", "relay", "dcutr", "dns", "websocket", "quic", "tls", "metrics", "macros", "tokio", "cbor", "autonat"] }
+quinn = "0.11"
+rustls = "0.23"
+webpki-roots = "0.26"
 base64 = "0.21"
+void = "1"
+either = "1.9"
+bs58 = "0.5"
+reqwest = { version = "0.11", features = ["json"] }
+dashmap = "5.5"
+async-trait = "0.1"
+ring = "0.17"
+curve25519-dalek = "4.1"
+zeroize = { version = "1.7", features = ["zeroize_derive"] }
+bytes = "1.5"
+
+# Crypto
+x25519-dalek = "2.0"
+ed25519-dalek = "2.1"
+aes-gcm = "0.10"
+chacha20poly1305 = "0.10"
+sha2 = "0.10"
+hkdf = "0.12"
+
+# Other dependencies
+qudag-crypto = { path = "../crypto" }
 
 [dev-dependencies]
 proptest.workspace = true
-mockito = "1.2"
-serde_json = "1.0"
-bincode = "1.3"
-tokio-test.workspace = true
-test-log = "0.2"
-blake3.workspace = true
-rand.workspace = true
-uuid.workspace = true
-ring = "0.17"
-criterion.workspace = true
-
-[[bench]]
-name = "network_benchmarks"
-harness = false
-
-[[bench]]
-name = "throughput"
-harness = false
-
-[[bench]]
-name = "throughput_optimized"
-harness = false
-
-[[bench]]
-name = "peer_benchmarks"
-harness = false
-
-[[bench]]
-name = "routing_benchmarks"
-harness = false
-
-[[bench]]
-name = "queue_benchmarks"
-harness = false

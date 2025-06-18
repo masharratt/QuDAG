@@ -5,8 +5,6 @@
 //! Module-LWE problem.
 
 use rand::RngCore;
-use subtle::ConstantTimeEq;
-use zeroize::Zeroize;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
 use std::collections::HashMap;
@@ -87,7 +85,7 @@ impl MlKem768 {
     }
 
     /// Generate a keypair with custom RNG for testing
-    pub fn keygen_with_rng<R: RngCore + rand::CryptoRng>(rng: &mut R) -> Result<(PublicKey, SecretKey), KEMError> {
+    pub fn keygen_with_rng<R: RngCore + rand::CryptoRng>(#[allow(unused_variables)] rng: &mut R) -> Result<(PublicKey, SecretKey), KEMError> {
         // For now, use a placeholder implementation
         // In a real implementation, this would use the ML-KEM algorithm
         let mut pk_bytes = vec![0u8; Self::PUBLIC_KEY_SIZE];
@@ -298,15 +296,15 @@ mod tests {
 
     #[test]
     fn test_ciphertext_size() {
-        let (pk, sk) = MlKem768::keygen().unwrap();
+        let (pk, _sk) = MlKem768::keygen().unwrap();
         let (ct, _ss) = MlKem768::encapsulate(&pk).unwrap();
         assert_eq!(ct.as_bytes().len(), MlKem768::CIPHERTEXT_SIZE);
     }
 
     #[test]
     fn test_shared_secret_size() {
-        let (pk, sk) = MlKem768::keygen().unwrap();
-        let (ct, ss) = MlKem768::encapsulate(&pk).unwrap();
+        let (pk, _sk) = MlKem768::keygen().unwrap();
+        let (_ct, ss) = MlKem768::encapsulate(&pk).unwrap();
         assert_eq!(ss.as_bytes().len(), MlKem768::SHARED_SECRET_SIZE);
     }
 }

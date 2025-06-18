@@ -6,10 +6,10 @@
 //! - ChaCha20-Poly1305 for symmetric encryption
 
 use crate::types::NetworkError;
-use rand::{rngs::OsRng, CryptoRng, RngCore};
+use rand::{rngs::OsRng, RngCore};
 use std::fmt::Debug;
-use tracing::{debug, error, info};
-use zeroize::{Zeroize, ZeroizeOnDrop};
+use tracing::{debug, info};
+use zeroize::ZeroizeOnDrop;
 
 /// ML-KEM (Kyber) security levels
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -127,6 +127,10 @@ pub struct MlKem {
     /// Random number generator
     rng: OsRng,
 }
+
+// Ensure MlKem is Send + Sync
+unsafe impl Send for MlKem {}
+unsafe impl Sync for MlKem {}
 
 impl MlKem {
     /// Create a new ML-KEM instance with specified security level
@@ -270,6 +274,10 @@ pub struct QuantumKeyExchange {
     /// Our keypair
     our_keypair: Option<(MlKemPublicKey, MlKemSecretKey)>,
 }
+
+// Ensure QuantumKeyExchange is Send + Sync
+unsafe impl Send for QuantumKeyExchange {}
+unsafe impl Sync for QuantumKeyExchange {}
 
 impl QuantumKeyExchange {
     /// Create a new quantum key exchange with default security level

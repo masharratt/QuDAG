@@ -1,16 +1,16 @@
 #![deny(unsafe_code)]
 
 use crate::types::{NetworkError, PeerId, ConnectionStatus};
-use crate::connection::{ConnectionInfo, PooledConnection, WarmingState, ConnectionLimits};
+use crate::connection::{ConnectionInfo, PooledConnection, WarmingState};
 use dashmap::DashMap;
 use parking_lot::RwLock;
 use std::collections::{HashMap, VecDeque};
 use std::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tokio::sync::{mpsc, Semaphore, Notify};
+use tokio::sync::{Semaphore, Notify};
 use tokio::time::{interval, sleep};
-use tracing::{debug, info, warn, error};
+use tracing::{debug, warn};
 
 /// Connection pool configuration
 #[derive(Debug, Clone)]
@@ -97,6 +97,7 @@ pub struct ConnectionPool {
     /// Connection waiters
     waiters: Arc<DashMap<PeerId, Arc<Notify>>>,
     /// Maintenance task handle
+    #[allow(dead_code)]
     maintenance_handle: Option<tokio::task::JoinHandle<()>>,
 }
 
@@ -217,7 +218,7 @@ impl ConnectionPool {
             tokio::select! {
                 _ = waiter.notified() => {
                     // Retry acquisition
-                    self.acquire(peer_id).await
+                    Box::pin(self.acquire(peer_id)).await
                 }
                 _ = sleep(self.config.acquire_timeout) => {
                     self.increment_failed_acquisitions();
@@ -300,7 +301,7 @@ impl ConnectionPool {
     }
 
     /// Create a new connection
-    async fn create_connection(&self, peer_id: PeerId) -> Result<PooledConnection, NetworkError> {
+    async fn create_connection(&self, _peer_id: PeerId) -> Result<PooledConnection, NetworkError> {
         // Simulate connection creation (in real implementation, this would establish actual connection)
         let info = ConnectionInfo::new(ConnectionStatus::Connected);
         

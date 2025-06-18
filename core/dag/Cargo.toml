@@ -6,35 +6,28 @@ authors.workspace = true
 repository.workspace = true
 license.workspace = true
 
-[lints]
-workspace = true
-
 [dependencies]
 thiserror.workspace = true
 tracing.workspace = true
 serde.workspace = true
 tokio.workspace = true
-blake3 = "1.5"
-parking_lot = "0.12"
+futures.workspace = true
+serde_json.workspace = true
+parking_lot.workspace = true
+blake3.workspace = true
+uuid.workspace = true
+bincode.workspace = true
+rand.workspace = true
+lru.workspace = true
+metrics.workspace = true
+anyhow.workspace = true
+
+# Additional dependencies needed by graph module
 dashmap = "5.5"
 rayon = "1.8"
-lru = "0.12"
-rand = "0.8"
+
+# Other dependencies
+qudag-crypto = { path = "../crypto" }
 
 [dev-dependencies]
 proptest.workspace = true
-tokio-test = "0.4"
-rand = "0.8"
-criterion.workspace = true
-
-[[bench]]
-name = "dag_benchmarks"
-harness = false
-
-[[bench]]
-name = "consensus_benchmarks"
-harness = false
-
-[[bench]]
-name = "finality_benchmarks"
-harness = false

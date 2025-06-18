@@ -1,14 +1,14 @@
 #![deny(unsafe_code)]
 
-use crate::types::{NetworkError, PeerId};
+use crate::types::PeerId;
 use dashmap::DashMap;
 use parking_lot::RwLock;
-use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::Notify;
-use tokio::time::{interval, sleep};
-use tracing::{debug, info, warn};
+use tokio::time::interval;
+use tracing::{info, warn};
 
 /// Circuit breaker state
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -362,7 +362,7 @@ impl CircuitBreaker {
     }
 
     /// Update state statistics
-    fn update_state_stats(&self, from_state: CircuitState, to_state: CircuitState) {
+    fn update_state_stats(&self, from_state: CircuitState, _to_state: CircuitState) {
         let mut stats = self.stats.write();
         stats.state_changes += 1;
         

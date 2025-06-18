@@ -13,7 +13,6 @@ use tokio::sync::{RwLock, Mutex};
 use tokio::time::interval;
 use rand::{thread_rng, RngCore, Rng};
 use sha2::{Sha256, Digest};
-use curve25519_dalek::{scalar::Scalar, ristretto::RistrettoPoint, ristretto::CompressedRistretto};
 use x25519_dalek::{EphemeralSecret, PublicKey};
 
 /// Errors that can occur during shadow address operations.
@@ -37,7 +36,7 @@ pub enum ShadowAddressError {
 }
 
 /// Shadow address components for stealth address generation.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ShadowAddress {
     /// Public view key for address scanning
     pub view_key: Vec<u8>,
@@ -56,7 +55,7 @@ pub struct ShadowAddress {
 }
 
 /// Shadow-specific features for enhanced privacy
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ShadowFeatures {
     /// Indicates if this is a temporary address
     pub is_temporary: bool,
@@ -75,7 +74,7 @@ pub struct ShadowFeatures {
 }
 
 /// Metadata for shadow addresses.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ShadowMetadata {
     /// Address version
     pub version: u8,
@@ -274,10 +273,10 @@ impl DefaultShadowAddressHandler {
     fn generate_stealth_keys(
         &self,
         recipient_view_key: &[u8],
-        recipient_spend_key: &[u8],
+        _recipient_spend_key: &[u8],
     ) -> Result<(Vec<u8>, Vec<u8>, [u8; 32]), ShadowAddressError> {
         // Generate ephemeral keypair
-        let ephemeral_secret = EphemeralSecret::new(thread_rng());
+        let ephemeral_secret = EphemeralSecret::random_from_rng(thread_rng());
         let ephemeral_public = PublicKey::from(&ephemeral_secret);
         
         // Create shared secret
@@ -795,7 +794,7 @@ impl ShadowAddressMixer {
     ) -> Result<Vec<ShadowAddress>, ShadowAddressError> {
         let mut mixed = addresses;
         
-        for round in 0..self.rounds {
+        for _round in 0..self.rounds {
             // Shuffle addresses
             let mut rng = thread_rng();
             use rand::seq::SliceRandom;

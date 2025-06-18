@@ -1,18 +1,18 @@
 //! Production-ready P2P network peer discovery implementation with Kademlia DHT,
 //! dark addressing support, and sophisticated peer reputation management.
 
-use crate::dark_resolver::{DarkResolver, DarkResolverError};
-use crate::shadow_address::{ShadowAddress, ShadowAddressResolver, DefaultShadowAddressHandler, NetworkType};
-use crate::types::{NetworkError, NetworkAddress, PeerId};
+use crate::dark_resolver::DarkResolver;
+use crate::shadow_address::{ShadowAddress, DefaultShadowAddressHandler, NetworkType};
+use crate::types::NetworkError;
 use libp2p::PeerId as LibP2PPeerId;
-use rand::{Rng, RngCore, seq::SliceRandom};
+use rand::{Rng, seq::SliceRandom};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 use tokio::sync::{mpsc, RwLock, Semaphore};
-use tracing::{debug, error, info, warn};
+use tracing::{debug, info, warn};
 
 /// Peer discovery method with advanced options.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -627,7 +627,7 @@ impl DiscoveredPeer {
                         };
                     }
                 }
-                CircuitBreakerState::HalfOpen { test_requests, .. } => {
+                CircuitBreakerState::HalfOpen { .. } => {
                     self.circuit_breaker_state = CircuitBreakerState::Open {
                         opened_at: Instant::now(),
                         failure_count: self.connection_attempts as usize,
@@ -642,7 +642,7 @@ impl DiscoveredPeer {
     }
 
     /// Update connection quality metrics
-    fn update_connection_quality(&mut self, success: bool) {
+    fn update_connection_quality(&mut self, _success: bool) {
         let success_rate = if self.connection_attempts > 0 {
             self.successful_connections as f64 / self.connection_attempts as f64
         } else {
@@ -805,6 +805,7 @@ impl DiscoveredPeer {
 }
 
 /// Production-ready peer discovery service with advanced DHT, dark addressing, and load balancing.
+#[allow(dead_code)]
 pub struct KademliaPeerDiscovery {
     /// Configuration
     config: DiscoveryConfig,
@@ -1265,6 +1266,7 @@ impl TopologyOptimizer {
 
 /// Network topology metrics.
 #[derive(Debug, Clone)]
+#[allow(dead_code)]
 pub struct TopologyMetrics {
     /// Measurement timestamp
     timestamp: Instant,
@@ -1516,6 +1518,8 @@ impl KademliaPeerDiscovery {
         }
 
         info!("Starting DHT bootstrap with {} nodes", self.config.bootstrap_nodes.len());
+        let start_time = Instant::now();
+        let mut discovered_peers = 0;
 
         for bootstrap_addr in &self.config.bootstrap_nodes {
             if self.bootstrap_tried.contains(bootstrap_addr) {
@@ -1534,6 +1538,7 @@ impl KademliaPeerDiscovery {
 
             // Add to discovered peers
             self.discovered_peers.write().await.insert(peer_id, discovered_peer.clone());
+            discovered_peers += 1;
 
             // Send discovery event
             if let Some(tx) = &self.event_tx {
@@ -1546,7 +1551,11 @@ impl KademliaPeerDiscovery {
         self.bootstrap_completed = true;
         
         if let Some(tx) = &self.event_tx {
-            let _ = tx.send(DiscoveryEvent::BootstrapCompleted).await;
+            let _ = tx.send(DiscoveryEvent::BootstrapCompleted {
+                peers_discovered: discovered_peers,
+                duration: start_time.elapsed(),
+                success_rate: discovered_peers as f64 / self.config.bootstrap_nodes.len().max(1) as f64,
+            }).await;
         }
 
         info!("DHT bootstrap completed");
@@ -1673,11 +1682,17 @@ impl KademliaPeerDiscovery {
     /// Update peer reputation
     pub async fn update_peer_reputation(&self, peer_id: LibP2PPeerId, delta: f64) {
         if let Some(peer) = self.discovered_peers.write().await.get_mut(&peer_id) {
+            let old_reputation = peer.reputation;
             peer.reputation += delta;
             peer.reputation = peer.reputation.clamp(-50.0, 50.0);
             
             if let Some(tx) = &self.event_tx {
-                let _ = tx.send(DiscoveryEvent::ReputationUpdated(peer_id, peer.reputation)).await;
+                let _ = tx.send(DiscoveryEvent::ReputationUpdated {
+                    peer_id,
+                    old_reputation,
+                    new_reputation: peer.reputation,
+                    reason: "Connection update".to_string(),
+                }).await;
             }
         }
     }
@@ -1685,7 +1700,7 @@ impl KademliaPeerDiscovery {
     /// Record connection attempt for a peer
     pub async fn record_connection_attempt(&self, peer_id: LibP2PPeerId, success: bool) {
         if let Some(peer) = self.discovered_peers.write().await.get_mut(&peer_id) {
-            peer.record_connection_attempt(success);
+            peer.record_connection_attempt(success, &self.config.scoring_config);
             
             if success {
                 info!("Successful connection to peer: {:?}", peer_id);

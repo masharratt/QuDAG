@@ -1,11 +1,10 @@
 use crate::types::{NetworkError, NetworkMessage, PeerId, RoutingStrategy};
-use crate::onion::{MLKEMOnionRouter, OnionError, OnionLayer, CircuitManager, DirectoryClient};
+use crate::onion::{MLKEMOnionRouter, CircuitManager, DirectoryClient};
 use rand::seq::{IteratorRandom, SliceRandom};
 use rand::thread_rng;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::{RwLock, Mutex};
-use std::time::{Duration, Instant};
 
 /// Information about a hop in a route
 #[derive(Debug, Clone)]
@@ -189,7 +188,7 @@ impl Router {
         
         // Create onion layers for the message
         let onion_router = self.onion_router.lock().await;
-        let layers = onion_router.encrypt_layers(
+        let _layers = onion_router.encrypt_layers(
             message.payload.clone(),
             circuit.hops.clone()
         ).await

@@ -5,6 +5,41 @@
 //!
 //! This module provides the core DAG (Directed Acyclic Graph) implementation
 //! with quantum-resistant consensus using a modified Avalanche protocol.
+//!
+//! ## Key Types
+//!
+//! - [`QrDag`] - Main DAG consensus implementation (alias for `DAGConsensus`)
+//! - [`Vertex`] / [`VertexId`] - DAG vertices and their identifiers
+//! - [`Consensus`] / [`QRAvalanche`] - Consensus algorithms and implementations
+//! - [`Graph`] - High-performance graph data structure with caching
+//! - [`Node`] - Node representation with state management
+//! - [`TipSelection`] - Algorithms for choosing vertices to extend
+//!
+//! ## Example Usage
+//!
+//! ```rust
+//! use qudag_dag::{QrDag, Vertex, VertexId, ConsensusConfig};
+//! use std::collections::HashSet;
+//!
+//! // Create a new DAG consensus instance
+//! let mut dag = QrDag::new();
+//!
+//! // Add a message to the DAG
+//! let message = b"Hello, DAG!".to_vec();
+//! dag.add_message(message.clone()).expect("Failed to add message");
+//!
+//! // Check if the message exists
+//! assert!(dag.contains_message(&message));
+//!
+//! // Get current tips
+//! let tips = dag.get_tips();
+//! println!("Current tips: {:?}", tips);
+//!
+//! // Create a vertex directly
+//! let vertex_id = VertexId::new();
+//! let vertex = Vertex::new(vertex_id, b"vertex data".to_vec(), HashSet::new());
+//! dag.add_vertex(vertex).expect("Failed to add vertex");
+//! ```
 
 /// Consensus algorithms and voting mechanisms for the DAG
 pub mod consensus;
@@ -29,26 +64,32 @@ mod consensus_tests;
 #[cfg(test)]
 mod invariant_tests;
 
+#[cfg(test)]
+mod module_exports_tests;
+
+#[cfg(test)]
+mod lib_test_compilation;
+
 /// Result type alias for DAG operations
 pub type Result<T> = std::result::Result<T, error::DagError>;
 pub use edge::Edge;
 pub use error::DagError;
-pub use graph::Graph;
-pub use node::{Node, NodeState};
+pub use graph::{Graph, GraphMetrics, StorageConfig};
+pub use node::{Node, NodeState, SerializableHash};
 
 pub use consensus::{
-    Consensus, ConsensusError, ConsensusMetrics, ConsensusStatus, QRAvalanche, QRAvalancheConfig,
-    VotingRecord,
+    Confidence, Consensus, ConsensusError, ConsensusMetrics, ConsensusStatus, QRAvalanche, 
+    QRAvalancheConfig, VotingRecord,
 };
 pub use dag::{Dag, DagError as DagModuleError, DagMessage};
-pub use tip_selection::{TipSelection, TipSelectionConfig, TipSelectionError};
+pub use tip_selection::{AdvancedTipSelection, ParentSelectionAlgorithm, TipSelection, 
+    TipSelectionConfig, TipSelectionError, VertexWeight};
 pub use vertex::{Vertex, VertexError, VertexId, VertexOps};
 
 /// Alias for QR-Avalanche DAG consensus implementation
 pub type QrDag = DAGConsensus;
 
-/// Confidence level alias for consensus status
-pub type Confidence = ConsensusStatus;
+// Note: We export both Confidence (detailed confidence info) and ConsensusStatus (simple status)
 
 use std::collections::HashSet;
 use std::time::Duration;
@@ -80,6 +121,7 @@ impl Default for ConsensusConfig {
 /// Main DAG consensus implementation for test compatibility
 pub struct DAGConsensus {
     dag: Dag,
+    #[allow(dead_code)]
     config: ConsensusConfig,
     consensus: QRAvalanche,
 }
@@ -168,7 +210,7 @@ impl DAGConsensus {
     }
 
     /// Gets the confidence/consensus status for a vertex
-    pub fn get_confidence(&self, vertex_id: &str) -> Option<Confidence> {
+    pub fn get_confidence(&self, vertex_id: &str) -> Option<ConsensusStatus> {
         let id = VertexId::from_bytes(vertex_id.as_bytes().to_vec());
         self.consensus.vertices.get(&id).cloned()
     }

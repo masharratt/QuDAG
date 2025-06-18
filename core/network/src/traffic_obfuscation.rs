@@ -8,17 +8,15 @@
 //! - Protocol obfuscation
 //! - Traffic analysis resistance
 
-use crate::message::{MessageEnvelope, NetworkMessage};
 use crate::onion::{MixMessage, MixMessageType, MixNode, TrafficAnalysisResistance};
-use crate::types::{MessagePriority, NetworkError};
+use crate::types::{MessagePriority, NetworkError, NetworkMessage};
 use rand::{thread_rng, Rng, RngCore};
 use serde::{Deserialize, Serialize};
-use std::collections::VecDeque;
 use std::sync::Arc;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use tokio::sync::{mpsc, Mutex, RwLock};
+use tokio::sync::{Mutex, RwLock};
 use tokio::time::{interval, sleep};
-use tracing::{debug, info, warn};
+use tracing::{info, warn};
 use base64::{Engine as _, engine::general_purpose};
 
 /// Standard message sizes for normalization (in bytes)
@@ -127,8 +125,7 @@ pub struct TrafficObfuscator {
     /// Message statistics
     stats: Arc<RwLock<ObfuscationStats>>,
     /// Shutdown signal
-    shutdown_tx: mpsc::Sender<()>,
-    shutdown_rx: Arc<Mutex<mpsc::Receiver<()>>>,
+    shutdown_tx: tokio::sync::broadcast::Sender<()>,
 }
 
 /// Obfuscation statistics
@@ -152,10 +149,14 @@ pub struct ObfuscationStats {
     pub bursts_prevented: u64,
 }
 
+// Ensure TrafficObfuscator is Send + Sync
+unsafe impl Send for TrafficObfuscator {}
+unsafe impl Sync for TrafficObfuscator {}
+
 impl TrafficObfuscator {
     /// Create a new traffic obfuscator
     pub fn new(config: TrafficObfuscationConfig) -> Self {
-        let (shutdown_tx, shutdown_rx) = mpsc::channel(1);
+        let (shutdown_tx, _shutdown_rx) = tokio::sync::broadcast::channel(1);
         
         let mix_config = crate::onion::MixConfig {
             batch_size: config.mix_batch_size,
@@ -177,7 +178,6 @@ impl TrafficObfuscator {
             protocol_obfuscator: Arc::new(ProtocolObfuscator::new(config.obfuscation_patterns)),
             stats: Arc::new(RwLock::new(ObfuscationStats::default())),
             shutdown_tx,
-            shutdown_rx: Arc::new(Mutex::new(shutdown_rx)),
         }
     }
 
@@ -199,7 +199,7 @@ impl TrafficObfuscator {
     /// Stop the traffic obfuscator
     pub async fn stop(&self) {
         info!("Stopping traffic obfuscator");
-        let _ = self.shutdown_tx.send(()).await;
+        let _ = self.shutdown_tx.send(());
     }
 
     /// Process a message through obfuscation pipeline
@@ -373,7 +373,7 @@ impl TrafficObfuscator {
         let dummy_generator = self.dummy_generator.clone();
         let mix_node = self.mix_node.clone();
         let stats = self.stats.clone();
-        let mut shutdown_rx = self.shutdown_rx.lock().await.resubscribe();
+        let mut shutdown_rx = self.shutdown_tx.subscribe();
         
         tokio::spawn(async move {
             let mut interval = interval(Duration::from_millis(100));
@@ -402,7 +402,7 @@ impl TrafficObfuscator {
     /// Start periodic batch flushing
     async fn start_batch_flushing(&self) {
         let obfuscator = self.clone();
-        let mut shutdown_rx = self.shutdown_rx.lock().await.resubscribe();
+        let mut shutdown_rx = self.shutdown_tx.subscribe();
         
         tokio::spawn(async move {
             let mut interval = interval(Duration::from_millis(100));
@@ -450,6 +450,10 @@ struct DummyTrafficGenerator {
     message_counter: Arc<Mutex<u64>>,
 }
 
+// Ensure DummyTrafficGenerator is Send + Sync
+unsafe impl Send for DummyTrafficGenerator {}
+unsafe impl Sync for DummyTrafficGenerator {}
+
 impl DummyTrafficGenerator {
     fn new(ratio: f64) -> Self {
         Self {
@@ -496,6 +500,10 @@ struct TrafficShaper {
     burst_reset_time: Arc<Mutex<SystemTime>>,
 }
 
+// Ensure TrafficShaper is Send + Sync
+unsafe impl Send for TrafficShaper {}
+unsafe impl Sync for TrafficShaper {}
+
 impl TrafficShaper {
     fn new(delay_range: (u64, u64)) -> Self {
         Self {
@@ -539,6 +547,10 @@ struct ProtocolObfuscator {
     /// Obfuscation patterns
     patterns: Vec<ObfuscationPattern>,
 }
+
+// Ensure ProtocolObfuscator is Send + Sync
+unsafe impl Send for ProtocolObfuscator {}
+unsafe impl Sync for ProtocolObfuscator {}
 
 impl ProtocolObfuscator {
     fn new(patterns: Vec<ObfuscationPattern>) -> Self {
@@ -684,7 +696,6 @@ impl Clone for TrafficObfuscator {
             protocol_obfuscator: self.protocol_obfuscator.clone(),
             stats: self.stats.clone(),
             shutdown_tx: self.shutdown_tx.clone(),
-            shutdown_rx: self.shutdown_rx.clone(),
         }
     }
 }

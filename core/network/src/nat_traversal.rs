@@ -9,33 +9,78 @@
 //! - IPv6 support with fallback to IPv4
 //! - Connection upgrade paths from relay to direct connections
 
-use crate::types::{NetworkError, PeerId};
-use crate::connection::{ConnectionInfo, ConnectionManager};
-use async_trait::async_trait;
+use crate::types::{NetworkError, PeerId, ConnectionStatus};
+use crate::connection::ConnectionManager;
 use dashmap::DashMap;
-use futures::future::BoxFuture;
 use libp2p::{
-    autonat::{self, Event as AutoNATEvent},
-    core::{multiaddr::Protocol, Multiaddr},
-    // relay::v2::{client, relay}, // v2 not available in libp2p 0.53
-    relay,
-    PeerId as LibP2PPeerId,
+    core::{Multiaddr},
 };
 use parking_lot::RwLock;
 use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet, VecDeque};
 use std::net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use thiserror::Error;
 use tokio::net::UdpSocket;
-use tokio::sync::{mpsc, Mutex, RwLock as TokioRwLock, Semaphore};
+use tokio::sync::{mpsc, Mutex, Semaphore};
 use tokio::time::{interval, sleep, timeout};
-use tracing::{debug, error, info, trace, warn};
-use std::collections::BTreeMap;
-use futures::Future;
+use tracing::{debug, error, info, warn};
+
+/// STUN transaction ID type (12 bytes as per RFC 5389)
+type TransactionId = [u8; 12];
+
+/// STUN message structure
+#[derive(Debug, Clone)]
+pub struct Message {
+    /// Message type
+    pub msg_type: MessageType,
+    /// Transaction ID
+    pub transaction_id: TransactionId,
+    /// Attributes
+    pub attributes: Vec<Attribute>,
+}
+
+/// STUN message types
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub enum MessageType {
+    /// Binding request
+    BindingRequest,
+    /// Binding response
+    BindingResponse,
+    /// Binding error response
+    BindingErrorResponse,
+    /// Allocate request (TURN)
+    AllocateRequest,
+    /// Allocate response (TURN)
+    AllocateResponse,
+}
+
+/// STUN attributes
+#[derive(Debug, Clone)]
+pub enum Attribute {
+    /// Mapped address
+    MappedAddress(SocketAddr),
+    /// XOR mapped address
+    XorMappedAddress(SocketAddr),
+    /// Changed address
+    ChangedAddress(SocketAddr),
+    /// Username
+    Username(String),
+    /// Message integrity
+    MessageIntegrity(Vec<u8>),
+    /// Error code
+    ErrorCode(u16, String),
+    /// Unknown attributes
+    UnknownAttributes(Vec<u16>),
+    /// Realm
+    Realm(String),
+    /// Nonce
+    Nonce(Vec<u8>),
+}
+
+// NatTraversalStats will be defined later with atomic fields
 
 /// Errors that can occur during NAT traversal operations
 #[derive(Debug, Error)]
@@ -83,6 +128,10 @@ pub enum NatTraversalError {
     /// Timeout error
     #[error("Operation timed out")]
     Timeout,
+    
+    /// Connection error
+    #[error("Connection error: {0}")]
+    ConnectionError(NetworkError),
 }
 
 /// NAT types detected by the system
@@ -299,6 +348,12 @@ pub enum PortMappingMethod {
 /// NAT traversal statistics
 #[derive(Debug)]
 pub struct NatTraversalStats {
+    /// Total traversal attempts
+    pub total_attempts: AtomicU64,
+    /// Successful traversals
+    pub successful_traversals: AtomicU64,
+    /// Failed traversals
+    pub failed_traversals: AtomicU64,
     /// Successful STUN queries
     pub stun_success: AtomicU64,
     /// Failed STUN queries
@@ -315,11 +370,16 @@ pub struct NatTraversalStats {
     pub port_mappings_created: AtomicU64,
     /// Port mappings failed
     pub port_mappings_failed: AtomicU64,
+    /// Average traversal time (in milliseconds)
+    pub avg_traversal_time_ms: AtomicU64,
 }
 
 impl Default for NatTraversalStats {
     fn default() -> Self {
         Self {
+            total_attempts: AtomicU64::new(0),
+            successful_traversals: AtomicU64::new(0),
+            failed_traversals: AtomicU64::new(0),
             stun_success: AtomicU64::new(0),
             stun_failures: AtomicU64::new(0),
             hole_punch_success: AtomicU64::new(0),
@@ -328,6 +388,7 @@ impl Default for NatTraversalStats {
             upgraded_connections: AtomicU64::new(0),
             port_mappings_created: AtomicU64::new(0),
             port_mappings_failed: AtomicU64::new(0),
+            avg_traversal_time_ms: AtomicU64::new(0),
         }
     }
 }
@@ -339,11 +400,13 @@ pub struct StunClient {
     /// UDP socket for STUN
     socket: Arc<Mutex<Option<UdpSocket>>>,
     /// Transaction tracking
+    #[allow(dead_code)]
     transactions: Arc<DashMap<TransactionId, StunTransaction>>,
 }
 
 /// STUN transaction information
 #[derive(Debug)]
+#[allow(dead_code)]
 struct StunTransaction {
     /// Server address
     server: SocketAddr,
@@ -366,7 +429,7 @@ impl StunClient {
     /// Detect NAT type and public address
     pub async fn detect_nat(&self) -> Result<NatInfo, NatTraversalError> {
         // Bind local socket
-        let local_addr = if cfg!(feature = "ipv6") {
+        let local_addr = if false { // TODO: Add ipv6 feature flag
             SocketAddr::new(IpAddr::V6(Ipv6Addr::UNSPECIFIED), 0)
         } else {
             SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0)
@@ -424,19 +487,21 @@ impl StunClient {
 
     /// Query a single STUN server
     async fn query_stun_server(&self, server: &SocketAddr) -> Result<SocketAddr, NatTraversalError> {
-        let socket = self.socket.lock().await.as_ref()
-            .ok_or_else(|| NatTraversalError::StunError("Socket not initialized".to_string()))?
-            .try_clone()?;
+        // Get the socket from the mutex guard
+        let socket_guard = self.socket.lock().await;
+        let socket = socket_guard.as_ref()
+            .ok_or_else(|| NatTraversalError::StunError("Socket not initialized".to_string()))?;
         
         // Simple STUN-like request - send a UDP packet and expect echo with public address
         let request_data = b"STUN_REQUEST";
         
         // Send request
-        socket.send_to(request_data, server).await?;
+        socket.send_to(request_data, server).await
+            .map_err(|e| NatTraversalError::StunError(e.to_string()))?;
         
         // Wait for response
         let mut response_buf = vec![0u8; 1024];
-        let (len, from) = timeout(Duration::from_secs(5), socket.recv_from(&mut response_buf)).await
+        let (_len, from) = timeout(Duration::from_secs(5), socket.recv_from(&mut response_buf)).await
             .map_err(|_| NatTraversalError::Timeout)??;
         
         if from != *server {
@@ -572,6 +637,7 @@ pub struct UpnpManager {
     /// Active mappings
     mappings: Arc<DashMap<u16, UpnpMapping>>,
     /// Mapping refresh interval
+    #[allow(dead_code)]
     refresh_interval: Duration,
 }
 
@@ -660,6 +726,7 @@ impl UpnpManager {
     }
 
     /// Get local IP address
+    #[allow(dead_code)]
     async fn get_local_ip(&self) -> Result<IpAddr, NatTraversalError> {
         // Try to get local IP by connecting to a public address
         let socket = UdpSocket::bind("0.0.0.0:0").await?;
@@ -726,7 +793,7 @@ impl NatPmpClient {
     }
 
     /// Test if an address responds to NAT-PMP
-    async fn test_gateway(&self, gateway: &IpAddr) -> bool {
+    async fn test_gateway(&self, _gateway: &IpAddr) -> bool {
         // TODO: Implement actual NAT-PMP protocol test
         // For now, return false
         false
@@ -836,7 +903,7 @@ impl HolePunchCoordinator {
         self.success_handlers.insert(peer_id, tx);
         
         // Start probing all candidate pairs
-        let probe_tasks: Vec<_> = local_candidates.iter()
+        let _probe_tasks: Vec<_> = local_candidates.iter()
             .flat_map(|local| {
                 remote_candidates.iter().map(move |remote| {
                     self.probe_candidate_pair(*local, *remote, peer_id)
@@ -992,7 +1059,7 @@ impl RelayManager {
 
     /// Add a relay server
     pub async fn add_relay_server(&self, server: RelayServer) {
-        self.relay_servers.write().await.push(server);
+        self.relay_servers.write().push(server);
     }
 
     /// Establish relay connection to a peer
@@ -1030,7 +1097,7 @@ impl RelayManager {
 
     /// Select best relay server based on load
     async fn select_relay_server(&self) -> Result<RelayServer, NatTraversalError> {
-        let servers = self.relay_servers.read().await;
+        let servers = self.relay_servers.read();
         
         servers.iter()
             .filter(|s| s.is_available)
@@ -1046,7 +1113,7 @@ impl RelayManager {
             self.stats.active_connections.fetch_sub(1, Ordering::Relaxed);
             
             // Update relay server load
-            let servers = self.relay_servers.read().await;
+            let servers = self.relay_servers.read();
             if let Some(server) = servers.iter().find(|s| s.id == connection.relay_server) {
                 server.load.fetch_sub(1, Ordering::Relaxed);
             }
@@ -1492,6 +1559,9 @@ impl NatTraversalManager {
     /// Get NAT traversal statistics
     pub fn get_stats(&self) -> NatTraversalStats {
         NatTraversalStats {
+            total_attempts: AtomicU64::new(self.stats.total_attempts.load(Ordering::Relaxed)),
+            successful_traversals: AtomicU64::new(self.stats.successful_traversals.load(Ordering::Relaxed)),
+            failed_traversals: AtomicU64::new(self.stats.failed_traversals.load(Ordering::Relaxed)),
             stun_success: AtomicU64::new(self.stats.stun_success.load(Ordering::Relaxed)),
             stun_failures: AtomicU64::new(self.stats.stun_failures.load(Ordering::Relaxed)),
             hole_punch_success: AtomicU64::new(self.stats.hole_punch_success.load(Ordering::Relaxed)),
@@ -1500,6 +1570,7 @@ impl NatTraversalManager {
             upgraded_connections: AtomicU64::new(self.stats.upgraded_connections.load(Ordering::Relaxed)),
             port_mappings_created: AtomicU64::new(self.stats.port_mappings_created.load(Ordering::Relaxed)),
             port_mappings_failed: AtomicU64::new(self.stats.port_mappings_failed.load(Ordering::Relaxed)),
+            avg_traversal_time_ms: AtomicU64::new(self.stats.avg_traversal_time_ms.load(Ordering::Relaxed)),
         }
     }
 
