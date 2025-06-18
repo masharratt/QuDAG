@@ -1,12 +1,12 @@
+use pin_project::pin_project;
 use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
 use std::task::{Context, Poll};
+use std::time::{Duration, Instant};
 use tokio::sync::{RwLock, Semaphore};
 use tokio::time::timeout;
-use tracing::{debug, warn, error};
-use pin_project::pin_project;
+use tracing::{debug, error, warn};
 
 /// Async operation optimizer with timeouts and retries
 pub struct AsyncOptimizer {
@@ -49,7 +49,8 @@ impl AsyncOptimizer {
     where
         F: Future<Output = Result<T, AsyncError>>,
     {
-        self.execute_with_timeout(future, self.default_timeout).await
+        self.execute_with_timeout(future, self.default_timeout)
+            .await
     }
 
     /// Execute future with custom timeout
@@ -61,7 +62,10 @@ impl AsyncOptimizer {
     where
         F: Future<Output = Result<T, AsyncError>>,
     {
-        let _permit = self.max_concurrent.acquire().await
+        let _permit = self
+            .max_concurrent
+            .acquire()
+            .await
             .map_err(|_| AsyncError::ResourceExhausted)?;
 
         let start_time = Instant::now();
@@ -70,12 +74,18 @@ impl AsyncOptimizer {
             Ok(result) => {
                 let duration = start_time.elapsed();
                 if duration > Duration::from_millis(100) {
-                    debug!("Async operation took {:.2}ms", duration.as_secs_f64() * 1000.0);
+                    debug!(
+                        "Async operation took {:.2}ms",
+                        duration.as_secs_f64() * 1000.0
+                    );
                 }
                 result
             }
             Err(_) => {
-                warn!("Async operation timed out after {:.2}s", timeout_duration.as_secs_f64());
+                warn!(
+                    "Async operation timed out after {:.2}s",
+                    timeout_duration.as_secs_f64()
+                );
                 Err(AsyncError::Timeout)
             }
         }
@@ -92,7 +102,7 @@ impl AsyncOptimizer {
 
         loop {
             attempt += 1;
-            
+
             match self.execute(operation()).await {
                 Ok(result) => {
                     if attempt > 1 {
@@ -111,15 +121,20 @@ impl AsyncOptimizer {
                         return Err(e);
                     }
 
-                    warn!("Attempt {} failed, retrying in {:.2}ms: {:?}", 
-                          attempt, delay.as_secs_f64() * 1000.0, e);
-                    
+                    warn!(
+                        "Attempt {} failed, retrying in {:.2}ms: {:?}",
+                        attempt,
+                        delay.as_secs_f64() * 1000.0,
+                        e
+                    );
+
                     tokio::time::sleep(delay).await;
-                    
+
                     // Exponential backoff
                     delay = Duration::from_millis(
-                        (delay.as_millis() as f64 * self.retry_config.backoff_multiplier) as u64
-                    ).min(self.retry_config.max_delay);
+                        (delay.as_millis() as f64 * self.retry_config.backoff_multiplier) as u64,
+                    )
+                    .min(self.retry_config.max_delay);
                 }
             }
         }
@@ -130,17 +145,18 @@ impl AsyncOptimizer {
     where
         F: Future<Output = Result<T, AsyncError>>,
     {
-        let chunk_size = self.max_concurrent.available_permits().min(operations.len());
+        let chunk_size = self
+            .max_concurrent
+            .available_permits()
+            .min(operations.len());
         let mut results = Vec::with_capacity(operations.len());
 
         while !operations.is_empty() {
             let chunk_len = chunk_size.min(operations.len());
             let chunk: Vec<_> = operations.drain(..chunk_len).collect();
-            
-            let chunk_futures: Vec<_> = chunk.into_iter()
-                .map(|op| self.execute(op))
-                .collect();
-            
+
+            let chunk_futures: Vec<_> = chunk.into_iter().map(|op| self.execute(op)).collect();
+
             let chunk_results = futures::future::join_all(chunk_futures).await;
             results.extend(chunk_results);
         }
@@ -149,20 +165,23 @@ impl AsyncOptimizer {
     }
 }
 
+/// Type alias for stream processing function
+type ProcessorFn<T> = Arc<
+    dyn Fn(Vec<T>) -> Pin<Box<dyn Future<Output = Result<(), AsyncError>> + Send>>
+        + Send
+        + Sync,
+>;
+
 /// Optimized stream processing
 pub struct StreamProcessor<T> {
     buffer_size: usize,
     batch_timeout: Duration,
-    processor: Arc<dyn Fn(Vec<T>) -> Pin<Box<dyn Future<Output = Result<(), AsyncError>> + Send>> + Send + Sync>,
+    processor: ProcessorFn<T>,
 }
 
 impl<T: Send + 'static> StreamProcessor<T> {
     /// Create new stream processor
-    pub fn new<F, Fut>(
-        buffer_size: usize,
-        batch_timeout: Duration,
-        processor: F,
-    ) -> Self
+    pub fn new<F, Fut>(buffer_size: usize, batch_timeout: Duration, processor: F) -> Self
     where
         F: Fn(Vec<T>) -> Fut + Send + Sync + 'static,
         Fut: Future<Output = Result<(), AsyncError>> + Send + 'static,
@@ -175,7 +194,10 @@ impl<T: Send + 'static> StreamProcessor<T> {
     }
 
     /// Process stream with batching
-    pub async fn process_stream(&self, mut receiver: tokio::sync::mpsc::Receiver<T>) -> Result<(), AsyncError> {
+    pub async fn process_stream(
+        &self,
+        mut receiver: tokio::sync::mpsc::Receiver<T>,
+    ) -> Result<(), AsyncError> {
         let mut buffer = Vec::with_capacity(self.buffer_size);
         let mut last_flush = Instant::now();
 
@@ -183,8 +205,8 @@ impl<T: Send + 'static> StreamProcessor<T> {
             buffer.push(item);
 
             // Flush if buffer is full or timeout reached
-            let should_flush = buffer.len() >= self.buffer_size || 
-                             last_flush.elapsed() >= self.batch_timeout;
+            let should_flush =
+                buffer.len() >= self.buffer_size || last_flush.elapsed() >= self.batch_timeout;
 
             if should_flush {
                 self.flush_buffer(&mut buffer).await?;
@@ -208,15 +230,18 @@ impl<T: Send + 'static> StreamProcessor<T> {
 
         let batch = std::mem::take(buffer);
         let batch_size = batch.len();
-        
+
         debug!("Processing batch of {} items", batch_size);
-        
+
         let start = Instant::now();
         (self.processor)(batch).await?;
         let duration = start.elapsed();
-        
-        debug!("Batch processed in {:.2}ms", duration.as_secs_f64() * 1000.0);
-        
+
+        debug!(
+            "Batch processed in {:.2}ms",
+            duration.as_secs_f64() * 1000.0
+        );
+
         Ok(())
     }
 }
@@ -242,17 +267,17 @@ impl TaskPool {
         F: Future<Output = ()> + Send + 'static,
     {
         let mut pool = self.pool.write().await;
-        
+
         // Clean up completed tasks
         pool.retain(|handle| !handle.is_finished());
-        
+
         if pool.len() >= self.max_tasks {
             return Err(AsyncError::ResourceExhausted);
         }
 
         let handle = tokio::spawn(future);
         pool.push(handle);
-        
+
         Ok(())
     }
 
@@ -260,20 +285,20 @@ impl TaskPool {
     pub async fn join_all(&self) -> Result<(), AsyncError> {
         let mut pool = self.pool.write().await;
         let handles = std::mem::take(&mut *pool);
-        
+
         for handle in handles {
             if let Err(e) = handle.await {
                 error!("Task failed: {:?}", e);
             }
         }
-        
+
         Ok(())
     }
 
     /// Shutdown pool gracefully
     pub async fn shutdown(&self) {
         let mut pool = self.pool.write().await;
-        
+
         for handle in pool.drain(..) {
             handle.abort();
         }
@@ -285,19 +310,19 @@ impl TaskPool {
 pub enum AsyncError {
     #[error("Operation timed out")]
     Timeout,
-    
+
     #[error("Resource exhausted")]
     ResourceExhausted,
-    
+
     #[error("Task cancelled")]
     Cancelled,
-    
+
     #[error("IO error: {0}")]
     Io(String),
-    
+
     #[error("Network error: {0}")]
     Network(String),
-    
+
     #[error("Internal error: {0}")]
     Internal(String),
 }
@@ -316,12 +341,15 @@ impl AsyncError {
     }
 }
 
+/// Type alias for error handler function
+type ErrorHandlerFn = Box<dyn Fn(&AsyncError) + Send + Sync>;
+
 /// Future wrapper for error propagation optimization
 #[pin_project]
 pub struct ErrorPropagationFuture<F> {
     #[pin]
     inner: F,
-    error_handler: Option<Box<dyn Fn(&AsyncError) + Send + Sync>>,
+    error_handler: Option<ErrorHandlerFn>,
 }
 
 impl<F> ErrorPropagationFuture<F> {
@@ -351,7 +379,7 @@ where
 
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         let this = self.project();
-        
+
         match this.inner.poll(cx) {
             Poll::Ready(Err(e)) => {
                 if let Some(ref handler) = this.error_handler {
@@ -384,7 +412,11 @@ impl ResourceLimiter {
     }
 
     /// Check if resources are available
-    pub async fn check_resources(&self, memory_needed: usize, tasks_needed: usize) -> Result<(), AsyncError> {
+    pub async fn check_resources(
+        &self,
+        memory_needed: usize,
+        tasks_needed: usize,
+    ) -> Result<(), AsyncError> {
         let current_memory = *self.current_memory.read().await;
         let current_tasks = *self.current_tasks.read().await;
 
@@ -400,13 +432,17 @@ impl ResourceLimiter {
     }
 
     /// Acquire resources
-    pub async fn acquire_resources(self: &Arc<Self>, memory: usize, tasks: usize) -> Result<ResourceGuard, AsyncError> {
+    pub async fn acquire_resources(
+        self: &Arc<Self>,
+        memory: usize,
+        tasks: usize,
+    ) -> Result<ResourceGuard, AsyncError> {
         self.check_resources(memory, tasks).await?;
 
         {
             let mut current_memory = self.current_memory.write().await;
             let mut current_tasks = self.current_tasks.write().await;
-            
+
             *current_memory += memory;
             *current_tasks += tasks;
         }
@@ -422,7 +458,7 @@ impl ResourceLimiter {
     async fn release_resources(&self, memory: usize, tasks: usize) {
         let mut current_memory = self.current_memory.write().await;
         let mut current_tasks = self.current_tasks.write().await;
-        
+
         *current_memory = current_memory.saturating_sub(memory);
         *current_tasks = current_tasks.saturating_sub(tasks);
     }
@@ -442,7 +478,7 @@ impl Drop for ResourceGuard {
         let limiter = Arc::clone(&self.limiter);
         let memory = self.memory;
         let tasks = self.tasks;
-        
+
         if let Ok(handle) = tokio::runtime::Handle::try_current() {
             handle.spawn(async move {
                 limiter.release_resources(memory, tasks).await;
@@ -458,11 +494,12 @@ mod tests {
     #[tokio::test]
     async fn test_async_optimizer() {
         let optimizer = AsyncOptimizer::new(2, Duration::from_secs(1));
-        
-        let result = optimizer.execute(async {
-            Ok::<i32, AsyncError>(42)
-        }).await.unwrap();
-        
+
+        let result = optimizer
+            .execute(async { Ok::<i32, AsyncError>(42) })
+            .await
+            .unwrap();
+
         assert_eq!(result, 42);
     }
 
@@ -470,18 +507,21 @@ mod tests {
     async fn test_retry_logic() {
         let optimizer = AsyncOptimizer::new(2, Duration::from_secs(1));
         let mut attempt = 0;
-        
-        let result = optimizer.execute_with_retry(|| {
-            attempt += 1;
-            async move {
-                if attempt < 3 {
-                    Err(AsyncError::Network("temporary failure".to_string()))
-                } else {
-                    Ok(42)
+
+        let result = optimizer
+            .execute_with_retry(|| {
+                attempt += 1;
+                async move {
+                    if attempt < 3 {
+                        Err(AsyncError::Network("temporary failure".to_string()))
+                    } else {
+                        Ok(42)
+                    }
                 }
-            }
-        }).await.unwrap();
-        
+            })
+            .await
+            .unwrap();
+
         assert_eq!(result, 42);
         assert_eq!(attempt, 3);
     }
@@ -489,10 +529,10 @@ mod tests {
     #[tokio::test]
     async fn test_resource_limiter() {
         let limiter = Arc::new(ResourceLimiter::new(1000, 10));
-        
+
         // Should succeed
         let _guard = limiter.acquire_resources(500, 5).await.unwrap();
-        
+
         // Should fail due to memory limit
         assert!(limiter.acquire_resources(600, 3).await.is_err());
     }
@@ -500,18 +540,22 @@ mod tests {
     #[tokio::test]
     async fn test_task_pool() {
         let pool = TaskPool::new(2);
-        
+
         pool.spawn(async {
             tokio::time::sleep(Duration::from_millis(10)).await;
-        }).await.unwrap();
-        
+        })
+        .await
+        .unwrap();
+
         pool.spawn(async {
             tokio::time::sleep(Duration::from_millis(10)).await;
-        }).await.unwrap();
-        
+        })
+        .await
+        .unwrap();
+
         // Should fail as pool is full
         assert!(pool.spawn(async {}).await.is_err());
-        
+
         pool.join_all().await.unwrap();
     }
 }

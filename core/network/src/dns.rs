@@ -12,11 +12,11 @@ pub enum DnsError {
     /// API request failed
     #[error("API request failed: {0}")]
     ApiError(String),
-    
+
     /// Invalid record data
     #[error("Invalid record data: {0}")]
     ValidationError(String),
-    
+
     /// Record not found
     #[error("Record not found: {0}")]
     NotFound(String),
@@ -78,9 +78,15 @@ impl CloudflareClient {
 
     /// Lists all DNS records in the zone
     pub async fn list_records(&self) -> Result<Vec<DnsRecord>, DnsError> {
-        let url = format!("{}/zones/{}/dns_records", Self::API_BASE, self.config.zone_id);
-        
-        let response = self.http_client.get(&url)
+        let url = format!(
+            "{}/zones/{}/dns_records",
+            Self::API_BASE,
+            self.config.zone_id
+        );
+
+        let response = self
+            .http_client
+            .get(&url)
             .header("Authorization", format!("Bearer {}", self.config.api_token))
             .header("Content-Type", "application/json")
             .send()
@@ -88,10 +94,15 @@ impl CloudflareClient {
             .map_err(|e| DnsError::ApiError(e.to_string()))?;
 
         if !response.status().is_success() {
-            return Err(DnsError::ApiError(format!("API request failed: {}", response.status())));
+            return Err(DnsError::ApiError(format!(
+                "API request failed: {}",
+                response.status()
+            )));
         }
 
-        let records = response.json::<Vec<DnsRecord>>().await
+        let records = response
+            .json::<Vec<DnsRecord>>()
+            .await
             .map_err(|e| DnsError::ApiError(e.to_string()))?;
 
         Ok(records)
@@ -99,9 +110,15 @@ impl CloudflareClient {
 
     /// Creates a new DNS record
     pub async fn create_record(&self, record: DnsRecord) -> Result<DnsRecord, DnsError> {
-        let url = format!("{}/zones/{}/dns_records", Self::API_BASE, self.config.zone_id);
-        
-        let response = self.http_client.post(&url)
+        let url = format!(
+            "{}/zones/{}/dns_records",
+            Self::API_BASE,
+            self.config.zone_id
+        );
+
+        let response = self
+            .http_client
+            .post(&url)
             .header("Authorization", format!("Bearer {}", self.config.api_token))
             .header("Content-Type", "application/json")
             .json(&record)
@@ -110,20 +127,36 @@ impl CloudflareClient {
             .map_err(|e| DnsError::ApiError(e.to_string()))?;
 
         if !response.status().is_success() {
-            return Err(DnsError::ApiError(format!("API request failed: {}", response.status())));
+            return Err(DnsError::ApiError(format!(
+                "API request failed: {}",
+                response.status()
+            )));
         }
 
-        let created_record = response.json::<DnsRecord>().await
+        let created_record = response
+            .json::<DnsRecord>()
+            .await
             .map_err(|e| DnsError::ApiError(e.to_string()))?;
 
         Ok(created_record)
     }
 
     /// Updates an existing DNS record
-    pub async fn update_record(&self, record_id: &str, record: DnsRecord) -> Result<DnsRecord, DnsError> {
-        let url = format!("{}/zones/{}/dns_records/{}", Self::API_BASE, self.config.zone_id, record_id);
-        
-        let response = self.http_client.put(&url)
+    pub async fn update_record(
+        &self,
+        record_id: &str,
+        record: DnsRecord,
+    ) -> Result<DnsRecord, DnsError> {
+        let url = format!(
+            "{}/zones/{}/dns_records/{}",
+            Self::API_BASE,
+            self.config.zone_id,
+            record_id
+        );
+
+        let response = self
+            .http_client
+            .put(&url)
             .header("Authorization", format!("Bearer {}", self.config.api_token))
             .header("Content-Type", "application/json")
             .json(&record)
@@ -132,10 +165,15 @@ impl CloudflareClient {
             .map_err(|e| DnsError::ApiError(e.to_string()))?;
 
         if !response.status().is_success() {
-            return Err(DnsError::ApiError(format!("API request failed: {}", response.status())));
+            return Err(DnsError::ApiError(format!(
+                "API request failed: {}",
+                response.status()
+            )));
         }
 
-        let updated_record = response.json::<DnsRecord>().await
+        let updated_record = response
+            .json::<DnsRecord>()
+            .await
             .map_err(|e| DnsError::ApiError(e.to_string()))?;
 
         Ok(updated_record)
@@ -143,9 +181,16 @@ impl CloudflareClient {
 
     /// Deletes a DNS record
     pub async fn delete_record(&self, record_id: &str) -> Result<(), DnsError> {
-        let url = format!("{}/zones/{}/dns_records/{}", Self::API_BASE, self.config.zone_id, record_id);
-        
-        let response = self.http_client.delete(&url)
+        let url = format!(
+            "{}/zones/{}/dns_records/{}",
+            Self::API_BASE,
+            self.config.zone_id,
+            record_id
+        );
+
+        let response = self
+            .http_client
+            .delete(&url)
             .header("Authorization", format!("Bearer {}", self.config.api_token))
             .header("Content-Type", "application/json")
             .send()
@@ -153,7 +198,10 @@ impl CloudflareClient {
             .map_err(|e| DnsError::ApiError(e.to_string()))?;
 
         if !response.status().is_success() {
-            return Err(DnsError::ApiError(format!("API request failed: {}", response.status())));
+            return Err(DnsError::ApiError(format!(
+                "API request failed: {}",
+                response.status()
+            )));
         }
 
         Ok(())
@@ -186,7 +234,11 @@ impl DnsManager {
     }
 
     /// Updates an existing DNS record
-    pub async fn update_record(&self, record_id: &str, record: DnsRecord) -> Result<DnsRecord, DnsError> {
+    pub async fn update_record(
+        &self,
+        record_id: &str,
+        record: DnsRecord,
+    ) -> Result<DnsRecord, DnsError> {
         // Validate record data
         self.validate_record(&record)?;
         self.client.update_record(record_id, record).await
@@ -201,28 +253,43 @@ impl DnsManager {
     fn validate_record(&self, record: &DnsRecord) -> Result<(), DnsError> {
         // Validate record name
         if record.name.is_empty() || record.name.len() > 255 {
-            return Err(DnsError::ValidationError("Invalid record name length".to_string()));
+            return Err(DnsError::ValidationError(
+                "Invalid record name length".to_string(),
+            ));
         }
 
         // Basic hostname validation
-        if !record.name.chars().all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-') {
-            return Err(DnsError::ValidationError("Invalid characters in record name".to_string()));
+        if !record
+            .name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-')
+        {
+            return Err(DnsError::ValidationError(
+                "Invalid characters in record name".to_string(),
+            ));
         }
 
         // Validate content based on record type
         match record.record_type {
             RecordType::A => {
                 // Validate IPv4 address
-                if !record.content.split('.').count() == 4 
-                   && !record.content.split('.')
-                        .all(|octet| octet.parse::<u8>().is_ok()) {
-                    return Err(DnsError::ValidationError("Invalid IPv4 address".to_string()));
+                if !record.content.split('.').count() == 4
+                    && !record
+                        .content
+                        .split('.')
+                        .all(|octet| octet.parse::<u8>().is_ok())
+                {
+                    return Err(DnsError::ValidationError(
+                        "Invalid IPv4 address".to_string(),
+                    ));
                 }
             }
             RecordType::AAAA => {
                 // Basic IPv6 validation
                 if !record.content.contains(':') || record.content.len() > 39 {
-                    return Err(DnsError::ValidationError("Invalid IPv6 address".to_string()));
+                    return Err(DnsError::ValidationError(
+                        "Invalid IPv6 address".to_string(),
+                    ));
                 }
             }
             RecordType::TXT => {
@@ -233,7 +300,11 @@ impl DnsManager {
             }
             RecordType::CNAME => {
                 // Validate CNAME is a valid hostname
-                if !record.content.chars().all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-') {
+                if !record
+                    .content
+                    .chars()
+                    .all(|c| c.is_ascii_alphanumeric() || c == '.' || c == '-')
+                {
                     return Err(DnsError::ValidationError("Invalid CNAME value".to_string()));
                 }
             }
@@ -241,7 +312,9 @@ impl DnsManager {
 
         // Validate TTL
         if record.ttl < 60 || record.ttl > 86400 {
-            return Err(DnsError::ValidationError("TTL must be between 60 and 86400 seconds".to_string()));
+            return Err(DnsError::ValidationError(
+                "TTL must be between 60 and 86400 seconds".to_string(),
+            ));
         }
 
         Ok(())
@@ -276,16 +349,19 @@ mod tests {
         let _m = mock("GET", "/zones/test_zone/dns_records")
             .with_header("Authorization", "Bearer test_token")
             .with_status(200)
-            .with_body(json!({
-                "success": true,
-                "result": [{
-                    "name": "test.example.com",
-                    "type": "A",
-                    "content": "192.0.2.1",
-                    "ttl": 3600,
-                    "proxied": false
-                }]
-            }).to_string())
+            .with_body(
+                json!({
+                    "success": true,
+                    "result": [{
+                        "name": "test.example.com",
+                        "type": "A",
+                        "content": "192.0.2.1",
+                        "ttl": 3600,
+                        "proxied": false
+                    }]
+                })
+                .to_string(),
+            )
             .create();
 
         let client = CloudflareClient::new(setup_test_config());
@@ -300,16 +376,19 @@ mod tests {
         let _m = mock("POST", "/zones/test_zone/dns_records")
             .with_header("Authorization", "Bearer test_token")
             .with_status(200)
-            .with_body(json!({
-                "success": true,
-                "result": {
-                    "name": "test.example.com",
-                    "type": "A",
-                    "content": "192.0.2.1",
-                    "ttl": 3600,
-                    "proxied": false
-                }
-            }).to_string())
+            .with_body(
+                json!({
+                    "success": true,
+                    "result": {
+                        "name": "test.example.com",
+                        "type": "A",
+                        "content": "192.0.2.1",
+                        "ttl": 3600,
+                        "proxied": false
+                    }
+                })
+                .to_string(),
+            )
             .create();
 
         let client = CloudflareClient::new(setup_test_config());
@@ -324,16 +403,19 @@ mod tests {
         let _m = mock("PUT", "/zones/test_zone/dns_records/test_id")
             .with_header("Authorization", "Bearer test_token")
             .with_status(200)
-            .with_body(json!({
-                "success": true,
-                "result": {
-                    "name": "test.example.com",
-                    "type": "A",
-                    "content": "192.0.2.2",
-                    "ttl": 3600,
-                    "proxied": false
-                }
-            }).to_string())
+            .with_body(
+                json!({
+                    "success": true,
+                    "result": {
+                        "name": "test.example.com",
+                        "type": "A",
+                        "content": "192.0.2.2",
+                        "ttl": 3600,
+                        "proxied": false
+                    }
+                })
+                .to_string(),
+            )
             .create();
 
         let client = CloudflareClient::new(setup_test_config());
@@ -346,10 +428,13 @@ mod tests {
         let _m = mock("DELETE", "/zones/test_zone/dns_records/test_id")
             .with_header("Authorization", "Bearer test_token")
             .with_status(200)
-            .with_body(json!({
-                "success": true,
-                "result": {}
-            }).to_string())
+            .with_body(
+                json!({
+                    "success": true,
+                    "result": {}
+                })
+                .to_string(),
+            )
             .create();
 
         let client = CloudflareClient::new(setup_test_config());

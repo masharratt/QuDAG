@@ -1,8 +1,11 @@
-use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use qudag_simulator::{
-    network::{NetworkSimulator, SimulatorConfig},
-    scenarios::{ScenarioConfig, NetworkConditions, test_basic_connectivity, test_byzantine_tolerance, test_network_partition},
     metrics::NetworkMetrics,
+    network::{NetworkSimulator, SimulatorConfig},
+    scenarios::{
+        test_basic_connectivity, test_byzantine_tolerance, test_network_partition,
+        NetworkConditions, ScenarioConfig,
+    },
 };
 use std::time::Duration;
 use tokio::runtime::Runtime;
@@ -19,25 +22,23 @@ pub fn benchmark_simulator(c: &mut Criterion) {
             node_count,
             |b, &node_count| {
                 b.iter(|| {
-                    Runtime::new()
-                        .unwrap()
-                        .block_on(async {
-                            let config = SimulatorConfig {
-                                node_count,
-                                latency_ms: 50,
-                                drop_rate: 0.01,
-                                partition_prob: 0.0,
-                            };
+                    Runtime::new().unwrap().block_on(async {
+                        let config = SimulatorConfig {
+                            node_count,
+                            latency_ms: 50,
+                            drop_rate: 0.01,
+                            partition_prob: 0.0,
+                        };
 
-                            let (mut sim, _) = NetworkSimulator::new(config);
+                        let (mut sim, _) = NetworkSimulator::new(config);
 
-                            // Add nodes
-                            for _ in 0..node_count {
-                                sim.add_node(Default::default()).await.unwrap();
-                            }
+                        // Add nodes
+                        for _ in 0..node_count {
+                            sim.add_node(Default::default()).await.unwrap();
+                        }
 
-                            sim
-                        })
+                        sim
+                    })
                 })
             },
         );
@@ -50,22 +51,20 @@ pub fn benchmark_simulator(c: &mut Criterion) {
             node_count,
             |b, &node_count| {
                 b.iter(|| {
-                    Runtime::new()
-                        .unwrap()
-                        .block_on(async {
-                            let config = ScenarioConfig {
-                                node_count,
-                                duration: Duration::from_millis(100), // Shorter for benchmarking
-                                msg_rate: 100.0,
-                                network: NetworkConditions {
-                                    latency: Duration::from_millis(10),
-                                    loss_rate: 0.01,
-                                    partition_prob: 0.0,
-                                },
-                            };
+                    Runtime::new().unwrap().block_on(async {
+                        let config = ScenarioConfig {
+                            node_count,
+                            duration: Duration::from_millis(100), // Shorter for benchmarking
+                            msg_rate: 100.0,
+                            network: NetworkConditions {
+                                latency: Duration::from_millis(10),
+                                loss_rate: 0.01,
+                                partition_prob: 0.0,
+                            },
+                        };
 
-                            test_basic_connectivity(config).await.unwrap()
-                        })
+                        test_basic_connectivity(config).await.unwrap()
+                    })
                 })
             },
         );
@@ -78,22 +77,20 @@ pub fn benchmark_simulator(c: &mut Criterion) {
             node_count,
             |b, &node_count| {
                 b.iter(|| {
-                    Runtime::new()
-                        .unwrap()
-                        .block_on(async {
-                            let config = ScenarioConfig {
-                                node_count,
-                                duration: Duration::from_millis(100),
-                                msg_rate: 50.0,
-                                network: NetworkConditions {
-                                    latency: Duration::from_millis(20),
-                                    loss_rate: 0.02,
-                                    partition_prob: 0.0,
-                                },
-                            };
+                    Runtime::new().unwrap().block_on(async {
+                        let config = ScenarioConfig {
+                            node_count,
+                            duration: Duration::from_millis(100),
+                            msg_rate: 50.0,
+                            network: NetworkConditions {
+                                latency: Duration::from_millis(20),
+                                loss_rate: 0.02,
+                                partition_prob: 0.0,
+                            },
+                        };
 
-                            test_byzantine_tolerance(config).await.unwrap()
-                        })
+                        test_byzantine_tolerance(config).await.unwrap()
+                    })
                 })
             },
         );
@@ -106,22 +103,20 @@ pub fn benchmark_simulator(c: &mut Criterion) {
             partition_prob,
             |b, &partition_prob| {
                 b.iter(|| {
-                    Runtime::new()
-                        .unwrap()
-                        .block_on(async {
-                            let config = ScenarioConfig {
-                                node_count: 10,
-                                duration: Duration::from_millis(150),
-                                msg_rate: 20.0,
-                                network: NetworkConditions {
-                                    latency: Duration::from_millis(30),
-                                    loss_rate: 0.01,
-                                    partition_prob,
-                                },
-                            };
+                    Runtime::new().unwrap().block_on(async {
+                        let config = ScenarioConfig {
+                            node_count: 10,
+                            duration: Duration::from_millis(150),
+                            msg_rate: 20.0,
+                            network: NetworkConditions {
+                                latency: Duration::from_millis(30),
+                                loss_rate: 0.01,
+                                partition_prob,
+                            },
+                        };
 
-                            test_network_partition(config).await.unwrap()
-                        })
+                        test_network_partition(config).await.unwrap()
+                    })
                 })
             },
         );
@@ -135,18 +130,12 @@ pub fn benchmark_metrics(c: &mut Criterion) {
     group.sample_size(100);
 
     // Metrics creation benchmark
-    group.bench_function("metrics_creation", |b| {
-        b.iter(|| {
-            NetworkMetrics::new()
-        })
-    });
+    group.bench_function("metrics_creation", |b| b.iter(|| NetworkMetrics::new()));
 
     // Metrics serialization benchmark
     group.bench_function("metrics_serialization", |b| {
         let metrics = NetworkMetrics::new();
-        b.iter(|| {
-            serde_json::to_string(&metrics).unwrap()
-        })
+        b.iter(|| serde_json::to_string(&metrics).unwrap())
     });
 
     // Metrics deserialization benchmark
@@ -168,72 +157,71 @@ pub fn benchmark_node_operations(c: &mut Criterion) {
     // Node addition benchmark
     group.bench_function("node_addition", |b| {
         b.iter(|| {
-            Runtime::new()
-                .unwrap()
-                .block_on(async {
-                    let config = SimulatorConfig {
-                        node_count: 1,
-                        latency_ms: 10,
-                        drop_rate: 0.0,
-                        partition_prob: 0.0,
-                    };
+            Runtime::new().unwrap().block_on(async {
+                let config = SimulatorConfig {
+                    node_count: 1,
+                    latency_ms: 10,
+                    drop_rate: 0.0,
+                    partition_prob: 0.0,
+                };
 
-                    let (mut sim, _) = NetworkSimulator::new(config);
-                    sim.add_node(Default::default()).await.unwrap();
-                    sim
-                })
+                let (mut sim, _) = NetworkSimulator::new(config);
+                sim.add_node(Default::default()).await.unwrap();
+                sim
+            })
         })
     });
 
     // Node removal benchmark
     group.bench_function("node_removal", |b| {
         b.iter(|| {
-            Runtime::new()
-                .unwrap()
-                .block_on(async {
-                    let config = SimulatorConfig {
-                        node_count: 1,
-                        latency_ms: 10,
-                        drop_rate: 0.0,
-                        partition_prob: 0.0,
-                    };
+            Runtime::new().unwrap().block_on(async {
+                let config = SimulatorConfig {
+                    node_count: 1,
+                    latency_ms: 10,
+                    drop_rate: 0.0,
+                    partition_prob: 0.0,
+                };
 
-                    let (mut sim, _) = NetworkSimulator::new(config);
-                    sim.add_node(Default::default()).await.unwrap();
-                    sim.remove_node("node-0").await.unwrap();
-                    sim
-                })
+                let (mut sim, _) = NetworkSimulator::new(config);
+                sim.add_node(Default::default()).await.unwrap();
+                sim.remove_node("node-0").await.unwrap();
+                sim
+            })
         })
     });
 
     // Partition creation benchmark
     group.bench_function("partition_creation", |b| {
         b.iter(|| {
-            Runtime::new()
-                .unwrap()
-                .block_on(async {
-                    let config = SimulatorConfig {
-                        node_count: 10,
-                        latency_ms: 10,
-                        drop_rate: 0.0,
-                        partition_prob: 0.5,
-                    };
+            Runtime::new().unwrap().block_on(async {
+                let config = SimulatorConfig {
+                    node_count: 10,
+                    latency_ms: 10,
+                    drop_rate: 0.0,
+                    partition_prob: 0.5,
+                };
 
-                    let (mut sim, _) = NetworkSimulator::new(config);
-                    
-                    // Add nodes
-                    for _ in 0..10 {
-                        sim.add_node(Default::default()).await.unwrap();
-                    }
-                    
-                    sim.create_partition().await.unwrap();
-                    sim
-                })
+                let (mut sim, _) = NetworkSimulator::new(config);
+
+                // Add nodes
+                for _ in 0..10 {
+                    sim.add_node(Default::default()).await.unwrap();
+                }
+
+                sim.create_partition().await.unwrap();
+                sim
+            })
         })
     });
 
     group.finish();
 }
 
-criterion_group!(benches, benchmark_simulator, benchmark_metrics, benchmark_node_operations);
+criterion_group!(
+    benches,
+    benchmark_simulator,
+    benchmark_metrics,
+    benchmark_node_operations
+);
 criterion_main!(benches);

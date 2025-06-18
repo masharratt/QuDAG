@@ -1,5 +1,5 @@
-use qudag_crypto::ml_dsa::{MlDsaKeyPair, MlDsaPublicKey, MlDsaError};
 use proptest::prelude::*;
+use qudag_crypto::ml_dsa::{MlDsaError, MlDsaKeyPair, MlDsaPublicKey};
 use rand::{thread_rng, RngCore};
 
 #[test]
@@ -14,8 +14,10 @@ fn test_mldsa_sign_verify() {
     let message = b"Test message for ML-DSA signature";
     let mut rng = thread_rng();
     let keypair = MlDsaKeyPair::generate(&mut rng).expect("Key generation should succeed");
-    
-    let signature = keypair.sign(message, &mut rng).expect("Signing should succeed");
+
+    let signature = keypair
+        .sign(message, &mut rng)
+        .expect("Signing should succeed");
     let public_key = MlDsaPublicKey::from_bytes(keypair.public_key()).expect("Valid public key");
     let verification = public_key.verify(message, &signature);
     assert!(verification.is_ok());
@@ -27,10 +29,10 @@ fn test_mldsa_invalid_signature() {
     let mut rng = thread_rng();
     let keypair = MlDsaKeyPair::generate(&mut rng).expect("Key generation should succeed");
     let public_key = MlDsaPublicKey::from_bytes(keypair.public_key()).expect("Valid public key");
-    
+
     let mut invalid_signature = vec![0u8; 2372]; // ML-DSA-65 signature size
     thread_rng().fill_bytes(&mut invalid_signature);
-    
+
     let verification = public_key.verify(message, &invalid_signature);
     assert!(matches!(verification, Err(MlDsaError::VerificationFailed)));
 }
@@ -42,8 +44,10 @@ fn test_mldsa_message_tampering() {
     let mut rng = thread_rng();
     let keypair = MlDsaKeyPair::generate(&mut rng).expect("Key generation should succeed");
     let public_key = MlDsaPublicKey::from_bytes(keypair.public_key()).expect("Valid public key");
-    
-    let signature = keypair.sign(message, &mut rng).expect("Signing should succeed");
+
+    let signature = keypair
+        .sign(message, &mut rng)
+        .expect("Signing should succeed");
     let verification = public_key.verify(tampered_message, &signature);
     assert!(matches!(verification, Err(MlDsaError::VerificationFailed)));
 }

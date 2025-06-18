@@ -1,7 +1,7 @@
 use criterion::{criterion_group, criterion_main, Criterion};
 use qudag_simulator::{
-    scenarios::{ScenarioConfig, NetworkConditions},
     metrics::NetworkMetrics,
+    scenarios::{NetworkConditions, ScenarioConfig},
 };
 use std::time::Duration;
 

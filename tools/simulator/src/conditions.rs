@@ -1,7 +1,7 @@
 //! Network condition simulation for realistic testing environments.
 
-use rand::{Rng, thread_rng};
-use serde::{Serialize, Deserialize};
+use rand::{thread_rng, Rng};
+use serde::{Deserialize, Serialize};
 use std::time::{Duration, Instant};
 use tokio::time::sleep;
 use tracing::{debug, warn};
@@ -136,10 +136,13 @@ impl NetworkConditionSimulator {
     }
 
     /// Simulate message transmission with network conditions
-    pub async fn transmit_message(&mut self, message_size: usize) -> Result<Duration, NetworkError> {
+    pub async fn transmit_message(
+        &mut self,
+        message_size: usize,
+    ) -> Result<Duration, NetworkError> {
         // Check for outages
         self.update_outage_state().await;
-        
+
         if self.is_in_outage {
             return Err(NetworkError::NetworkOutage);
         }
@@ -158,7 +161,7 @@ impl NetworkConditionSimulator {
 
         // Total delay is latency + transmission time
         let total_delay = latency + transmission_delay;
-        
+
         debug!(
             "Message transmitted: size={} bytes, latency={:?}, transmission_delay={:?}",
             message_size, latency, transmission_delay
@@ -171,7 +174,8 @@ impl NetworkConditionSimulator {
     /// Check if packet should be dropped based on loss rate
     fn should_drop_packet(&self) -> bool {
         let mut rng = thread_rng();
-        let loss_rate = self.conditions.packet_loss_rate * (1.0 + self.conditions.congestion_factor);
+        let loss_rate =
+            self.conditions.packet_loss_rate * (1.0 + self.conditions.congestion_factor);
         rng.gen::<f64>() < loss_rate
     }
 
@@ -180,14 +184,18 @@ impl NetworkConditionSimulator {
         let mut rng = thread_rng();
         let jitter_ms = rng.gen_range(0..=self.conditions.latency_variance.as_millis() as u64);
         let congestion_factor = 1.0 + self.conditions.congestion_factor;
-        
+
         Duration::from_millis(
-            (self.conditions.base_latency.as_millis() as f64 * congestion_factor) as u64 + jitter_ms
+            (self.conditions.base_latency.as_millis() as f64 * congestion_factor) as u64
+                + jitter_ms,
         )
     }
 
     /// Apply bandwidth limiting and return transmission delay
-    async fn apply_bandwidth_limit(&mut self, message_size: usize) -> Result<Duration, NetworkError> {
+    async fn apply_bandwidth_limit(
+        &mut self,
+        message_size: usize,
+    ) -> Result<Duration, NetworkError> {
         // Reset bandwidth counter every second
         let now = Instant::now();
         if now.duration_since(self.last_bandwidth_reset) >= Duration::from_secs(1) {
@@ -196,36 +204,37 @@ impl NetworkConditionSimulator {
         }
 
         let message_size_u64 = message_size as u64;
-        
+
         // Check if we would exceed bandwidth limit
         if self.current_bandwidth_usage + message_size_u64 > self.conditions.bandwidth_limit {
             // Check if burst capacity allows this message
             if message_size_u64 > self.conditions.burst_capacity {
                 return Err(NetworkError::BandwidthExceeded);
             }
-            
+
             // Wait until next bandwidth window
             let wait_time = Duration::from_secs(1) - now.duration_since(self.last_bandwidth_reset);
             sleep(wait_time).await;
-            
+
             // Reset counters
             self.current_bandwidth_usage = 0;
             self.last_bandwidth_reset = Instant::now();
         }
 
         // Calculate transmission time based on effective bandwidth
-        let effective_bandwidth = self.conditions.bandwidth_limit as f64 * (1.0 - self.conditions.congestion_factor);
+        let effective_bandwidth =
+            self.conditions.bandwidth_limit as f64 * (1.0 - self.conditions.congestion_factor);
         let transmission_time = Duration::from_secs_f64(message_size as f64 / effective_bandwidth);
-        
+
         self.current_bandwidth_usage += message_size_u64;
-        
+
         Ok(transmission_time)
     }
 
     /// Update outage state based on probability
     async fn update_outage_state(&mut self) {
         let now = Instant::now();
-        
+
         // Check if current outage has ended
         if let Some(end_time) = self.outage_end_time {
             if now >= end_time {
@@ -234,14 +243,17 @@ impl NetworkConditionSimulator {
                 debug!("Network outage ended");
             }
         }
-        
+
         // Check for new outages
         if !self.is_in_outage {
             let mut rng = thread_rng();
             if rng.gen::<f64>() < self.conditions.outage_probability {
                 self.is_in_outage = true;
                 self.outage_end_time = Some(now + self.conditions.outage_duration);
-                warn!("Network outage started, duration: {:?}", self.conditions.outage_duration);
+                warn!(
+                    "Network outage started, duration: {:?}",
+                    self.conditions.outage_duration
+                );
             }
         }
     }
@@ -250,9 +262,11 @@ impl NetworkConditionSimulator {
     pub fn get_stats(&self) -> NetworkStats {
         NetworkStats {
             current_bandwidth_usage: self.current_bandwidth_usage,
-            bandwidth_utilization: self.current_bandwidth_usage as f64 / self.conditions.bandwidth_limit as f64,
+            bandwidth_utilization: self.current_bandwidth_usage as f64
+                / self.conditions.bandwidth_limit as f64,
             is_in_outage: self.is_in_outage,
-            effective_packet_loss_rate: self.conditions.packet_loss_rate * (1.0 + self.conditions.congestion_factor),
+            effective_packet_loss_rate: self.conditions.packet_loss_rate
+                * (1.0 + self.conditions.congestion_factor),
             conditions: self.conditions.clone(),
         }
     }
@@ -285,15 +299,15 @@ pub enum NetworkError {
     /// Packet was dropped due to network conditions
     #[error("Packet dropped due to network conditions")]
     PacketLoss,
-    
+
     /// Network is currently experiencing an outage
     #[error("Network outage in progress")]
     NetworkOutage,
-    
+
     /// Message exceeds bandwidth capacity
     #[error("Message size exceeds bandwidth capacity")]
     BandwidthExceeded,
-    
+
     /// General network error
     #[error("Network error: {0}")]
     General(String),
@@ -309,7 +323,7 @@ mod tests {
         let mut simulator = NetworkConditionSimulator::new(NetworkProfile::Lan);
         let result = simulator.transmit_message(1000).await;
         assert!(result.is_ok());
-        
+
         let delay = result.unwrap();
         assert!(delay < Duration::from_millis(10)); // LAN should be fast
     }
@@ -319,7 +333,7 @@ mod tests {
         let mut simulator = NetworkConditionSimulator::new(NetworkProfile::Satellite);
         let result = simulator.transmit_message(1000).await;
         assert!(result.is_ok());
-        
+
         let delay = result.unwrap();
         assert!(delay > Duration::from_millis(500)); // Satellite should have high latency
     }
@@ -356,11 +370,11 @@ mod tests {
         };
 
         let mut simulator = NetworkConditionSimulator::with_conditions(conditions);
-        
+
         // First small message should succeed
         let result = simulator.transmit_message(100).await;
         assert!(result.is_ok());
-        
+
         // Large message should be rejected
         let result = simulator.transmit_message(2000).await;
         assert!(matches!(result, Err(NetworkError::BandwidthExceeded)));
@@ -370,7 +384,7 @@ mod tests {
     async fn test_network_stats() {
         let mut simulator = NetworkConditionSimulator::new(NetworkProfile::Wan);
         let _ = simulator.transmit_message(1000).await;
-        
+
         let stats = simulator.get_stats();
         assert!(stats.bandwidth_utilization >= 0.0);
         assert!(stats.bandwidth_utilization <= 1.0);
@@ -381,10 +395,10 @@ mod tests {
     async fn test_profile_serialization() {
         let profile = NetworkProfile::Mobile;
         let conditions = profile.conditions();
-        
+
         let serialized = serde_json::to_string(&conditions).unwrap();
         let deserialized: NetworkConditions = serde_json::from_str(&serialized).unwrap();
-        
+
         assert_eq!(conditions.base_latency, deserialized.base_latency);
         assert_eq!(conditions.packet_loss_rate, deserialized.packet_loss_rate);
     }

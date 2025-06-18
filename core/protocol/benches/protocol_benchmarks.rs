@@ -4,17 +4,17 @@ use tokio::runtime::Runtime;
 
 fn bench_message_propagation(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
-    
+
     c.bench_function("message_propagation", |b| {
         b.iter(|| {
             rt.block_on(async {
                 let config = ProtocolConfig::default();
                 let mut coordinator = Coordinator::new(config).await.unwrap();
                 coordinator.start().await.unwrap();
-                
+
                 let message = black_box(vec![1, 2, 3, 4]);
                 coordinator.broadcast_message(message).await.unwrap();
-                
+
                 coordinator.stop().await.unwrap();
             });
         })
@@ -23,7 +23,7 @@ fn bench_message_propagation(c: &mut Criterion) {
 
 fn bench_node_initialization(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
-    
+
     c.bench_function("node_initialization", |b| {
         b.iter(|| {
             rt.block_on(async {
@@ -37,7 +37,7 @@ fn bench_node_initialization(c: &mut Criterion) {
 
 fn bench_multi_node_broadcast(c: &mut Criterion) {
     let rt = Runtime::new().unwrap();
-    
+
     c.bench_function("multi_node_broadcast", |b| {
         b.iter(|| {
             rt.block_on(async {
@@ -49,16 +49,16 @@ fn bench_multi_node_broadcast(c: &mut Criterion) {
                     let node = Coordinator::new(config).await.unwrap();
                     nodes.push(node);
                 }
-                
+
                 // Start all nodes
                 for node in nodes.iter_mut() {
                     node.start().await.unwrap();
                 }
-                
+
                 // Broadcast message from first node
                 let message = black_box(vec![1, 2, 3, 4]);
                 nodes[0].broadcast_message(message).await.unwrap();
-                
+
                 // Stop all nodes
                 for node in nodes.iter_mut() {
                     node.stop().await.unwrap();

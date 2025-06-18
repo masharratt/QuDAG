@@ -1,6 +1,6 @@
-use blake3::Hash;
-use serde::{Serialize, Deserialize};
 use crate::node::SerializableHash;
+use blake3::Hash;
+use serde::{Deserialize, Serialize};
 
 /// Represents a directed edge in the DAG between two nodes
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq, Hash)]
@@ -28,7 +28,7 @@ impl Edge {
         self.from.clone().into()
     }
 
-    /// Returns the child node hash 
+    /// Returns the child node hash
     pub fn to(&self) -> Hash {
         self.to.clone().into()
     }
@@ -61,10 +61,7 @@ mod tests {
 
     #[test]
     fn test_edge_weight() {
-        let mut edge = Edge::new(
-            blake3::hash(b"parent"),
-            blake3::hash(b"child")
-        );
+        let mut edge = Edge::new(blake3::hash(b"parent"), blake3::hash(b"child"));
 
         assert_eq!(edge.weight(), 1);
         edge.increment_weight();

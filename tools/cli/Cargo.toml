@@ -34,6 +34,12 @@ serde_json = "1.0"
 pin-project = "1.0"
 hex = "0.4"
 rand = "0.8"
+dirs = "5.0"
+libp2p = "0.53"
+async-trait = "0.1"
+toml = "0.8"
+libc = "0.2"
+whoami = "1.4"
 
 # Internal dependencies
 qudag-protocol = { path = "../../core/protocol" }
@@ -44,6 +50,10 @@ qudag-crypto = { path = "../../core/crypto" }
 [[bin]]
 name = "qudag"
 path = "src/main.rs"
+
+[[example]]
+name = "peer_management"
+path = "../../examples/peer_management_example.rs"
 
 [dev-dependencies]
 proptest.workspace = true

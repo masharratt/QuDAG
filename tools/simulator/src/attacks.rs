@@ -1,12 +1,12 @@
 //! Attack simulation module for testing protocol resilience.
 
 use anyhow::Result;
-use rand::{Rng, thread_rng};
-use serde::{Serialize, Deserialize};
+use rand::{thread_rng, Rng};
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::time::{Duration, Instant};
 use tokio::time::{interval, sleep};
-use tracing::{info, warn, debug};
+use tracing::{debug, info, warn};
 use uuid::Uuid;
 
 /// Types of attacks that can be simulated
@@ -231,7 +231,7 @@ impl AttackSimulator {
     pub async fn launch_attack(&mut self, attack: AttackType) -> Result<Uuid> {
         let attack_id = Uuid::new_v4();
         let start_time = Instant::now();
-        
+
         let duration = match &attack {
             AttackType::DoS { duration, .. } => *duration,
             AttackType::DDoS { duration, .. } => *duration,
@@ -255,33 +255,72 @@ impl AttackSimulator {
 
         // Execute the specific attack
         match attack {
-            AttackType::DoS { intensity, targets, .. } => {
-                self.execute_dos_attack(attack_id, intensity, targets).await?;
-            },
-            AttackType::DDoS { attacker_count, intensity_per_attacker, targets, .. } => {
-                self.execute_ddos_attack(attack_id, attacker_count, intensity_per_attacker, targets).await?;
-            },
-            AttackType::Sybil { fake_identity_count, behavior, .. } => {
-                self.execute_sybil_attack(attack_id, fake_identity_count, behavior).await?;
-            },
-            AttackType::Eclipse { targets, malicious_connections, .. } => {
-                self.execute_eclipse_attack(attack_id, targets, malicious_connections).await?;
-            },
-            AttackType::Byzantine { byzantine_nodes, behavior, .. } => {
-                self.execute_byzantine_attack(attack_id, byzantine_nodes, behavior).await?;
-            },
-            AttackType::Routing { malicious_nodes, manipulation, .. } => {
-                self.execute_routing_attack(attack_id, malicious_nodes, manipulation).await?;
-            },
+            AttackType::DoS {
+                intensity, targets, ..
+            } => {
+                self.execute_dos_attack(attack_id, intensity, targets)
+                    .await?;
+            }
+            AttackType::DDoS {
+                attacker_count,
+                intensity_per_attacker,
+                targets,
+                ..
+            } => {
+                self.execute_ddos_attack(
+                    attack_id,
+                    attacker_count,
+                    intensity_per_attacker,
+                    targets,
+                )
+                .await?;
+            }
+            AttackType::Sybil {
+                fake_identity_count,
+                behavior,
+                ..
+            } => {
+                self.execute_sybil_attack(attack_id, fake_identity_count, behavior)
+                    .await?;
+            }
+            AttackType::Eclipse {
+                targets,
+                malicious_connections,
+                ..
+            } => {
+                self.execute_eclipse_attack(attack_id, targets, malicious_connections)
+                    .await?;
+            }
+            AttackType::Byzantine {
+                byzantine_nodes,
+                behavior,
+                ..
+            } => {
+                self.execute_byzantine_attack(attack_id, byzantine_nodes, behavior)
+                    .await?;
+            }
+            AttackType::Routing {
+                malicious_nodes,
+                manipulation,
+                ..
+            } => {
+                self.execute_routing_attack(attack_id, malicious_nodes, manipulation)
+                    .await?;
+            }
         }
 
         Ok(attack_id)
     }
 
     /// Execute DoS attack
-    async fn execute_dos_attack(&mut self, attack_id: Uuid, intensity: u64, targets: Vec<String>) -> Result<()> {
+    async fn execute_dos_attack(
+        &mut self,
+        attack_id: Uuid,
+        intensity: u64,
+        targets: Vec<String>,
+    ) -> Result<()> {
         debug!("Executing DoS attack with intensity: {} msg/s", intensity);
-        
+
         let target_nodes = if targets.is_empty() {
             self.network_state.nodes.iter().cloned().collect()
         } else {
@@ -291,14 +330,14 @@ impl AttackSimulator {
         // Simulate message flooding
         let mut interval = interval(Duration::from_millis(1000 / intensity));
         let _start_time = Instant::now();
-        
+
         while let Some(attack) = self.active_attacks.get(&attack_id) {
             if Instant::now() >= attack.end_time {
                 break;
             }
 
             interval.tick().await;
-            
+
             // Send flood messages to targets
             for target in &target_nodes {
                 debug!("Sending flood message to {}", target);
@@ -312,14 +351,14 @@ impl AttackSimulator {
 
     /// Execute DDoS attack
     async fn execute_ddos_attack(
-        &mut self, 
-        attack_id: Uuid, 
-        attacker_count: usize, 
+        &mut self,
+        attack_id: Uuid,
+        attacker_count: usize,
         intensity_per_attacker: u64,
-        targets: Vec<String>
+        targets: Vec<String>,
     ) -> Result<()> {
         debug!("Executing DDoS attack with {} attackers", attacker_count);
-        
+
         let target_nodes = if targets.is_empty() {
             self.network_state.nodes.iter().cloned().collect()
         } else {
@@ -328,24 +367,24 @@ impl AttackSimulator {
 
         // Spawn multiple attacker tasks
         let mut handles = Vec::new();
-        
+
         for i in 0..attacker_count {
             let targets_clone = target_nodes.clone();
             let attack_end_time = self.active_attacks.get(&attack_id).unwrap().end_time;
-            
+
             let handle = tokio::spawn(async move {
                 let mut interval = interval(Duration::from_millis(1000 / intensity_per_attacker));
-                
+
                 while Instant::now() < attack_end_time {
                     interval.tick().await;
-                    
+
                     for target in &targets_clone {
                         debug!("Attacker {} sending message to {}", i, target);
                         // In a real implementation, this would send actual messages
                     }
                 }
             });
-            
+
             handles.push(handle);
         }
 
@@ -360,13 +399,16 @@ impl AttackSimulator {
 
     /// Execute Sybil attack
     async fn execute_sybil_attack(
-        &mut self, 
-        attack_id: Uuid, 
-        fake_identity_count: usize, 
-        behavior: SybilBehavior
+        &mut self,
+        attack_id: Uuid,
+        fake_identity_count: usize,
+        behavior: SybilBehavior,
     ) -> Result<()> {
-        debug!("Executing Sybil attack with {} fake identities", fake_identity_count);
-        
+        debug!(
+            "Executing Sybil attack with {} fake identities",
+            fake_identity_count
+        );
+
         // Create fake identities
         let mut fake_identities = Vec::new();
         for i in 0..fake_identity_count {
@@ -379,13 +421,13 @@ impl AttackSimulator {
         match behavior {
             SybilBehavior::Flooding => {
                 self.sybil_flooding(&fake_identities).await?;
-            },
+            }
             SybilBehavior::FakeVoting => {
                 self.sybil_fake_voting(&fake_identities).await?;
-            },
+            }
             SybilBehavior::Partitioning => {
                 self.sybil_partitioning(&fake_identities).await?;
-            },
+            }
             SybilBehavior::Mixed => {
                 // Randomly assign behaviors to different fake identities
                 let mut rng = thread_rng();
@@ -397,7 +439,7 @@ impl AttackSimulator {
                         _ => unreachable!(),
                     }
                 }
-            },
+            }
         }
 
         // Clean up fake identities after attack
@@ -411,13 +453,13 @@ impl AttackSimulator {
 
     /// Execute Eclipse attack
     async fn execute_eclipse_attack(
-        &mut self, 
-        attack_id: Uuid, 
-        targets: Vec<String>, 
-        malicious_connections: usize
+        &mut self,
+        attack_id: Uuid,
+        targets: Vec<String>,
+        malicious_connections: usize,
     ) -> Result<()> {
         debug!("Executing Eclipse attack on {} targets", targets.len());
-        
+
         for target in &targets {
             if !self.network_state.nodes.contains(target) {
                 warn!("Target node {} not found in network", target);
@@ -430,7 +472,7 @@ impl AttackSimulator {
                 let malicious_id = format!("eclipse-{}-{}-{}", attack_id, target, i);
                 malicious_nodes.push(malicious_id.clone());
                 self.network_state.nodes.insert(malicious_id.clone());
-                
+
                 // Connect malicious node to target
                 self.add_connection(&malicious_id, target);
             }
@@ -439,13 +481,16 @@ impl AttackSimulator {
             if let Some(connections) = self.network_state.connections.get_mut(target) {
                 let _original_connections: Vec<_> = connections.iter().cloned().collect();
                 connections.clear();
-                
+
                 // Only allow connections to malicious nodes
                 for malicious in &malicious_nodes {
                     connections.insert(malicious.clone());
                 }
-                
-                debug!("Target {} isolated with {} malicious connections", target, malicious_connections);
+
+                debug!(
+                    "Target {} isolated with {} malicious connections",
+                    target, malicious_connections
+                );
             }
         }
 
@@ -461,41 +506,44 @@ impl AttackSimulator {
 
     /// Execute Byzantine attack
     async fn execute_byzantine_attack(
-        &mut self, 
-        attack_id: Uuid, 
-        byzantine_nodes: Vec<String>, 
-        behavior: ByzantineBehavior
+        &mut self,
+        attack_id: Uuid,
+        byzantine_nodes: Vec<String>,
+        behavior: ByzantineBehavior,
     ) -> Result<()> {
-        debug!("Executing Byzantine attack with {} nodes", byzantine_nodes.len());
-        
+        debug!(
+            "Executing Byzantine attack with {} nodes",
+            byzantine_nodes.len()
+        );
+
         // Mark nodes as byzantine
         for node in &byzantine_nodes {
             if !self.network_state.nodes.contains(node) {
                 warn!("Byzantine node {} not found in network", node);
                 continue;
             }
-            
+
             match &behavior {
                 ByzantineBehavior::FailStop => {
                     debug!("Node {} entering fail-stop mode", node);
                     // In real implementation, this would stop the node
-                },
+                }
                 ByzantineBehavior::Conflicting => {
                     debug!("Node {} will send conflicting messages", node);
                     // In real implementation, this would send conflicting consensus messages
-                },
+                }
                 ByzantineBehavior::Delaying => {
                     debug!("Node {} will delay messages", node);
                     // In real implementation, this would add delays to message processing
-                },
+                }
                 ByzantineBehavior::Corrupting => {
                     debug!("Node {} will corrupt messages", node);
                     // In real implementation, this would modify message contents
-                },
+                }
                 ByzantineBehavior::Arbitrary => {
                     debug!("Node {} will exhibit arbitrary behavior", node);
                     // In real implementation, this would randomly apply various malicious behaviors
-                },
+                }
             }
         }
 
@@ -511,27 +559,30 @@ impl AttackSimulator {
 
     /// Execute routing attack
     async fn execute_routing_attack(
-        &mut self, 
-        attack_id: Uuid, 
-        malicious_nodes: Vec<String>, 
-        manipulation: RoutingManipulation
+        &mut self,
+        attack_id: Uuid,
+        malicious_nodes: Vec<String>,
+        manipulation: RoutingManipulation,
     ) -> Result<()> {
-        debug!("Executing routing attack with {} malicious nodes", malicious_nodes.len());
-        
+        debug!(
+            "Executing routing attack with {} malicious nodes",
+            malicious_nodes.len()
+        );
+
         for node in &malicious_nodes {
             match &manipulation {
                 RoutingManipulation::MessageDropping => {
                     debug!("Node {} will drop messages", node);
-                },
+                }
                 RoutingManipulation::RouteModification => {
                     debug!("Node {} will modify routes", node);
-                },
+                }
                 RoutingManipulation::LoopCreation => {
                     debug!("Node {} will create routing loops", node);
-                },
+                }
                 RoutingManipulation::Blackhole => {
                     debug!("Node {} will blackhole all messages", node);
-                },
+                }
             }
         }
 
@@ -564,7 +615,10 @@ impl AttackSimulator {
 
     async fn sybil_partitioning(&self, identities: &[String]) -> Result<()> {
         for identity in identities {
-            debug!("Sybil identity {} attempting to partition network", identity);
+            debug!(
+                "Sybil identity {} attempting to partition network",
+                identity
+            );
             // In real implementation, would attempt network partitioning
         }
         Ok(())
@@ -634,7 +688,7 @@ mod tests {
     async fn test_add_nodes() {
         let mut simulator = AttackSimulator::new();
         simulator.add_nodes(vec!["node1".to_string(), "node2".to_string()]);
-        
+
         assert_eq!(simulator.network_state.nodes.len(), 2);
         assert!(simulator.network_state.nodes.contains("node1"));
         assert!(simulator.network_state.nodes.contains("node2"));
@@ -644,21 +698,21 @@ mod tests {
     async fn test_dos_attack() -> Result<()> {
         let mut simulator = AttackSimulator::new();
         simulator.add_nodes(vec!["target".to_string()]);
-        
+
         let attack = AttackType::DoS {
             intensity: 100,
             duration: Duration::from_millis(100),
             targets: vec!["target".to_string()],
         };
-        
+
         let _attack_id = simulator.launch_attack(attack).await?;
-        
+
         // Wait for attack to complete
         tokio::time::sleep(Duration::from_millis(150)).await;
-        
+
         assert_eq!(simulator.attack_metrics.total_attacks, 1);
         assert!(simulator.get_active_attacks().is_empty());
-        
+
         Ok(())
     }
 
@@ -666,22 +720,22 @@ mod tests {
     async fn test_sybil_attack() -> Result<()> {
         let mut simulator = AttackSimulator::new();
         simulator.add_nodes(vec!["honest1".to_string(), "honest2".to_string()]);
-        
+
         let attack = AttackType::Sybil {
             fake_identity_count: 5,
             behavior: SybilBehavior::Flooding,
             duration: Duration::from_millis(100),
         };
-        
+
         let _attack_id = simulator.launch_attack(attack).await?;
-        
+
         // Wait for attack to complete
         tokio::time::sleep(Duration::from_millis(150)).await;
-        
+
         assert_eq!(simulator.attack_metrics.total_attacks, 1);
         // Fake identities should be cleaned up
         assert_eq!(simulator.network_state.nodes.len(), 2);
-        
+
         Ok(())
     }
 
@@ -689,7 +743,7 @@ mod tests {
     async fn test_attack_metrics() {
         let simulator = AttackSimulator::new();
         let metrics = simulator.get_metrics();
-        
+
         assert_eq!(metrics.total_attacks, 0);
         assert_eq!(metrics.successful_attacks, 0);
         assert_eq!(metrics.failed_attacks, 0);

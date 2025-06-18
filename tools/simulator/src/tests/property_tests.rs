@@ -1,7 +1,7 @@
 use super::super::{
-    network::{NetworkSimulator, SimulatorConfig},
-    scenarios::{ScenarioConfig, NetworkConditions},
     metrics::NetworkMetrics,
+    network::{NetworkSimulator, SimulatorConfig},
+    scenarios::{NetworkConditions, ScenarioConfig},
 };
 use proptest::prelude::*;
 use qudag_protocol::config::Config as ProtocolConfig;
@@ -60,7 +60,7 @@ proptest! {
     fn test_simulator_creation_with_any_valid_config(config in arb_simulator_config()) {
         tokio_test::block_on(async move {
             let (simulator, _events_rx) = NetworkSimulator::new(config.clone());
-            
+
             // Verify simulator is created with correct configuration
             prop_assert_eq!(simulator.config.node_count, config.node_count);
             prop_assert_eq!(simulator.config.latency_ms, config.latency_ms);
@@ -69,7 +69,7 @@ proptest! {
             prop_assert_eq!(simulator.nodes.len(), 0);
         });
     }
-    
+
     #[test]
     fn test_node_addition_maintains_invariants(
         config in arb_simulator_config(),
@@ -77,23 +77,23 @@ proptest! {
     ) {
         tokio_test::block_on(async move {
             let (mut simulator, mut events_rx) = NetworkSimulator::new(config);
-            
+
             for i in 0..node_count {
                 let result = simulator.add_node(ProtocolConfig::default()).await;
                 prop_assert!(result.is_ok());
                 prop_assert_eq!(simulator.nodes.len(), i + 1);
                 prop_assert_eq!(simulator.nodes[i].id, format!("node-{}", i));
-                
+
                 // Verify event is sent
                 let event_result = tokio::time::timeout(
-                    Duration::from_millis(100), 
+                    Duration::from_millis(100),
                     events_rx.recv()
                 ).await;
                 prop_assert!(event_result.is_ok());
             }
         });
     }
-    
+
     #[test]
     fn test_partition_probability_affects_partition_size(
         node_count in 1usize..50,
@@ -106,22 +106,22 @@ proptest! {
                 drop_rate: 0.0,
                 partition_prob,
             };
-            
+
             let (mut simulator, mut events_rx) = NetworkSimulator::new(config);
-            
+
             // Add nodes
             for _ in 0..node_count {
                 simulator.add_node(ProtocolConfig::default()).await.unwrap();
             }
-            
+
             // Drain join events
             for _ in 0..node_count {
                 tokio::time::timeout(Duration::from_millis(100), events_rx.recv()).await.unwrap();
             }
-            
+
             // Create partition
             simulator.create_partition().await.unwrap();
-            
+
             // Verify partition event
             let event = tokio::time::timeout(Duration::from_millis(100), events_rx.recv()).await.unwrap().unwrap();
             if let super::super::network::SimulatorEvent::Partition { nodes } = event {
@@ -132,7 +132,7 @@ proptest! {
             }
         });
     }
-    
+
     #[test]
     fn test_metrics_serialization_roundtrip(
         avg_latency_ms in 0u64..10000,
@@ -164,10 +164,10 @@ proptest! {
                 pending_tx_count: pending_count,
             },
         };
-        
+
         let serialized = serde_json::to_string(&metrics).unwrap();
         let deserialized: NetworkMetrics = serde_json::from_str(&serialized).unwrap();
-        
+
         prop_assert_eq!(metrics.latency.avg_latency, deserialized.latency.avg_latency);
         prop_assert_eq!(metrics.latency.p95_latency, deserialized.latency.p95_latency);
         prop_assert_eq!(metrics.latency.p99_latency, deserialized.latency.p99_latency);
@@ -179,7 +179,7 @@ proptest! {
         prop_assert_eq!(metrics.consensus.finalized_tx_count, deserialized.consensus.finalized_tx_count);
         prop_assert_eq!(metrics.consensus.pending_tx_count, deserialized.consensus.pending_tx_count);
     }
-    
+
     #[test]
     fn test_scenario_execution_always_succeeds(config in arb_scenario_config()) {
         // Limit test duration to prevent timeouts
@@ -187,19 +187,19 @@ proptest! {
             duration: Duration::from_millis(std::cmp::min(config.duration.as_millis() as u64, 200)),
             ..config
         };
-        
+
         tokio_test::block_on(async move {
             let connectivity_result = super::super::scenarios::test_basic_connectivity(limited_config.clone()).await;
             prop_assert!(connectivity_result.is_ok());
-            
+
             let byzantine_result = super::super::scenarios::test_byzantine_tolerance(limited_config.clone()).await;
             prop_assert!(byzantine_result.is_ok());
-            
+
             let partition_result = super::super::scenarios::test_network_partition(limited_config).await;
             prop_assert!(partition_result.is_ok());
         });
     }
-    
+
     #[test]
     fn test_node_removal_maintains_consistency(
         initial_nodes in 1usize..20,
@@ -212,28 +212,28 @@ proptest! {
                 drop_rate: 0.0,
                 partition_prob: 0.0,
             };
-            
+
             let (mut simulator, mut events_rx) = NetworkSimulator::new(config);
-            
+
             // Add initial nodes
             for _ in 0..initial_nodes {
                 simulator.add_node(ProtocolConfig::default()).await.unwrap();
             }
-            
+
             // Drain join events
             for _ in 0..initial_nodes {
                 tokio::time::timeout(Duration::from_millis(100), events_rx.recv()).await.unwrap();
             }
-            
+
             let mut expected_count = initial_nodes;
-            
+
             // Remove nodes (some may not exist)
             for &node_idx in &nodes_to_remove {
                 if node_idx < expected_count {
                     let node_id = format!("node-{}", node_idx);
                     simulator.remove_node(&node_id).await.unwrap();
                     expected_count -= 1;
-                    
+
                     // Should receive NodeLeft event
                     let event = tokio::time::timeout(Duration::from_millis(100), events_rx.recv()).await.unwrap().unwrap();
                     if let super::super::network::SimulatorEvent::NodeLeft(id) = event {
@@ -246,17 +246,17 @@ proptest! {
                     simulator.remove_node(&format!("node-{}", node_idx)).await.unwrap();
                 }
             }
-            
+
             // Verify final state is consistent
             prop_assert!(simulator.nodes.len() <= initial_nodes);
-            
+
             // All remaining nodes should have valid IDs
             for node in &simulator.nodes {
                 prop_assert!(node.id.starts_with("node-"));
             }
         });
     }
-    
+
     #[test]
     fn test_simulator_config_bounds(
         node_count in 0usize..1000,
@@ -271,10 +271,10 @@ proptest! {
             drop_rate: drop_rate.max(0.0).min(1.0), // Clamp to valid range
             partition_prob: partition_prob.max(0.0).min(1.0), // Clamp to valid range
         };
-        
+
         tokio_test::block_on(async move {
             let (simulator, _events_rx) = NetworkSimulator::new(config.clone());
-            
+
             // Should always create successfully with clamped values
             prop_assert!(simulator.config.drop_rate >= 0.0 && simulator.config.drop_rate <= 1.0);
             prop_assert!(simulator.config.partition_prob >= 0.0 && simulator.config.partition_prob <= 1.0);

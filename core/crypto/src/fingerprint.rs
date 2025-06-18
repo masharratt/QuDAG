@@ -19,13 +19,13 @@ pub enum FingerprintError {
 }
 
 /// A quantum-resistant fingerprint using ML-DSA signatures
-/// 
+///
 /// # Examples
-/// 
+///
 /// ```rust
 /// use qudag_crypto::fingerprint::Fingerprint;
 /// use rand::thread_rng;
-/// 
+///
 /// fn example() -> Result<(), Box<dyn std::error::Error>> {
 ///     let mut rng = thread_rng();
 ///     let data = b"some data to fingerprint";
@@ -61,16 +61,16 @@ impl Fingerprint {
         // Generate ML-DSA keypair for signing
         let keypair = MlDsaKeyPair::generate(rng)?;
         let public_key = MlDsaPublicKey::from_bytes(keypair.public_key())?;
-        
+
         // Hash the input data to create fingerprint
         let mut hasher = Hasher::new();
         hasher.update(data);
         let mut fingerprint_data = vec![0u8; 64];
         hasher.finalize_xof().fill(&mut fingerprint_data);
-        
+
         // Sign the fingerprint data
         let signature = keypair.sign(&fingerprint_data, rng)?;
-        
+
         Ok((
             Self {
                 data: fingerprint_data,
@@ -79,18 +79,18 @@ impl Fingerprint {
             public_key,
         ))
     }
-    
+
     /// Verify a fingerprint using the provided public key
     pub fn verify(&self, public_key: &MlDsaPublicKey) -> Result<(), FingerprintError> {
         public_key.verify(&self.data, &self.signature)?;
         Ok(())
     }
-    
+
     /// Get a reference to the fingerprint data
     pub fn data(&self) -> &[u8] {
         &self.data
     }
-    
+
     /// Get a reference to the signature
     pub fn signature(&self) -> &[u8] {
         &self.signature

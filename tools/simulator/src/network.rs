@@ -1,6 +1,6 @@
 use anyhow::Result;
 use qudag_protocol::config::Config as ProtocolConfig;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use tokio::sync::mpsc;
 use tracing::info;
 
@@ -48,13 +48,13 @@ impl NetworkSimulator {
     /// Create a new network simulator
     pub fn new(config: SimulatorConfig) -> (Self, mpsc::Receiver<SimulatorEvent>) {
         let (events_tx, events_rx) = mpsc::channel(1000);
-        
+
         let simulator = Self {
             config,
             nodes: Vec::new(),
             events_tx,
         };
-        
+
         (simulator, events_rx)
     }
 
@@ -62,13 +62,13 @@ impl NetworkSimulator {
     pub async fn add_node(&mut self, config: ProtocolConfig) -> Result<()> {
         let id = format!("node-{}", self.nodes.len());
         let (msg_tx, _msg_rx) = mpsc::channel(1000);
-        
+
         self.nodes.push(NodeHandle {
             id: id.clone(),
             config,
             msg_tx,
         });
-        
+
         self.events_tx.send(SimulatorEvent::NodeJoined(id)).await?;
         Ok(())
     }
@@ -77,7 +77,9 @@ impl NetworkSimulator {
     pub async fn remove_node(&mut self, id: &str) -> Result<()> {
         if let Some(pos) = self.nodes.iter().position(|n| n.id == id) {
             self.nodes.remove(pos);
-            self.events_tx.send(SimulatorEvent::NodeLeft(id.to_string())).await?;
+            self.events_tx
+                .send(SimulatorEvent::NodeLeft(id.to_string()))
+                .await?;
         }
         Ok(())
     }
@@ -89,11 +91,13 @@ impl NetworkSimulator {
             .iter()
             .map(|n| n.id.clone())
             .collect();
-            
-        self.events_tx.send(SimulatorEvent::Partition {
-            nodes: partitioned.clone()
-        }).await?;
-        
+
+        self.events_tx
+            .send(SimulatorEvent::Partition {
+                nodes: partitioned.clone(),
+            })
+            .await?;
+
         info!("Created network partition with {} nodes", partition_size);
         Ok(())
     }

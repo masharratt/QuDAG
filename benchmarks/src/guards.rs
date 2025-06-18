@@ -3,9 +3,9 @@
 //! This module provides safety guards and protective mechanisms for benchmarks,
 //! including resource limits, timeouts, and error recovery.
 
-use std::time::{Duration, Instant};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 use thiserror::Error;
 
 /// Benchmark guard errors
@@ -14,15 +14,15 @@ pub enum GuardError {
     /// Timeout exceeded
     #[error("Benchmark timeout exceeded: {duration:?}")]
     TimeoutExceeded { duration: Duration },
-    
+
     /// Memory limit exceeded
     #[error("Memory limit exceeded: {current} bytes > {limit} bytes")]
     MemoryLimitExceeded { current: u64, limit: u64 },
-    
+
     /// CPU limit exceeded
     #[error("CPU usage limit exceeded: {current}% > {limit}%")]
     CpuLimitExceeded { current: f64, limit: f64 },
-    
+
     /// Operation count limit exceeded
     #[error("Operation count limit exceeded: {current} > {limit}")]
     OperationLimitExceeded { current: u64, limit: u64 },
@@ -56,9 +56,9 @@ impl Default for ResourceLimits {
     fn default() -> Self {
         Self {
             max_duration: Some(Duration::from_secs(300)), // 5 minutes default
-            max_memory: Some(1024 * 1024 * 1024), // 1GB default
-            max_cpu: Some(95.0), // 95% CPU default
-            max_operations: Some(1_000_000), // 1M operations default
+            max_memory: Some(1024 * 1024 * 1024),         // 1GB default
+            max_cpu: Some(95.0),                          // 95% CPU default
+            max_operations: Some(1_000_000),              // 1M operations default
         }
     }
 }
@@ -79,7 +79,7 @@ impl ResourceLimits {
         Self {
             max_duration: Some(Duration::from_secs(30)),
             max_memory: Some(100 * 1024 * 1024), // 100MB
-            max_cpu: Some(80.0), // 80%
+            max_cpu: Some(80.0),                 // 80%
             max_operations: Some(10_000),
         }
     }
@@ -109,8 +109,8 @@ impl BenchmarkGuard {
     /// Check if the benchmark should continue running
     pub fn should_continue(&self) -> Result<(), GuardError> {
         if self.aborted.load(Ordering::Relaxed) {
-            return Err(GuardError::TimeoutExceeded { 
-                duration: self.start_time.elapsed() 
+            return Err(GuardError::TimeoutExceeded {
+                duration: self.start_time.elapsed(),
             });
         }
 
@@ -127,9 +127,9 @@ impl BenchmarkGuard {
         if let Some(max_ops) = self.limits.max_operations {
             let current_ops = self.operation_count.load(Ordering::Relaxed);
             if current_ops > max_ops {
-                return Err(GuardError::OperationLimitExceeded { 
-                    current: current_ops, 
-                    limit: max_ops 
+                return Err(GuardError::OperationLimitExceeded {
+                    current: current_ops,
+                    limit: max_ops,
                 });
             }
         }
@@ -147,9 +147,9 @@ impl BenchmarkGuard {
     pub fn check_memory(&self, current_memory: u64) -> Result<(), GuardError> {
         if let Some(max_memory) = self.limits.max_memory {
             if current_memory > max_memory {
-                return Err(GuardError::MemoryLimitExceeded { 
-                    current: current_memory, 
-                    limit: max_memory 
+                return Err(GuardError::MemoryLimitExceeded {
+                    current: current_memory,
+                    limit: max_memory,
                 });
             }
         }
@@ -160,9 +160,9 @@ impl BenchmarkGuard {
     pub fn check_cpu(&self, current_cpu: f64) -> Result<(), GuardError> {
         if let Some(max_cpu) = self.limits.max_cpu {
             if current_cpu > max_cpu {
-                return Err(GuardError::CpuLimitExceeded { 
-                    current: current_cpu, 
-                    limit: max_cpu 
+                return Err(GuardError::CpuLimitExceeded {
+                    current: current_cpu,
+                    limit: max_cpu,
                 });
             }
         }
@@ -220,7 +220,9 @@ impl TimeoutGuard {
     pub fn check(&self) -> Result<(), GuardError> {
         let now = Instant::now();
         if now > self.deadline {
-            let elapsed = now.duration_since(self.deadline - (self.deadline - (self.deadline - Duration::from_secs(0))));
+            let elapsed = now.duration_since(
+                self.deadline - (self.deadline - (self.deadline - Duration::from_secs(0))),
+            );
             Err(GuardError::TimeoutExceeded { duration: elapsed })
         } else {
             Ok(())

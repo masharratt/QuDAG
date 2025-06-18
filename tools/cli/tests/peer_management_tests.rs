@@ -3,12 +3,12 @@
 
 use assert_cmd::Command;
 use predicates::prelude::*;
-use std::sync::{Arc, Mutex};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 use tempfile::TempDir;
 use tokio::sync::RwLock;
-use serde::{Serialize, Deserialize};
 
 /// Mock peer information for testing
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -49,22 +49,25 @@ impl MockPeerManager {
 
     async fn add_peer(&self, address: &str) -> Result<String, String> {
         let mut peers = self.peers.write().await;
-        
+
         // Check if already connected
-        if peers.values().any(|p| p.address == address && p.status == PeerStatus::Connected) {
+        if peers
+            .values()
+            .any(|p| p.address == address && p.status == PeerStatus::Connected)
+        {
             return Err("Peer already connected".to_string());
         }
-        
+
         // Check max peers limit
         if peers.len() >= self.max_peers {
             return Err("Maximum peer limit reached".to_string());
         }
-        
+
         // Validate address format
         if !Self::validate_address(address) {
             return Err("Invalid peer address format".to_string());
         }
-        
+
         let peer_id = format!("peer_{}", uuid::Uuid::new_v4().simple());
         let peer_info = MockPeerInfo {
             peer_id: peer_id.clone(),
@@ -82,14 +85,14 @@ impl MockPeerManager {
             bytes_sent: 0,
             bytes_received: 0,
         };
-        
+
         peers.insert(peer_id.clone(), peer_info);
         Ok(peer_id)
     }
 
     async fn remove_peer(&self, peer_id: &str) -> Result<(), String> {
         let mut peers = self.peers.write().await;
-        
+
         match peers.get_mut(peer_id) {
             Some(peer) => {
                 // Graceful disconnection
@@ -118,12 +121,12 @@ impl MockPeerManager {
         if let Ok(_) = address.parse::<std::net::SocketAddrV4>() {
             return true;
         }
-        
+
         // IPv6:port
         if let Ok(_) = address.parse::<std::net::SocketAddrV6>() {
             return true;
         }
-        
+
         // Domain:port
         if address.contains(':') {
             let parts: Vec<&str> = address.split(':').collect();
@@ -135,17 +138,17 @@ impl MockPeerManager {
                 }
             }
         }
-        
+
         // .onion address (Tor)
         if address.ends_with(".onion") && address.contains(':') {
             return true;
         }
-        
+
         // .dark address (QuDAG dark addressing)
         if address.ends_with(".dark") {
             return true;
         }
-        
+
         false
     }
 }
@@ -170,17 +173,17 @@ mod tests {
         // This test assumes we have a mock RPC server running
         // In RED phase, this should fail
         let mut cmd = Command::cargo_bin("qudag").unwrap();
-        
+
         // First add some peers (this will fail in RED phase)
         cmd.args(&["peer", "add", "192.168.1.100:8000"])
             .assert()
             .success();
-            
+
         let mut cmd = Command::cargo_bin("qudag").unwrap();
         cmd.args(&["peer", "add", "example.com:8001"])
             .assert()
             .success();
-        
+
         // Now list peers
         let mut cmd = Command::cargo_bin("qudag").unwrap();
         cmd.args(&["peer", "list"])
@@ -233,7 +236,9 @@ mod tests {
         cmd.args(&["peer", "add", "node1.qudag.network:8000"])
             .assert()
             .success()
-            .stdout(predicate::str::contains("Adding peer: node1.qudag.network:8000"))
+            .stdout(predicate::str::contains(
+                "Adding peer: node1.qudag.network:8000",
+            ))
             .stdout(predicate::str::contains("Successfully connected to peer"));
     }
 
@@ -244,8 +249,12 @@ mod tests {
         cmd.args(&["peer", "add", "3g2upl4pq6kufc4m.onion:8000"])
             .assert()
             .success()
-            .stdout(predicate::str::contains("Adding peer: 3g2upl4pq6kufc4m.onion:8000"))
-            .stdout(predicate::str::contains("Successfully connected to peer via Tor"));
+            .stdout(predicate::str::contains(
+                "Adding peer: 3g2upl4pq6kufc4m.onion:8000",
+            ))
+            .stdout(predicate::str::contains(
+                "Successfully connected to peer via Tor",
+            ));
     }
 
     /// Test 'qudag peer add' with .dark address (QuDAG dark addressing)
@@ -267,7 +276,9 @@ mod tests {
         cmd.args(&["peer", "add", "invalid-address"])
             .assert()
             .failure()
-            .stderr(predicate::str::contains("Error: Invalid peer address format"));
+            .stderr(predicate::str::contains(
+                "Error: Invalid peer address format",
+            ));
     }
 
     /// Test 'qudag peer add' with missing port
@@ -297,7 +308,7 @@ mod tests {
         cmd.args(&["peer", "add", "192.168.1.100:8000"])
             .assert()
             .success();
-            
+
         // Try to add the same peer again
         let mut cmd = Command::cargo_bin("qudag").unwrap();
         cmd.args(&["peer", "add", "192.168.1.100:8000"])
@@ -316,13 +327,15 @@ mod tests {
                 .assert()
                 .success();
         }
-        
+
         // Try to add one more
         let mut cmd = Command::cargo_bin("qudag").unwrap();
         cmd.args(&["peer", "add", "192.168.1.51:8000"])
             .assert()
             .failure()
-            .stderr(predicate::str::contains("Error: Maximum peer limit reached"));
+            .stderr(predicate::str::contains(
+                "Error: Maximum peer limit reached",
+            ));
     }
 
     /// Test 'qudag peer remove' with valid peer
@@ -330,18 +343,20 @@ mod tests {
     fn test_peer_remove_valid() {
         // First add a peer
         let mut cmd = Command::cargo_bin("qudag").unwrap();
-        let output = cmd.args(&["peer", "add", "192.168.1.100:8000"])
+        let output = cmd
+            .args(&["peer", "add", "192.168.1.100:8000"])
             .output()
             .unwrap();
-        
+
         // Extract peer ID from output (assuming format: "Connected with peer ID: <id>")
         let stdout = String::from_utf8_lossy(&output.stdout);
-        let peer_id = stdout.lines()
+        let peer_id = stdout
+            .lines()
             .find(|line| line.contains("peer ID:"))
             .and_then(|line| line.split("peer ID:").nth(1))
             .map(|s| s.trim())
             .unwrap_or("peer_12345");
-        
+
         // Now remove the peer
         let mut cmd = Command::cargo_bin("qudag").unwrap();
         cmd.args(&["peer", "remove", peer_id])
@@ -359,7 +374,9 @@ mod tests {
         cmd.args(&["peer", "remove", "192.168.1.100:8000"])
             .assert()
             .success()
-            .stdout(predicate::str::contains("Removing peer: 192.168.1.100:8000"))
+            .stdout(predicate::str::contains(
+                "Removing peer: 192.168.1.100:8000",
+            ))
             .stdout(predicate::str::contains("Peer removed successfully"));
     }
 
@@ -381,7 +398,7 @@ mod tests {
         cmd.args(&["peer", "add", "192.168.1.100:8000"])
             .assert()
             .success();
-        
+
         // Remove with --force flag
         let mut cmd = Command::cargo_bin("qudag").unwrap();
         cmd.args(&["peer", "remove", "192.168.1.100:8000", "--force"])
@@ -395,9 +412,9 @@ mod tests {
     #[tokio::test]
     async fn test_concurrent_peer_operations() {
         use tokio::task::JoinSet;
-        
+
         let mut tasks = JoinSet::new();
-        
+
         // Spawn multiple add operations concurrently
         for i in 0..10 {
             tasks.spawn(async move {
@@ -407,22 +424,20 @@ mod tests {
                     .success()
             });
         }
-        
+
         // Spawn list operations concurrently
         for _ in 0..5 {
             tasks.spawn(async {
                 let mut cmd = Command::cargo_bin("qudag").unwrap();
-                cmd.args(&["peer", "list"])
-                    .assert()
-                    .success()
+                cmd.args(&["peer", "list"]).assert().success()
             });
         }
-        
+
         // Wait for all operations to complete
         while let Some(result) = tasks.join_next().await {
             assert!(result.is_ok());
         }
-        
+
         // Verify final state
         let mut cmd = Command::cargo_bin("qudag").unwrap();
         cmd.args(&["peer", "list"])
@@ -435,19 +450,15 @@ mod tests {
     #[test]
     fn test_peer_reconnection() {
         let address = "192.168.1.100:8000";
-        
+
         // Add peer
         let mut cmd = Command::cargo_bin("qudag").unwrap();
-        cmd.args(&["peer", "add", address])
-            .assert()
-            .success();
-        
+        cmd.args(&["peer", "add", address]).assert().success();
+
         // Remove peer
         let mut cmd = Command::cargo_bin("qudag").unwrap();
-        cmd.args(&["peer", "remove", address])
-            .assert()
-            .success();
-        
+        cmd.args(&["peer", "remove", address]).assert().success();
+
         // Add peer again
         let mut cmd = Command::cargo_bin("qudag").unwrap();
         cmd.args(&["peer", "add", address])
@@ -460,14 +471,14 @@ mod tests {
     #[test]
     fn test_peer_ban() {
         let address = "192.168.1.100:8000";
-        
+
         // Ban a peer
         let mut cmd = Command::cargo_bin("qudag").unwrap();
         cmd.args(&["peer", "ban", address])
             .assert()
             .success()
             .stdout(predicate::str::contains("Peer banned:"));
-        
+
         // Try to add banned peer
         let mut cmd = Command::cargo_bin("qudag").unwrap();
         cmd.args(&["peer", "add", address])
@@ -484,7 +495,7 @@ mod tests {
         cmd.args(&["peer", "add", "192.168.1.100:8000"])
             .assert()
             .success();
-        
+
         // Get peer statistics
         let mut cmd = Command::cargo_bin("qudag").unwrap();
         cmd.args(&["peer", "stats", "192.168.1.100:8000"])
@@ -506,7 +517,7 @@ mod tests {
             .assert()
             .success()
             .stdout(predicate::str::contains("Connected Peers:"));
-        
+
         let mut cmd = Command::cargo_bin("qudag").unwrap();
         cmd.args(&["peer", "list", "--status", "disconnected"])
             .assert()
@@ -522,11 +533,13 @@ mod tests {
         cmd.args(&["peer", "add", "192.168.1.100:8000", "--timeout", "5"])
             .assert()
             .success()
-            .stdout(predicate::str::contains("Connection timeout set to 5 seconds"));
-        
+            .stdout(predicate::str::contains(
+                "Connection timeout set to 5 seconds",
+            ));
+
         // Simulate timeout scenario
         tokio::time::sleep(Duration::from_secs(6)).await;
-        
+
         // Check peer status
         let mut cmd = Command::cargo_bin("qudag").unwrap();
         cmd.args(&["peer", "list"])
@@ -540,12 +553,15 @@ mod tests {
     fn test_peer_batch_add() {
         // Add multiple peers from file
         let peer_file = tempfile::NamedTempFile::new().unwrap();
-        std::fs::write(peer_file.path(), 
+        std::fs::write(
+            peer_file.path(),
             "192.168.1.100:8000\n\
              192.168.1.101:8000\n\
              example.com:8001\n\
-             mynode.dark\n").unwrap();
-        
+             mynode.dark\n",
+        )
+        .unwrap();
+
         let mut cmd = Command::cargo_bin("qudag").unwrap();
         cmd.args(&["peer", "add", "--file", peer_file.path().to_str().unwrap()])
             .assert()
@@ -559,13 +575,18 @@ mod tests {
     #[test]
     fn test_peer_export() {
         let export_file = tempfile::NamedTempFile::new().unwrap();
-        
+
         let mut cmd = Command::cargo_bin("qudag").unwrap();
-        cmd.args(&["peer", "export", "--output", export_file.path().to_str().unwrap()])
-            .assert()
-            .success()
-            .stdout(predicate::str::contains("Exported peer list to"));
-        
+        cmd.args(&[
+            "peer",
+            "export",
+            "--output",
+            export_file.path().to_str().unwrap(),
+        ])
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Exported peer list to"));
+
         // Verify file content
         let content = std::fs::read_to_string(export_file.path()).unwrap();
         assert!(content.contains("peers") || content.contains("[]"));
@@ -575,25 +596,25 @@ mod tests {
     #[tokio::test]
     async fn test_mock_peer_manager() {
         let manager = MockPeerManager::new();
-        
+
         // Test adding valid peer
         let peer_id = manager.add_peer("192.168.1.100:8000").await.unwrap();
         assert!(!peer_id.is_empty());
-        
+
         // Test listing peers
         let peers = manager.list_peers().await;
         assert_eq!(peers.len(), 1);
         assert_eq!(peers[0].address, "192.168.1.100:8000");
-        
+
         // Test duplicate peer
         let result = manager.add_peer("192.168.1.100:8000").await;
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), "Peer already connected");
-        
+
         // Test removing peer
         let result = manager.remove_peer(&peer_id).await;
         assert!(result.is_ok());
-        
+
         // Verify peer was removed
         let peers = manager.list_peers().await;
         assert_eq!(peers.len(), 0);
@@ -605,9 +626,11 @@ mod tests {
         assert!(MockPeerManager::validate_address("192.168.1.100:8000"));
         assert!(MockPeerManager::validate_address("[2001:db8::1]:8000"));
         assert!(MockPeerManager::validate_address("example.com:8000"));
-        assert!(MockPeerManager::validate_address("3g2upl4pq6kufc4m.onion:8000"));
+        assert!(MockPeerManager::validate_address(
+            "3g2upl4pq6kufc4m.onion:8000"
+        ));
         assert!(MockPeerManager::validate_address("mynode.dark"));
-        
+
         assert!(!MockPeerManager::validate_address("invalid"));
         assert!(!MockPeerManager::validate_address("192.168.1.100"));
         assert!(!MockPeerManager::validate_address(":8000"));
@@ -637,9 +660,7 @@ mod bench {
         c.bench_function("peer_list", |b| {
             b.iter(|| {
                 let mut cmd = Command::cargo_bin("qudag").unwrap();
-                cmd.args(&["peer", "list"])
-                    .output()
-                    .unwrap();
+                cmd.args(&["peer", "list"]).output().unwrap();
             });
         });
     }

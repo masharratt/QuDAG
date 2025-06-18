@@ -1,4 +1,4 @@
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::time::Duration;
 use thiserror::Error;
 
@@ -49,7 +49,7 @@ pub enum ProtocolEvent {
     StateChanged {
         /// Previous state
         old_state: ProtocolState,
-        /// New state 
+        /// New state
         new_state: ProtocolState,
     },
 

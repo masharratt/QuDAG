@@ -1,5 +1,5 @@
-use std::time::{Duration, Instant};
 use metrics::{counter, gauge, histogram};
+use std::time::{Duration, Instant};
 
 pub struct BenchmarkMetrics {
     start_time: Instant,

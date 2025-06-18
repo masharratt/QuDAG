@@ -1,4 +1,4 @@
-use qudag_network::message::{Message, MessageType, MessageError};
+use qudag_network::message::{Message, MessageError, MessageType};
 
 #[test]
 fn test_message_creation() {
@@ -9,7 +9,7 @@ fn test_message_creation() {
         vec![7, 8, 9], // payload
         12345,         // timestamp
     );
-    
+
     assert!(matches!(msg.msg_type, MessageType::Data));
     assert_eq!(msg.sender, vec![1, 2, 3]);
     assert_eq!(msg.recipient, vec![4, 5, 6]);
@@ -28,7 +28,7 @@ fn test_message_validation() {
         12345,
     );
     assert!(msg.validate().is_ok());
-    
+
     // Empty sender
     let msg = Message::new(
         MessageType::Data,
@@ -41,7 +41,7 @@ fn test_message_validation() {
         msg.validate(),
         Err(MessageError::InvalidFormat(_))
     ));
-    
+
     // Empty recipient
     let msg = Message::new(
         MessageType::Data,
@@ -54,7 +54,7 @@ fn test_message_validation() {
         msg.validate(),
         Err(MessageError::InvalidFormat(_))
     ));
-    
+
     // Message too large
     let large_payload = vec![0; 2 * 1024 * 1024]; // 2MB
     let msg = Message::new(

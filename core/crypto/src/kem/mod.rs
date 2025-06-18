@@ -1,11 +1,11 @@
 //! ML-KEM (Kyber) implementation for post-quantum key encapsulation
 
-mod ml_kem;
-pub use ml_kem::*;
+// mod ml_kem;
+// pub use ml_kem::MlKem768Impl as MlKem768;
 
+use subtle::ConstantTimeEq;
 use thiserror::Error;
 use zeroize::{Zeroize, ZeroizeOnDrop};
-use subtle::ConstantTimeEq;
 
 /// Errors that can occur during KEM operations
 #[derive(Debug, Error)]
@@ -32,7 +32,7 @@ impl PublicKey {
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, KEMError> {
         Ok(Self(bytes.to_vec()))
     }
-    
+
     pub fn as_bytes(&self) -> &[u8] {
         &self.0
     }
@@ -60,7 +60,7 @@ impl SecretKey {
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, KEMError> {
         Ok(Self(bytes.to_vec()))
     }
-    
+
     pub fn as_bytes(&self) -> &[u8] {
         &self.0
     }
@@ -88,7 +88,7 @@ impl Ciphertext {
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, KEMError> {
         Ok(Self(bytes.to_vec()))
     }
-    
+
     pub fn as_bytes(&self) -> &[u8] {
         &self.0
     }
@@ -116,7 +116,7 @@ impl SharedSecret {
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, KEMError> {
         Ok(Self(bytes.to_vec()))
     }
-    
+
     pub fn as_bytes(&self) -> &[u8] {
         &self.0
     }
@@ -140,12 +140,15 @@ impl Eq for SharedSecret {}
 pub trait KeyEncapsulation {
     /// Generate a new key pair.
     fn keygen() -> Result<(PublicKey, SecretKey), KEMError>;
-    
+
     /// Encapsulate a shared secret using a public key.
     fn encapsulate(public_key: &PublicKey) -> Result<(Ciphertext, SharedSecret), KEMError>;
-    
+
     /// Decapsulate a shared secret using a secret key and ciphertext.
-    fn decapsulate(secret_key: &SecretKey, ciphertext: &Ciphertext) -> Result<SharedSecret, KEMError>;
+    fn decapsulate(
+        secret_key: &SecretKey,
+        ciphertext: &Ciphertext,
+    ) -> Result<SharedSecret, KEMError>;
 }
 
 /// ML-KEM key pair
@@ -153,6 +156,12 @@ pub trait KeyEncapsulation {
 pub struct KeyPair {
     pub public_key: Vec<u8>,
     pub secret_key: Vec<u8>,
+}
+
+impl Default for KeyPair {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl KeyPair {

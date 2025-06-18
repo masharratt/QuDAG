@@ -25,7 +25,7 @@ pub enum DagError {
     MissingParent(String),
 
     /// Child node missing for edge
-    #[error("Child node {0} missing for edge")] 
+    #[error("Child node {0} missing for edge")]
     MissingChild(String),
 
     /// Invalid node state transition

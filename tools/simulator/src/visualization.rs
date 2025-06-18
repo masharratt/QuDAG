@@ -1,11 +1,9 @@
 //! Visualization module for network topology and simulation metrics.
 
-use crate::{
-    metrics::{LatencyMetrics, ThroughputMetrics},
-};
+use crate::metrics::{LatencyMetrics, ThroughputMetrics};
 use anyhow::Result;
 use plotters::prelude::*;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::Path;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -163,10 +161,10 @@ impl NetworkVisualizer {
     /// Visualize network topology
     pub fn visualize_topology(&self, topology: &NetworkTopology) -> Result<String> {
         let output_path = format!("{}/network_topology.png", self.config.output_dir);
-        
+
         // Create output directory if it doesn't exist
         std::fs::create_dir_all(&self.config.output_dir)?;
-        
+
         let output_path_clone = output_path.clone();
         let root = BitMapBackend::new(&output_path_clone, (self.config.width, self.config.height))
             .into_drawing_area();
@@ -260,7 +258,10 @@ impl NetworkVisualizer {
         let time_series: Vec<_> = metrics_history
             .iter()
             .map(|data| {
-                let elapsed = data.timestamp.duration_since(start_time).unwrap_or_default();
+                let elapsed = data
+                    .timestamp
+                    .duration_since(start_time)
+                    .unwrap_or_default();
                 elapsed.as_secs_f64()
             })
             .collect();
@@ -289,15 +290,15 @@ impl NetworkVisualizer {
             let data_points: Vec<_> = metrics_history
                 .iter()
                 .zip(time_series.iter())
-                .filter_map(|(data, &time)| {
-                    data.values.get(metric_key).map(|&value| (time, value))
-                })
+                .filter_map(|(data, &time)| data.values.get(metric_key).map(|&value| (time, value)))
                 .collect();
 
             chart
                 .draw_series(LineSeries::new(data_points, color.stroke_width(2)))?
                 .label(metric_key)
-                .legend(move |(x, y)| Rectangle::new([(x - 5, y - 5), (x + 5, y + 5)], color.filled()));
+                .legend(move |(x, y)| {
+                    Rectangle::new([(x - 5, y - 5), (x + 5, y + 5)], color.filled())
+                });
         }
 
         chart.configure_series_labels().draw()?;
@@ -306,7 +307,10 @@ impl NetworkVisualizer {
     }
 
     /// Visualize latency distribution
-    pub fn visualize_latency_distribution(&self, latency_metrics: &LatencyMetrics) -> Result<String> {
+    pub fn visualize_latency_distribution(
+        &self,
+        latency_metrics: &LatencyMetrics,
+    ) -> Result<String> {
         let output_path = format!("{}/latency_distribution.png", self.config.output_dir);
         std::fs::create_dir_all(&self.config.output_dir)?;
 
@@ -317,8 +321,14 @@ impl NetworkVisualizer {
 
         let latencies = vec![
             ("Average", latency_metrics.avg_latency.as_millis() as f64),
-            ("95th Percentile", latency_metrics.p95_latency.as_millis() as f64),
-            ("99th Percentile", latency_metrics.p99_latency.as_millis() as f64),
+            (
+                "95th Percentile",
+                latency_metrics.p95_latency.as_millis() as f64,
+            ),
+            (
+                "99th Percentile",
+                latency_metrics.p99_latency.as_millis() as f64,
+            ),
             ("Maximum", latency_metrics.max_latency.as_millis() as f64),
         ];
 
@@ -337,14 +347,12 @@ impl NetworkVisualizer {
             .y_desc("Latency (ms)")
             .draw()?;
 
-        chart.draw_series(
-            latencies
-                .iter()
-                .enumerate()
-                .map(|(i, (_name, value))| {
-                    Rectangle::new([(i as f64 + 0.1, 0.0), (i as f64 + 0.9, *value)], BLUE.filled())
-                })
-        )?;
+        chart.draw_series(latencies.iter().enumerate().map(|(i, (_name, value))| {
+            Rectangle::new(
+                [(i as f64 + 0.1, 0.0), (i as f64 + 0.9, *value)],
+                BLUE.filled(),
+            )
+        }))?;
 
         // Add value labels on bars
         for (i, (name, value)) in latencies.iter().enumerate() {
@@ -353,7 +361,7 @@ impl NetworkVisualizer {
                 (i as f64 + 0.5, *value + max_latency * 0.02),
                 ("sans-serif", 12),
             )))?;
-            
+
             chart.draw_series(std::iter::once(Text::new(
                 name.to_string(),
                 (i as f64 + 0.5, -max_latency * 0.05),
@@ -366,7 +374,10 @@ impl NetworkVisualizer {
     }
 
     /// Visualize throughput over time
-    pub fn visualize_throughput(&self, throughput_history: &[(SystemTime, ThroughputMetrics)]) -> Result<String> {
+    pub fn visualize_throughput(
+        &self,
+        throughput_history: &[(SystemTime, ThroughputMetrics)],
+    ) -> Result<String> {
         if throughput_history.is_empty() {
             return Err(anyhow::anyhow!("No throughput data provided"));
         }
@@ -457,9 +468,13 @@ impl NetworkVisualizer {
 
         // Draw attack bars
         for (i, attack) in attacks.iter().enumerate() {
-            let attack_start = attack.start_time.duration_since(start_time).unwrap_or_default().as_secs_f64();
+            let attack_start = attack
+                .start_time
+                .duration_since(start_time)
+                .unwrap_or_default()
+                .as_secs_f64();
             let attack_end = attack_start + attack.duration.as_secs_f64();
-            
+
             let color = match attack.severity {
                 s if s > 0.8 => &RED,
                 s if s > 0.5 => &YELLOW,
@@ -474,7 +489,10 @@ impl NetworkVisualizer {
             // Add attack type label
             chart.draw_series(std::iter::once(Text::new(
                 attack.attack_type.clone(),
-                (attack_start + (attack_end - attack_start) / 2.0, i as f64 + 0.5),
+                (
+                    attack_start + (attack_end - attack_start) / 2.0,
+                    i as f64 + 0.5,
+                ),
                 ("sans-serif", 10),
             )))?;
         }
@@ -484,7 +502,8 @@ impl NetworkVisualizer {
     }
 
     /// Generate comprehensive dashboard
-    pub fn generate_dashboard(&self, 
+    pub fn generate_dashboard(
+        &self,
         topology: &NetworkTopology,
         metrics_history: &[TimeSeriesData],
         latency_metrics: &LatencyMetrics,
@@ -531,7 +550,8 @@ impl NetworkVisualizer {
 
     /// Generate HTML dashboard
     fn generate_html_dashboard(&self, image_files: &[String]) -> Result<String> {
-        let mut html = format!(r#"
+        let mut html = format!(
+            r#"
 <!DOCTYPE html>
 <html>
 <head>
@@ -550,27 +570,36 @@ impl NetworkVisualizer {
         <h1>QuDAG Network Simulation Dashboard</h1>
         <p>Generated on: {}</p>
     </div>
-"#, chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC"));
+"#,
+            chrono::Utc::now().format("%Y-%m-%d %H:%M:%S UTC")
+        );
 
         for image_file in image_files {
             if let Some(filename) = Path::new(image_file).file_name() {
                 if let Some(name) = filename.to_str() {
                     if name.ends_with(".png") {
-                        html.push_str(&format!(r#"
+                        html.push_str(&format!(
+                            r#"
     <div class="visualization">
         <h2>{}</h2>
         <img src="{}" alt="{}">
     </div>
-"#, name.replace("_", " ").replace(".png", ""), name, name));
+"#,
+                            name.replace("_", " ").replace(".png", ""),
+                            name,
+                            name
+                        ));
                     }
                 }
             }
         }
 
-        html.push_str(r#"
+        html.push_str(
+            r#"
 </body>
 </html>
-"#);
+"#,
+        );
 
         Ok(html)
     }
@@ -604,21 +633,19 @@ mod tests {
     #[test]
     fn test_network_topology_creation() {
         let topology = NetworkTopology {
-            nodes: vec![
-                NetworkNode {
-                    id: "node1".to_string(),
-                    position: (0.0, 0.0),
-                    node_type: NodeType::Honest,
-                    status: NodeStatus::Active,
-                    metrics: NodeMetrics {
-                        messages_sent: 100,
-                        messages_received: 95,
-                        cpu_usage: 0.5,
-                        memory_usage: 0.3,
-                        bandwidth_usage: 0.7,
-                    },
-                }
-            ],
+            nodes: vec![NetworkNode {
+                id: "node1".to_string(),
+                position: (0.0, 0.0),
+                node_type: NodeType::Honest,
+                status: NodeStatus::Active,
+                metrics: NodeMetrics {
+                    messages_sent: 100,
+                    messages_received: 95,
+                    cpu_usage: 0.5,
+                    memory_usage: 0.3,
+                    bandwidth_usage: 0.7,
+                },
+            }],
             connections: vec![],
             attacks: vec![],
         };

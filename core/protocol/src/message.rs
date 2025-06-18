@@ -1,10 +1,12 @@
 //! Protocol message implementation.
 
+use qudag_crypto::{
+    Ciphertext, MlDsa, MlDsaKeyPair, MlDsaPublicKey, MlKem768, PublicKey, SecretKey,
+};
+use qudag_dag::vertex::VertexId;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use thiserror::Error;
-use qudag_crypto::{MlDsa, MlDsaKeyPair, MlDsaPublicKey, MlKem768, PublicKey, SecretKey, Ciphertext};
-use qudag_dag::vertex::VertexId;
 use uuid::Uuid;
 
 /// Errors that can occur during message operations.
@@ -13,51 +15,51 @@ pub enum MessageError {
     /// Invalid message format
     #[error("Invalid message format")]
     InvalidFormat,
-    
+
     /// Message too large
     #[error("Message too large: {0} bytes")]
     MessageTooLarge(usize),
-    
+
     /// Invalid signature
     #[error("Invalid signature")]
     InvalidSignature,
-    
+
     /// Missing signature when required
     #[error("Missing signature")]
     MissingSignature,
-    
+
     /// Signing failed
     #[error("Message signing failed")]
     SigningFailed,
-    
+
     /// Verification failed
     #[error("Signature verification failed")]
     VerificationFailed,
-    
+
     /// Encryption failed
     #[error("Encryption failed")]
     EncryptionFailed,
-    
+
     /// Decryption failed
     #[error("Decryption failed")]
     DecryptionFailed,
-    
+
     /// Serialization failed
     #[error("Message serialization failed")]
     SerializationFailed,
-    
+
     /// Deserialization failed
     #[error("Message deserialization failed")]
     DeserializationFailed,
-    
+
     /// Message expired
     #[error("Message has expired")]
     MessageExpired,
-    
+
     /// Invalid timestamp
     #[error("Invalid message timestamp")]
     InvalidTimestamp,
-    
+
     /// Incompatible protocol version
     #[error("Incompatible protocol version: {0:?}")]
     IncompatibleVersion(ProtocolVersion),
@@ -84,7 +86,7 @@ impl ProtocolVersion {
         patch: 0,
         features: vec![],
     };
-    
+
     /// Check if this version is compatible with another
     pub fn is_compatible(&self, other: &ProtocolVersion) -> bool {
         self.major == other.major && self.minor <= other.minor
@@ -96,22 +98,22 @@ impl ProtocolVersion {
 pub enum MessageType {
     /// Protocol handshake messages
     Handshake(HandshakeType),
-    
+
     /// DAG consensus messages
     Consensus(ConsensusMessageType),
-    
+
     /// Network routing messages
     Routing(RoutingMessageType),
-    
+
     /// Anonymous communication messages
     Anonymous(AnonymousMessageType),
-    
+
     /// Protocol control messages
     Control(ControlMessageType),
-    
+
     /// State synchronization messages
     Sync(SyncMessageType),
-    
+
     /// Generic data messages
     Data(Vec<u8>),
 }
@@ -195,31 +197,31 @@ pub enum SyncMessageType {
 pub struct Message {
     /// Unique message identifier
     pub id: Uuid,
-    
+
     /// Protocol version
     pub version: ProtocolVersion,
-    
+
     /// Message type
     pub msg_type: MessageType,
-    
+
     /// Message payload
     pub payload: Vec<u8>,
-    
+
     /// Message timestamp (Unix timestamp in milliseconds)
     pub timestamp: u64,
-    
+
     /// Message signature (ML-DSA)
     pub signature: Option<Vec<u8>>,
-    
+
     /// Message headers for metadata
     pub headers: HashMap<String, String>,
-    
+
     /// Sender's public key hash for verification
     pub sender_key_hash: Option<Vec<u8>>,
-    
+
     /// Message sequence number for ordering
     pub sequence: u64,
-    
+
     /// Time-to-live for message expiration
     pub ttl: Option<u64>,
 }
@@ -243,12 +245,12 @@ impl Message {
             ttl: None,
         }
     }
-    
+
     /// Create a new message with version
     pub fn new_with_version(
         version: ProtocolVersion,
         msg_type: MessageType,
-        payload: Vec<u8>
+        payload: Vec<u8>,
     ) -> Self {
         Self {
             id: Uuid::new_v4(),
@@ -266,25 +268,25 @@ impl Message {
             ttl: None,
         }
     }
-    
+
     /// Set message sequence number
     pub fn with_sequence(mut self, sequence: u64) -> Self {
         self.sequence = sequence;
         self
     }
-    
+
     /// Set message TTL
     pub fn with_ttl(mut self, ttl: u64) -> Self {
         self.ttl = Some(ttl);
         self
     }
-    
+
     /// Add header to message
     pub fn with_header(mut self, key: String, value: String) -> Self {
         self.headers.insert(key, value);
         self
     }
-    
+
     /// Check if message has expired
     pub fn is_expired(&self) -> bool {
         if let Some(ttl) = self.ttl {
@@ -297,38 +299,40 @@ impl Message {
             false
         }
     }
-    
+
     /// Get message for signing (excludes signature field)
     fn get_signable_data(&self) -> Result<Vec<u8>, MessageError> {
         let mut msg_copy = self.clone();
         msg_copy.signature = None;
-        
-        bincode::serialize(&msg_copy)
-            .map_err(|_| MessageError::SerializationFailed)
+
+        bincode::serialize(&msg_copy).map_err(|_| MessageError::SerializationFailed)
     }
 
     /// Sign message with ML-DSA
     pub fn sign(&mut self, keypair: &MlDsaKeyPair) -> Result<(), MessageError> {
         let signable_data = self.get_signable_data()?;
-        
+
         // Sign using the keypair directly
-        let signature = keypair.sign(&signable_data, &mut rand::thread_rng())
+        let signature = keypair
+            .sign(&signable_data, &mut rand::thread_rng())
             .map_err(|_| MessageError::SigningFailed)?;
-        
+
         self.signature = Some(signature);
-        
+
         // Set sender key hash for verification
         let public_key_bytes = keypair.public_key();
         self.sender_key_hash = Some(blake3::hash(public_key_bytes).as_bytes().to_vec());
-        
+
         Ok(())
     }
 
     /// Verify message signature with ML-DSA
     pub fn verify(&self, public_key: &MlDsaPublicKey) -> Result<bool, MessageError> {
-        let signature = self.signature.as_ref()
+        let signature = self
+            .signature
+            .as_ref()
             .ok_or(MessageError::MissingSignature)?;
-            
+
         // Verify sender key hash matches
         if let Some(sender_hash) = &self.sender_key_hash {
             let public_key_bytes = public_key.as_bytes();
@@ -337,50 +341,49 @@ impl Message {
                 return Ok(false);
             }
         }
-        
+
         let signable_data = self.get_signable_data()?;
-        
+
         // Verify using the public key directly
-        public_key.verify(&signable_data, signature)
+        public_key
+            .verify(&signable_data, signature)
             .map_err(|_| MessageError::VerificationFailed)
             .map(|_| true)
     }
-    
+
     /// Serialize message to bytes
     pub fn to_bytes(&self) -> Result<Vec<u8>, MessageError> {
-        bincode::serialize(self)
-            .map_err(|_| MessageError::SerializationFailed)
+        bincode::serialize(self).map_err(|_| MessageError::SerializationFailed)
     }
-    
+
     /// Deserialize message from bytes
     pub fn from_bytes(data: &[u8]) -> Result<Self, MessageError> {
-        bincode::deserialize(data)
-            .map_err(|_| MessageError::DeserializationFailed)
+        bincode::deserialize(data).map_err(|_| MessageError::DeserializationFailed)
     }
-    
+
     /// Validate message structure and content
     pub fn validate(&self) -> Result<(), MessageError> {
         // Check if message has expired
         if self.is_expired() {
             return Err(MessageError::MessageExpired);
         }
-        
+
         // Check payload size limits (max 1MB)
         if self.payload.len() > 1024 * 1024 {
             return Err(MessageError::MessageTooLarge(self.payload.len()));
         }
-        
+
         // Validate timestamp is reasonable (not too far in future)
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .unwrap()
             .as_millis() as u64;
-        
+
         // Allow up to 5 minutes in the future
         if self.timestamp > now + (5 * 60 * 1000) {
             return Err(MessageError::InvalidTimestamp);
         }
-        
+
         Ok(())
     }
 }
@@ -400,20 +403,23 @@ pub struct EncryptedMessage {
 
 impl EncryptedMessage {
     /// Encrypt a message using ML-KEM + AES-GCM
-    pub fn encrypt(message: &Message, recipient_public_key: &PublicKey) -> Result<Self, MessageError> {
+    pub fn encrypt(
+        message: &Message,
+        recipient_public_key: &PublicKey,
+    ) -> Result<Self, MessageError> {
         // Serialize the message
         let message_bytes = message.to_bytes()?;
-        
+
         // Use ML-KEM for key encapsulation
         let (ciphertext, shared_secret) = MlKem768::encapsulate(recipient_public_key)
             .map_err(|_| MessageError::EncryptionFailed)?;
-        
+
         // Use shared secret as AES key (first 32 bytes)
         let _aes_key = &shared_secret.as_bytes()[..32];
-        
+
         // Encrypt message with AES-GCM (simplified - in real implementation use proper AEAD)
         let encrypted_data = message_bytes; // TODO: Implement actual AES-GCM encryption
-        
+
         Ok(Self {
             ciphertext: encrypted_data,
             encapsulation: ciphertext.as_bytes().to_vec(),
@@ -421,7 +427,7 @@ impl EncryptedMessage {
             timestamp: message.timestamp,
         })
     }
-    
+
     /// Decrypt a message using ML-KEM + AES-GCM
     pub fn decrypt(&self, recipient_secret_key: &SecretKey) -> Result<Message, MessageError> {
         // Decapsulate the shared secret
@@ -429,13 +435,13 @@ impl EncryptedMessage {
             .map_err(|_| MessageError::DecryptionFailed)?;
         let shared_secret = MlKem768::decapsulate(recipient_secret_key, &encapsulation)
             .map_err(|_| MessageError::DecryptionFailed)?;
-        
+
         // Use shared secret as AES key
         let _aes_key = &shared_secret.as_bytes()[..32];
-        
+
         // Decrypt message with AES-GCM (simplified)
         let message_bytes = &self.ciphertext; // TODO: Implement actual AES-GCM decryption
-        
+
         Message::from_bytes(message_bytes)
     }
 }
@@ -460,17 +466,17 @@ impl MessageFactory {
                 .unwrap()
                 .as_millis() as u64,
         };
-        
-        let payload_bytes = bincode::serialize(&payload)
-            .map_err(|_| MessageError::SerializationFailed)?;
-        
+
+        let payload_bytes =
+            bincode::serialize(&payload).map_err(|_| MessageError::SerializationFailed)?;
+
         Ok(Message::new_with_version(
             protocol_version,
             MessageType::Handshake(HandshakeType::Init),
             payload_bytes,
         ))
     }
-    
+
     /// Create a consensus vertex proposal message
     pub fn create_vertex_proposal(
         vertex_id: VertexId,
@@ -486,16 +492,16 @@ impl MessageFactory {
                 .unwrap()
                 .as_millis() as u64,
         };
-        
-        let payload_bytes = bincode::serialize(&payload)
-            .map_err(|_| MessageError::SerializationFailed)?;
-        
+
+        let payload_bytes =
+            bincode::serialize(&payload).map_err(|_| MessageError::SerializationFailed)?;
+
         Ok(Message::new(
             MessageType::Consensus(ConsensusMessageType::VertexProposal),
             payload_bytes,
         ))
     }
-    
+
     /// Create a ping message
     pub fn create_ping() -> Result<Message, MessageError> {
         let payload = ControlPayload::Ping {
@@ -505,14 +511,15 @@ impl MessageFactory {
                 .as_millis() as u64,
             nonce: rand::random::<u64>(),
         };
-        
-        let payload_bytes = bincode::serialize(&payload)
-            .map_err(|_| MessageError::SerializationFailed)?;
-        
+
+        let payload_bytes =
+            bincode::serialize(&payload).map_err(|_| MessageError::SerializationFailed)?;
+
         Ok(Message::new(
             MessageType::Control(ControlMessageType::Ping),
             payload_bytes,
-        ).with_ttl(30000)) // 30 second TTL
+        )
+        .with_ttl(30000)) // 30 second TTL
     }
 }
 
@@ -553,19 +560,8 @@ pub enum ConsensusPayload {
 /// Control message payloads
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ControlPayload {
-    Ping {
-        timestamp: u64,
-        nonce: u64,
-    },
-    Pong {
-        timestamp: u64,
-        nonce: u64,
-    },
-    Disconnect {
-        reason: String,
-        timestamp: u64,
-    },
-    KeepAlive {
-        timestamp: u64,
-    },
+    Ping { timestamp: u64, nonce: u64 },
+    Pong { timestamp: u64, nonce: u64 },
+    Disconnect { reason: String, timestamp: u64 },
+    KeepAlive { timestamp: u64 },
 }

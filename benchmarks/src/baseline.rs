@@ -132,9 +132,8 @@ impl BaselineBuilder {
         }
 
         let mean = self.values.iter().sum::<f64>() / self.values.len() as f64;
-        let variance = self.values.iter()
-            .map(|v| (v - mean).powi(2))
-            .sum::<f64>() / self.values.len() as f64;
+        let variance =
+            self.values.iter().map(|v| (v - mean).powi(2)).sum::<f64>() / self.values.len() as f64;
         let std_dev = variance.sqrt();
 
         Ok(PerformanceBaseline {
@@ -156,9 +155,7 @@ pub struct BaselineCapture;
 impl BaselineCapture {
     /// Capture baseline from duration measurements
     pub fn from_durations(name: &str, durations: Vec<Duration>) -> PerformanceBaseline {
-        let values: Vec<f64> = durations.iter()
-            .map(|d| d.as_nanos() as f64)
-            .collect();
+        let values: Vec<f64> = durations.iter().map(|d| d.as_nanos() as f64).collect();
 
         BaselineBuilder::new(name, "latency")
             .add_values(values)
@@ -178,9 +175,7 @@ impl BaselineCapture {
 
     /// Capture baseline from memory usage measurements
     pub fn from_memory_usage(name: &str, memory_bytes: Vec<u64>) -> PerformanceBaseline {
-        let values: Vec<f64> = memory_bytes.iter()
-            .map(|&m| m as f64)
-            .collect();
+        let values: Vec<f64> = memory_bytes.iter().map(|&m| m as f64).collect();
 
         BaselineBuilder::new(name, "memory")
             .add_values(values)
@@ -205,8 +200,8 @@ impl DefaultTargets {
 
     /// Cryptographic operation latency targets
     pub const ML_KEM_KEYGEN_NS: f64 = 1_000_000.0; // 1ms
-    pub const ML_KEM_ENCAPS_NS: f64 = 500_000.0;   // 0.5ms
-    pub const ML_KEM_DECAPS_NS: f64 = 500_000.0;   // 0.5ms
+    pub const ML_KEM_ENCAPS_NS: f64 = 500_000.0; // 0.5ms
+    pub const ML_KEM_DECAPS_NS: f64 = 500_000.0; // 0.5ms
 
     /// Create default baseline collection with targets
     pub fn create_default_baselines() -> BaselineCollection {

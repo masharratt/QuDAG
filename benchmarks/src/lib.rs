@@ -7,20 +7,20 @@
 //! the performance characteristics of the QuDAG protocol, including throughput,
 //! latency, scalability, and resource usage metrics.
 
-pub mod system;
-pub mod scenarios;
-pub mod metrics;
-pub mod utils;
 pub mod baseline;
-pub mod regression;
-pub mod monitoring;
 pub mod guards;
+pub mod metrics;
+pub mod monitoring;
+pub mod regression;
+pub mod scenarios;
+pub mod system;
+pub mod utils;
 
-pub use utils::{BenchmarkMetrics, ResourceMonitor};
 pub use baseline::*;
-pub use regression::*;
-pub use monitoring::*;
 pub use guards::*;
+pub use monitoring::*;
+pub use regression::*;
+pub use utils::{BenchmarkMetrics, ResourceMonitor};
 
 /// Re-export commonly used types for benchmarking
 pub use criterion;

@@ -3,7 +3,7 @@
 //! This module provides tools for detecting performance regressions by comparing
 //! current measurements against established baselines.
 
-use crate::baseline::{PerformanceBaseline, BaselineCollection};
+use crate::baseline::{BaselineCollection, PerformanceBaseline};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::time::SystemTime;
@@ -128,9 +128,9 @@ impl RegressionDetector {
 
         let threshold = self.get_threshold(benchmark_name, baseline);
         let percentage_change = ((current_value - baseline.value) / baseline.value) * 100.0;
-        
+
         // For latency metrics, higher values are regressions
-        // For throughput metrics, lower values are regressions  
+        // For throughput metrics, lower values are regressions
         let is_regression = match metric {
             "latency" | "memory" => percentage_change > threshold,
             "throughput" => percentage_change < -threshold,
@@ -145,8 +145,12 @@ impl RegressionDetector {
 
         let details = format!(
             "Current: {:.2} {}, Baseline: {:.2} {}, Change: {:.2}%, Threshold: {:.2}%",
-            current_value, baseline.unit, baseline.value, baseline.unit, 
-            percentage_change, threshold
+            current_value,
+            baseline.unit,
+            baseline.value,
+            baseline.unit,
+            percentage_change,
+            threshold
         );
 
         Some(RegressionResult {
@@ -168,9 +172,7 @@ impl RegressionDetector {
     ) -> Vec<RegressionResult> {
         measurements
             .iter()
-            .filter_map(|(name, (value, metric))| {
-                self.analyze_measurement(name, *value, metric)
-            })
+            .filter_map(|(name, (value, metric))| self.analyze_measurement(name, *value, metric))
             .collect()
     }
 
@@ -183,7 +185,8 @@ impl RegressionDetector {
 
         // Use adaptive threshold based on standard deviation
         if self.config.use_adaptive_thresholds && baseline.std_dev > 0.0 {
-            let adaptive_threshold = (baseline.std_dev / baseline.value) * 100.0 * self.config.adaptive_multiplier;
+            let adaptive_threshold =
+                (baseline.std_dev / baseline.value) * 100.0 * self.config.adaptive_multiplier;
             return adaptive_threshold.max(self.config.default_threshold);
         }
 
@@ -194,10 +197,12 @@ impl RegressionDetector {
     pub fn generate_report(&self, results: &[RegressionResult]) -> RegressionReport {
         let total_benchmarks = results.len();
         let regressions = results.iter().filter(|r| r.is_regression).count();
-        let critical_regressions = results.iter()
+        let critical_regressions = results
+            .iter()
             .filter(|r| r.severity == RegressionSeverity::Critical)
             .count();
-        let major_regressions = results.iter()
+        let major_regressions = results
+            .iter()
             .filter(|r| r.severity == RegressionSeverity::Major)
             .count();
 
@@ -206,13 +211,18 @@ impl RegressionDetector {
 
         for result in results {
             if result.is_regression {
-                if worst_regression.is_none() || 
-                   result.percentage_change.abs() > worst_regression.as_ref().unwrap().percentage_change.abs() {
+                if worst_regression.is_none()
+                    || result.percentage_change.abs()
+                        > worst_regression.as_ref().unwrap().percentage_change.abs()
+                {
                     worst_regression = Some(result.clone());
                 }
-            } else if result.percentage_change < 0.0 { // Improvement (negative change for latency)
-                if best_improvement.is_none() || 
-                   result.percentage_change < best_improvement.as_ref().unwrap().percentage_change {
+            } else if result.percentage_change < 0.0 {
+                // Improvement (negative change for latency)
+                if best_improvement.is_none()
+                    || result.percentage_change
+                        < best_improvement.as_ref().unwrap().percentage_change
+                {
                     best_improvement = Some(result.clone());
                 }
             }
@@ -277,12 +287,18 @@ impl RegressionReport {
             self.critical_regressions,
             self.major_regressions,
             if let Some(ref worst) = self.worst_regression {
-                format!("- Worst regression: {} ({:.2}%)\n", worst.benchmark_name, worst.percentage_change)
+                format!(
+                    "- Worst regression: {} ({:.2}%)\n",
+                    worst.benchmark_name, worst.percentage_change
+                )
             } else {
                 String::new()
             },
             if let Some(ref best) = self.best_improvement {
-                format!("- Best improvement: {} ({:.2}%)\n", best.benchmark_name, best.percentage_change)
+                format!(
+                    "- Best improvement: {} ({:.2}%)\n",
+                    best.benchmark_name, best.percentage_change
+                )
             } else {
                 String::new()
             }
@@ -326,13 +342,14 @@ impl RegressionMonitor {
         value: f64,
         metric: &str,
     ) -> Option<RegressionResult> {
-        self.detector.analyze_measurement(benchmark_name, value, metric)
+        self.detector
+            .analyze_measurement(benchmark_name, value, metric)
     }
 
     /// Add a full regression report to history
     pub fn add_report(&mut self, report: RegressionReport) {
         self.history.push(report);
-        
+
         // Keep only last 100 reports
         if self.history.len() > 100 {
             self.history.remove(0);
@@ -351,10 +368,12 @@ impl RegressionMonitor {
 
     /// Get trend analysis for a specific benchmark
     pub fn get_trend(&self, benchmark_name: &str) -> Option<Vec<f64>> {
-        let values: Vec<f64> = self.history
+        let values: Vec<f64> = self
+            .history
             .iter()
             .filter_map(|report| {
-                report.results
+                report
+                    .results
                     .iter()
                     .find(|r| r.benchmark_name == benchmark_name)
                     .map(|r| r.current_value)
@@ -391,33 +410,52 @@ mod tests {
         let detector = RegressionDetector::new(baselines);
 
         // Test regression (latency increased)
-        let result = detector.analyze_measurement("test_benchmark", 120.0, "latency").unwrap();
+        let result = detector
+            .analyze_measurement("test_benchmark", 120.0, "latency")
+            .unwrap();
         assert!(result.is_regression);
         assert_eq!(result.percentage_change, 20.0);
 
         // Test improvement (latency decreased)
-        let result = detector.analyze_measurement("test_benchmark", 80.0, "latency").unwrap();
+        let result = detector
+            .analyze_measurement("test_benchmark", 80.0, "latency")
+            .unwrap();
         assert!(!result.is_regression);
         assert_eq!(result.percentage_change, -20.0);
     }
 
     #[test]
     fn test_regression_severity() {
-        assert_eq!(RegressionSeverity::from_percentage(3.0), RegressionSeverity::None);
-        assert_eq!(RegressionSeverity::from_percentage(10.0), RegressionSeverity::Minor);
-        assert_eq!(RegressionSeverity::from_percentage(25.0), RegressionSeverity::Moderate);
-        assert_eq!(RegressionSeverity::from_percentage(40.0), RegressionSeverity::Major);
-        assert_eq!(RegressionSeverity::from_percentage(60.0), RegressionSeverity::Critical);
+        assert_eq!(
+            RegressionSeverity::from_percentage(3.0),
+            RegressionSeverity::None
+        );
+        assert_eq!(
+            RegressionSeverity::from_percentage(10.0),
+            RegressionSeverity::Minor
+        );
+        assert_eq!(
+            RegressionSeverity::from_percentage(25.0),
+            RegressionSeverity::Moderate
+        );
+        assert_eq!(
+            RegressionSeverity::from_percentage(40.0),
+            RegressionSeverity::Major
+        );
+        assert_eq!(
+            RegressionSeverity::from_percentage(60.0),
+            RegressionSeverity::Critical
+        );
     }
 
     #[test]
     fn test_regression_report() {
         let baselines = create_test_baseline();
         let detector = RegressionDetector::new(baselines);
-        
-        let results = vec![
-            detector.analyze_measurement("test_benchmark", 120.0, "latency").unwrap(),
-        ];
+
+        let results = vec![detector
+            .analyze_measurement("test_benchmark", 120.0, "latency")
+            .unwrap()];
 
         let report = detector.generate_report(&results);
         assert_eq!(report.total_benchmarks, 1);

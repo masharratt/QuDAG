@@ -1,9 +1,9 @@
 #[cfg(test)]
 mod integration_tests {
     use qudag_crypto::{
-        ml_kem::{MlKem768, KeyEncapsulation},
-        ml_dsa::{MLDsa, SIGNATURE_LENGTH},
         hqc::HQC,
+        ml_dsa::{MLDsa, SIGNATURE_LENGTH},
+        ml_kem::{KeyEncapsulation, MlKem768},
     };
     use std::time::Instant;
 
@@ -25,7 +25,7 @@ mod integration_tests {
     #[test]
     fn test_signature_integration() {
         let message = b"Test message for integration testing";
-        
+
         // Generate keypair
         let (pk, sk) = MLDsa::keygen().expect("Failed to generate ML-DSA keypair");
 
@@ -41,7 +41,7 @@ mod integration_tests {
     #[test]
     fn test_encryption_integration() {
         let message = b"Test message for HQC encryption";
-        
+
         // Generate keypair
         let (pk, sk) = HQC::keygen().expect("Failed to generate HQC keypair");
 
@@ -60,7 +60,7 @@ mod integration_tests {
 
         for _ in 0..iterations {
             let start = Instant::now();
-            
+
             // Generate and verify signature
             let message = b"Performance test message";
             let (pk, sk) = MLDsa::keygen().expect("Failed to generate keypair");
@@ -73,17 +73,26 @@ mod integration_tests {
 
         let avg_time = total_time / iterations;
         println!("Average operation time: {:?}", avg_time);
-        assert!(avg_time.as_millis() < 100, "Performance requirements not met");
+        assert!(
+            avg_time.as_millis() < 100,
+            "Performance requirements not met"
+        );
     }
 
     #[test]
     fn test_memory_safety() {
         use std::mem;
-        
+
         // Test ML-KEM key alignment
         let (pk, sk) = MlKem768::keygen().expect("Failed to generate keypair");
-        assert!(mem::align_of_val(&pk) >= 16, "Public key not properly aligned");
-        assert!(mem::align_of_val(&sk) >= 16, "Secret key not properly aligned");
+        assert!(
+            mem::align_of_val(&pk) >= 16,
+            "Public key not properly aligned"
+        );
+        assert!(
+            mem::align_of_val(&sk) >= 16,
+            "Secret key not properly aligned"
+        );
 
         // Test automatic cleanup
         let mut secret = [0u8; 32];

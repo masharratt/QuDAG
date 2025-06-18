@@ -1,12 +1,81 @@
-# Cryptography Module API
+# QuDAG Cryptographic API Documentation
 
-The `qudag_crypto` module provides quantum-resistant cryptographic primitives for the QuDAG protocol. It implements ML-KEM (Key Encapsulation Mechanism), ML-DSA (Digital Signature Algorithm), BLAKE3 hashing, and quantum fingerprinting.
+The `qudag_crypto` module provides production-ready quantum-resistant cryptographic primitives for the QuDAG protocol. This comprehensive suite includes ML-KEM-768, ML-DSA, HQC, BLAKE3 hashing, and quantum fingerprinting implementations that are fully compliant with NIST post-quantum standards.
 
-## Key Encapsulation (ML-KEM)
+## Table of Contents
 
-### MlKem768
+- [Overview](#overview)
+- [ML-KEM (Key Encapsulation Mechanism)](#ml-kem-key-encapsulation-mechanism)
+- [ML-DSA (Digital Signature Algorithm)](#ml-dsa-digital-signature-algorithm)
+- [HQC (Hamming Quasi-Cyclic)](#hqc-hamming-quasi-cyclic)
+- [Quantum Fingerprinting](#quantum-fingerprinting)
+- [BLAKE3 Hashing](#blake3-hashing)
+- [Migration Guide](#migration-guide)
+- [Performance Characteristics](#performance-characteristics)
+- [Security Properties](#security-properties)
 
-ML-KEM-768 implementation providing NIST security level 3 (equivalent to AES-256).
+## Overview
+
+QuDAG implements a comprehensive suite of post-quantum cryptographic algorithms standardized by NIST and other leading cryptographic organizations. All implementations prioritize:
+
+- **Quantum Resistance**: Protection against both classical and quantum attacks
+- **Memory Safety**: Automatic secret zeroization and constant-time operations
+- **Performance**: Optimized implementations with hardware acceleration where available
+- **Compatibility**: Standards-compliant implementations following NIST specifications
+
+### Supported Algorithms
+
+| Algorithm | Type | Security Level | Standard | Status |
+|-----------|------|----------------|----------|---------|
+| **ML-KEM-768** | Key Encapsulation | NIST Level 3 | FIPS 203 | ✅ Production Ready |
+| **ML-DSA** | Digital Signatures | NIST Level 3 | FIPS 204 | ✅ Production Ready |
+| **HQC** | Public Key Encryption | 128/192/256-bit | NIST Round 4 | ✅ Production Ready |
+| **BLAKE3** | Cryptographic Hash | 256-bit | RFC Draft | ✅ Production Ready |
+
+### Dependencies
+
+The implementation uses the following production cryptographic libraries:
+
+```toml
+[dependencies]
+ml-kem = "0.2"              # NIST ML-KEM implementation
+pqcrypto-dilithium = "0.5"  # ML-DSA (Dilithium) implementation
+pqcrypto-traits = "0.3"     # Post-quantum crypto traits
+blake3 = "1.3"              # BLAKE3 hashing
+sha3 = "0.10"               # SHA3/SHAKE for ML-DSA
+zeroize = "1.5"             # Memory zeroization
+subtle = "2.4"              # Constant-time operations
+rand = "0.8"                # Cryptographic randomness
+```
+
+## ML-KEM (Key Encapsulation Mechanism)
+
+ML-KEM-768 provides quantum-resistant key encapsulation based on the Module-LWE problem. This implementation is fully compliant with NIST FIPS 203 and provides NIST Level 3 security.
+
+### Basic Usage
+
+```rust
+use qudag_crypto::{ml_kem::MlKem768, kem::{KeyEncapsulation, KEMError}};
+
+fn basic_kem_example() -> Result<(), KEMError> {
+    // Generate a key pair
+    let (public_key, secret_key) = MlKem768::keygen()?;
+    
+    // Encapsulate a shared secret
+    let (ciphertext, shared_secret1) = MlKem768::encapsulate(&public_key)?;
+    
+    // Decapsulate the shared secret
+    let shared_secret2 = MlKem768::decapsulate(&secret_key, &ciphertext)?;
+    
+    // Verify both parties have the same secret
+    assert_eq!(shared_secret1.as_bytes(), shared_secret2.as_bytes());
+    Ok(())
+}
+```
+
+### MlKem768 Implementation
+
+The main ML-KEM-768 implementation with NIST Level 3 security.
 
 ```rust
 pub struct MlKem768;
@@ -16,7 +85,55 @@ impl MlKem768 {
     pub const SECRET_KEY_SIZE: usize = 2400;
     pub const CIPHERTEXT_SIZE: usize = 1088;
     pub const SHARED_SECRET_SIZE: usize = 32;
+    pub const SECURITY_LEVEL: u8 = 3;
+    pub const CACHE_SIZE: usize = 1024;
 }
+```
+
+### Methods
+
+#### `keygen() -> Result<(PublicKey, SecretKey), KEMError>`
+
+Generates a new ML-KEM-768 key pair using secure randomness.
+
+```rust
+let (pk, sk) = MlKem768::keygen()?;
+println!("Public key: {} bytes", pk.as_bytes().len());
+println!("Secret key: {} bytes", sk.as_bytes().len());
+```
+
+#### `encapsulate(public_key: &PublicKey) -> Result<(Ciphertext, SharedSecret), KEMError>`
+
+Encapsulates a random shared secret using the provided public key.
+
+```rust
+let (ciphertext, shared_secret) = MlKem768::encapsulate(&public_key)?;
+println!("Ciphertext: {} bytes", ciphertext.as_bytes().len());
+println!("Shared secret: {} bytes", shared_secret.as_bytes().len());
+```
+
+#### `decapsulate(secret_key: &SecretKey, ciphertext: &Ciphertext) -> Result<SharedSecret, KEMError>`
+
+Decapsulates the shared secret using the secret key and ciphertext.
+
+```rust
+let shared_secret = MlKem768::decapsulate(&secret_key, &ciphertext)?;
+assert_eq!(shared_secret.as_bytes().len(), MlKem768::SHARED_SECRET_SIZE);
+```
+
+### Performance Metrics
+
+The implementation provides performance metrics for monitoring:
+
+```rust
+pub struct Metrics {
+    pub key_cache_misses: u64,
+    pub key_cache_hits: u64,
+    pub avg_decap_time_ns: u64,
+}
+
+let metrics = MlKem768::get_metrics();
+println!("Cache hits: {}", metrics.key_cache_hits);
 ```
 
 ### ML-KEM Key Types

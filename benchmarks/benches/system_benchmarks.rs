@@ -1,9 +1,9 @@
-use criterion::{criterion_group, criterion_main, Criterion, BenchmarkId};
+use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion};
 use qudag_protocol::config::Config as ProtocolConfig;
 use qudag_simulator::{
-    network::{NetworkSimulator, SimulatorConfig},
-    scenarios::{ScenarioConfig, NetworkConditions},
     metrics::NetworkMetrics,
+    network::{NetworkSimulator, SimulatorConfig},
+    scenarios::{NetworkConditions, ScenarioConfig},
 };
 use std::time::Duration;
 
@@ -14,7 +14,7 @@ fn throughput_benchmarks(c: &mut Criterion) {
 
     for node_count in [10, 50, 100].iter() {
         group.bench_with_input(
-            BenchmarkId::new("message_throughput", node_count), 
+            BenchmarkId::new("message_throughput", node_count),
             node_count,
             |b, &n| {
                 b.iter(|| {
@@ -35,7 +35,7 @@ fn throughput_benchmarks(c: &mut Criterion) {
                         })
                         .unwrap()
                 });
-            }
+            },
         );
     }
     group.finish();
@@ -69,7 +69,7 @@ fn latency_benchmarks(c: &mut Criterion) {
                         })
                         .unwrap()
                 });
-            }
+            },
         );
     }
     group.finish();
@@ -103,7 +103,7 @@ fn scalability_benchmarks(c: &mut Criterion) {
                         })
                         .unwrap()
                 });
-            }
+            },
         );
     }
     group.finish();
@@ -127,17 +127,15 @@ fn resource_usage_benchmarks(c: &mut Criterion) {
                         drop_rate: 0.01,
                         partition_prob: 0.0,
                     };
-                    tokio::runtime::Runtime::new()
-                        .unwrap()
-                        .block_on(async {
-                            let (mut simulator, _events_rx) = NetworkSimulator::new(sim_config);
-                            for _ in 0..n {
-                                simulator.add_node(ProtocolConfig::default()).await.unwrap();
-                            }
-                            NetworkMetrics::new()
-                        })
+                    tokio::runtime::Runtime::new().unwrap().block_on(async {
+                        let (mut simulator, _events_rx) = NetworkSimulator::new(sim_config);
+                        for _ in 0..n {
+                            simulator.add_node(ProtocolConfig::default()).await.unwrap();
+                        }
+                        NetworkMetrics::new()
+                    })
                 });
-            }
+            },
         );
     }
     group.finish();
@@ -146,7 +144,7 @@ fn resource_usage_benchmarks(c: &mut Criterion) {
 criterion_group!(
     system_benches,
     throughput_benchmarks,
-    latency_benchmarks, 
+    latency_benchmarks,
     scalability_benchmarks,
     resource_usage_benchmarks
 );

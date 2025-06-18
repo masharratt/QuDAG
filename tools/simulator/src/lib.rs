@@ -3,19 +3,19 @@
 
 //! Network simulator for testing and validating QuDAG protocol behavior.
 
-pub mod network;
-pub mod metrics;
-pub mod scenarios;
-pub mod conditions;
 pub mod attacks;
-pub mod visualization;
+pub mod conditions;
+pub mod metrics;
+pub mod network;
 pub mod reports;
+pub mod scenarios;
+pub mod visualization;
 
 #[cfg(test)]
 mod tests {
-    mod network_tests;
-    mod metrics_tests;
-    mod scenarios_tests;
     mod integration_tests;
+    mod metrics_tests;
+    mod network_tests;
     mod property_tests;
+    mod scenarios_tests;
 }

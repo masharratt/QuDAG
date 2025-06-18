@@ -9,6 +9,12 @@ pub struct MemoryTracker {
     start_time: Instant,
 }
 
+impl Default for MemoryTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl MemoryTracker {
     pub fn new() -> Self {
         Self {
@@ -88,19 +94,19 @@ mod tests {
     #[test]
     fn test_memory_tracking() {
         let tracker = MemoryTracker::new();
-        
+
         // Track some allocations
         tracker.track_allocation(1024);
         tracker.track_allocation(2048);
-        
+
         // Track some deallocations
         tracker.track_deallocation(1024);
-        
+
         // Sleep to get non-zero uptime
         thread::sleep(Duration::from_secs(1));
-        
+
         let metrics = tracker.get_metrics();
-        
+
         assert_eq!(metrics.allocation_count, 2);
         assert_eq!(metrics.deallocation_count, 1);
         assert!(metrics.uptime_seconds >= 1);

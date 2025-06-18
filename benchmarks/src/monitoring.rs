@@ -3,11 +3,11 @@
 //! This module provides tools for monitoring benchmark execution in real-time,
 //! collecting metrics, and providing observability into system performance.
 
-use std::time::{Duration, Instant};
-use std::sync::Arc;
-use tokio::sync::RwLock;
-use serde::{Serialize, Deserialize};
 use crate::metrics::SystemMetrics;
+use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+use std::time::{Duration, Instant};
+use tokio::sync::RwLock;
 
 /// Real-time monitoring configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -78,10 +78,10 @@ impl BenchmarkMonitor {
     pub async fn record_sample(&self, metrics: SystemMetrics) {
         let timestamp = self.start_time.elapsed();
         let sample = TimestampedMetrics { timestamp, metrics };
-        
+
         let mut samples = self.samples.write().await;
         samples.push(sample);
-        
+
         // Keep only the most recent samples
         if samples.len() > self.config.max_samples {
             samples.remove(0);
@@ -110,8 +110,14 @@ pub mod utils {
         }
 
         let cpu_values: Vec<f64> = samples.iter().map(|s| s.metrics.node.cpu_usage).collect();
-        let memory_values: Vec<f64> = samples.iter().map(|s| s.metrics.node.memory_usage as f64).collect();
-        let throughput_values: Vec<f64> = samples.iter().map(|s| s.metrics.network.messages_per_second).collect();
+        let memory_values: Vec<f64> = samples
+            .iter()
+            .map(|s| s.metrics.node.memory_usage as f64)
+            .collect();
+        let throughput_values: Vec<f64> = samples
+            .iter()
+            .map(|s| s.metrics.network.messages_per_second)
+            .collect();
 
         MetricsStats {
             cpu_avg: cpu_values.iter().sum::<f64>() / cpu_values.len() as f64,

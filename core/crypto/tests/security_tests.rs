@@ -1,8 +1,8 @@
+use constant_time_eq::constant_time_eq;
 use subtle::ConstantTimeEq;
 use zeroize::Zeroize;
-use constant_time_eq::constant_time_eq;
 
-#[test]  
+#[test]
 fn test_constant_time_equality() {
     let a = vec![1u8, 2u8, 3u8];
     let b = vec![1u8, 2u8, 3u8];
@@ -35,8 +35,8 @@ fn test_constant_time_comparison() {
 
 #[test]
 fn test_timing_resistance() {
-    use qudag_crypto::ml_kem::MlKem768;
     use qudag_crypto::ml_dsa::MlDsaKeyPair;
+    use qudag_crypto::ml_kem::MlKem768;
     use rand::thread_rng;
 
     // Test KEM timing resistance
@@ -44,10 +44,12 @@ fn test_timing_resistance() {
     let (ct_kem, _) = MlKem768::encapsulate(&pk_kem).expect("KEM encapsulation failed");
     let _ = MlKem768::decapsulate(&sk_kem, &ct_kem).expect("KEM decapsulation failed");
 
-    // Test signature timing resistance  
+    // Test signature timing resistance
     let mut rng = thread_rng();
     let keypair = MlDsaKeyPair::generate(&mut rng).expect("Signature key generation failed");
     let message = b"Test message";
     let signature = keypair.sign(message, &mut rng).expect("Signing failed");
-    let _ = keypair.verify(message, &signature).expect("Verification failed");
+    let _ = keypair
+        .verify(message, &signature)
+        .expect("Verification failed");
 }

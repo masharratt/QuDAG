@@ -1,14 +1,14 @@
-use std::collections::{HashSet, VecDeque};
-use parking_lot::RwLock;
 use blake3::Hash;
 use dashmap::DashMap;
+use lru::LruCache;
+use parking_lot::RwLock;
 use rayon::prelude::*;
+use std::collections::{HashSet, VecDeque};
+use std::num::NonZeroUsize;
 use std::time::Instant;
 use tracing::info;
-use lru::LruCache;
-use std::num::NonZeroUsize;
 
-use crate::{Node, Edge, Result, DagError};
+use crate::{DagError, Edge, Node, Result};
 
 /// Graph performance metrics
 #[derive(Debug, Default)]
@@ -80,7 +80,8 @@ impl VertexStorage {
     fn get(&self, hash: &Hash) -> Option<Node> {
         // Try cache first
         if let Some(node) = self.cache.write().get(hash) {
-            self.cache_hits.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            self.cache_hits
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             return Some(node.clone());
         }
 
@@ -89,7 +90,8 @@ impl VertexStorage {
             let node = node.clone();
             // Update cache
             self.cache.write().put(*hash, node.clone());
-            self.cache_misses.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            self.cache_misses
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             Some(node)
         } else {
             None
@@ -104,13 +106,13 @@ impl VertexStorage {
 
         // Insert into main storage
         self.vertices.insert(hash, node.clone());
-        
+
         // Update cache
         self.cache.write().put(hash, node);
-        
+
         // Add to pruning queue
         self.pruning_queue.write().push_back(hash);
-        
+
         Ok(())
     }
 
@@ -118,14 +120,14 @@ impl VertexStorage {
         let mut pruning_queue = self.pruning_queue.write();
         let target_size = self.config.pruning_threshold;
         let current_size = self.vertices.len();
-        
+
         if current_size <= target_size {
             return Ok(());
         }
-        
+
         let to_remove = current_size - target_size;
         let mut removed = 0;
-        
+
         while removed < to_remove && !pruning_queue.is_empty() {
             if let Some(hash) = pruning_queue.pop_front() {
                 // Only remove if vertex is in Final state
@@ -137,7 +139,7 @@ impl VertexStorage {
                 }
             }
         }
-        
+
         info!("Pruned {} vertices from storage", removed);
         Ok(())
     }
@@ -167,6 +169,12 @@ pub struct Graph {
     edges: DashMap<Hash, HashSet<Edge>>,
     /// Performance metrics
     metrics: RwLock<GraphMetrics>,
+}
+
+impl Default for Graph {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl Graph {
@@ -208,7 +216,7 @@ impl Graph {
     pub fn add_node(&self, node: Node) -> Result<()> {
         let start = Instant::now();
         let node_hash = node.hash();
-        
+
         // Check if node already exists
         if self.storage.get(&node_hash).is_some() {
             return Err(DagError::NodeExists(format!("{:?}", node_hash)));
@@ -216,9 +224,9 @@ impl Graph {
 
         // Verify all parents exist concurrently
         let parents = node.parents();
-        let missing_parent = parents.par_iter().find_first(|parent| {
-            self.storage.get(parent).is_none()
-        });
+        let missing_parent = parents
+            .par_iter()
+            .find_first(|parent| self.storage.get(parent).is_none());
 
         if let Some(parent) = missing_parent {
             return Err(DagError::MissingParent(format!("{:?}", parent)));
@@ -226,9 +234,9 @@ impl Graph {
 
         // Add node to storage
         self.storage.insert(node_hash, node)?;
-        
+
         // Initialize edge set
-        self.edges.entry(node_hash).or_insert_with(HashSet::new);
+        self.edges.entry(node_hash).or_default();
 
         // Add edges from parents in parallel
         if let Some(node) = self.storage.get(&node_hash) {
@@ -245,9 +253,9 @@ impl Graph {
         let elapsed = start.elapsed().as_nanos() as u64;
         let mut metrics = self.metrics.write();
         metrics.vertices_processed += 1;
-        metrics.avg_vertex_time_ns = 
-            (metrics.avg_vertex_time_ns * (metrics.vertices_processed - 1) + elapsed) / 
-            metrics.vertices_processed;
+        metrics.avg_vertex_time_ns =
+            (metrics.avg_vertex_time_ns * (metrics.vertices_processed - 1) + elapsed)
+                / metrics.vertices_processed;
         metrics.cache_hit_rate = self.storage.cache_hit_rate();
         metrics.memory_usage_bytes = self.storage.memory_usage();
 
@@ -268,15 +276,17 @@ impl Graph {
     /// Updates the state of a node
     pub fn update_node_state(&self, hash: &Hash, new_state: crate::node::NodeState) -> Result<()> {
         // Get node from storage
-        let mut node = self.storage.get(hash)
+        let mut node = self
+            .storage
+            .get(hash)
             .ok_or_else(|| DagError::NodeNotFound(format!("{:?}", hash)))?;
-        
+
         // Update state
         node.update_state(new_state)?;
-        
+
         // Store updated node
         self.storage.insert(*hash, node)?;
-        
+
         Ok(())
     }
 
@@ -305,26 +315,25 @@ impl Graph {
     /// Triggers pruning of old vertices
     pub fn prune(&self) -> Result<()> {
         self.storage.prune_old_vertices()?;
-        
+
         // Update metrics
         let mut metrics = self.metrics.write();
         metrics.pruned_vertices += 1;
         metrics.memory_usage_bytes = self.storage.memory_usage();
-        
+
         Ok(())
     }
 
     /// Gets current performance metrics
     pub fn metrics(&self) -> GraphMetrics {
         let metrics_guard = self.metrics.read();
-        let metrics = GraphMetrics {
+        GraphMetrics {
             avg_vertex_time_ns: metrics_guard.avg_vertex_time_ns,
             vertices_processed: metrics_guard.vertices_processed,
             cache_hit_rate: self.storage.cache_hit_rate(),
             memory_usage_bytes: self.storage.memory_usage(),
             pruned_vertices: metrics_guard.pruned_vertices,
-        };
-        metrics
+        }
     }
 }
 
@@ -363,15 +372,15 @@ mod tests {
         let graph = Graph::new();
         let node = Node::new(vec![1], vec![]);
         let hash = node.hash();
-        
+
         graph.add_node(node).unwrap();
-        
+
         // Valid transition
         assert!(graph.update_node_state(&hash, NodeState::Verified).is_ok());
-        
+
         let node = graph.get_node(&hash).unwrap();
         assert_eq!(node.state(), NodeState::Verified);
-        
+
         // Invalid transition
         assert!(graph.update_node_state(&hash, NodeState::Pending).is_err());
     }
@@ -403,7 +412,7 @@ mod tests {
         let graph = Graph::new();
         let missing_hash = blake3::hash(b"missing");
         let node = Node::new(vec![1], vec![missing_hash]);
-        
+
         assert!(matches!(
             graph.add_node(node),
             Err(DagError::MissingParent(_))

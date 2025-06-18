@@ -1,23 +1,23 @@
-use serde::{Serialize, Deserialize};
-use std::time::Duration;
+use serde::{Deserialize, Serialize};
 use std::net::{IpAddr, Ipv4Addr};
+use std::time::Duration;
 use thiserror::Error;
 
 /// Network address combining IP and port
-/// 
+///
 /// # Examples
-/// 
+///
 /// ```rust
 /// use qudag_network::types::NetworkAddress;
 /// use std::net::{IpAddr, Ipv4Addr};
-/// 
+///
 /// // Create address from IP parts
 /// let addr1 = NetworkAddress::new([127, 0, 0, 1], 8080);
-/// 
+///
 /// // Create address from IP and port
 /// let ip = IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1));
 /// let addr2 = NetworkAddress::from_ip_port(ip, 3000);
-/// 
+///
 /// // Get socket address string
 /// let socket_str = addr1.to_socket_addr();
 /// assert_eq!(socket_str, "127.0.0.1:8080");
@@ -34,16 +34,21 @@ impl NetworkAddress {
     /// Create a new network address from IPv4 address parts and port
     pub fn new(ip_parts: [u8; 4], port: u16) -> Self {
         Self {
-            ip: IpAddr::V4(Ipv4Addr::new(ip_parts[0], ip_parts[1], ip_parts[2], ip_parts[3])),
+            ip: IpAddr::V4(Ipv4Addr::new(
+                ip_parts[0],
+                ip_parts[1],
+                ip_parts[2],
+                ip_parts[3],
+            )),
             port,
         }
     }
-    
+
     /// Create a new network address from IP and port
     pub fn from_ip_port(ip: IpAddr, port: u16) -> Self {
         Self { ip, port }
     }
-    
+
     /// Get the socket address as a string
     pub fn to_socket_addr(&self) -> String {
         format!("{}:{}", self.ip, self.port)
@@ -190,17 +195,17 @@ impl PeerId {
         rand::thread_rng().fill_bytes(&mut id);
         Self(id)
     }
-    
+
     /// Create a peer ID from bytes
     pub fn from_bytes(bytes: [u8; 32]) -> Self {
         Self(bytes)
     }
-    
+
     /// Get the peer ID as bytes
     pub fn to_bytes(&self) -> [u8; 32] {
         self.0
     }
-    
+
     /// Get the peer ID as a slice
     pub fn as_bytes(&self) -> &[u8] {
         &self.0

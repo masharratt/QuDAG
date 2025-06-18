@@ -22,7 +22,13 @@ async fn test_node_connectivity() {
     // Connect nodes
     let addr1 = node1.swarm.local_peer_id();
     let addr2 = node2.swarm.local_peer_id();
-    node1.swarm.behaviour_mut().connection_manager.connect(addr2).await.unwrap();
+    node1
+        .swarm
+        .behaviour_mut()
+        .connection_manager
+        .connect(addr2)
+        .await
+        .unwrap();
 
     // Wait for connection events
     let timeout = Duration::from_secs(5);
@@ -33,7 +39,9 @@ async fn test_node_connectivity() {
                 _ => continue,
             }
         }
-    }).await.unwrap();
+    })
+    .await
+    .unwrap();
 }
 
 #[tokio::test]
@@ -50,13 +58,18 @@ async fn test_message_routing() {
     let msg = NetworkMessage {
         id: "test".into(),
         source: vec![1],
-        destination: vec![2], 
+        destination: vec![2],
         payload: vec![0; 100],
         priority: MessagePriority::Normal,
         ttl: Duration::from_secs(60),
     };
 
-    node1.swarm.behaviour_mut().message_queue.enqueue(msg.clone()).await;
+    node1
+        .swarm
+        .behaviour_mut()
+        .message_queue
+        .enqueue(msg.clone())
+        .await;
 
     // Verify routing
     let timeout = Duration::from_secs(5);
@@ -67,7 +80,9 @@ async fn test_message_routing() {
                 _ => continue,
             }
         }
-    }).await.unwrap();
+    })
+    .await
+    .unwrap();
 }
 
 #[tokio::test]
@@ -86,7 +101,7 @@ async fn test_anonymous_routing() {
         node.swarm.behaviour_mut().router.add_peer(*peer_id).await;
     }
 
-    // Test anonymous message routing 
+    // Test anonymous message routing
     let msg = NetworkMessage {
         id: "anonymous".into(),
         source: vec![1],
@@ -96,7 +111,10 @@ async fn test_anonymous_routing() {
         ttl: Duration::from_secs(60),
     };
 
-    let route = node.swarm.behaviour_mut().router
+    let route = node
+        .swarm
+        .behaviour_mut()
+        .router
         .route(&msg, RoutingStrategy::Anonymous { hops: 3 })
         .await
         .unwrap();
@@ -108,7 +126,7 @@ async fn test_anonymous_routing() {
 #[tokio::test]
 async fn test_kademlia_discovery() {
     let node1_config = NetworkConfig {
-        listen_addr: "/ip4/127.0.0.1/tcp/0".into(), 
+        listen_addr: "/ip4/127.0.0.1/tcp/0".into(),
         bootstrap_peers: vec![],
         max_connections: 50,
     };
@@ -124,7 +142,11 @@ async fn test_kademlia_discovery() {
 
     // Bootstrap node2 using node1
     let node1_addr = node1.swarm.local_peer_id();
-    node2.swarm.behaviour_mut().kad.add_address(&node1_addr, "/ip4/127.0.0.1/tcp/0".parse().unwrap());
+    node2
+        .swarm
+        .behaviour_mut()
+        .kad
+        .add_address(&node1_addr, "/ip4/127.0.0.1/tcp/0".parse().unwrap());
     node2.swarm.behaviour_mut().kad.bootstrap().unwrap();
 
     // Wait for bootstrap completion
@@ -136,5 +158,7 @@ async fn test_kademlia_discovery() {
                 _ => tokio::time::sleep(Duration::from_millis(100)).await,
             }
         }
-    }).await.unwrap();
+    })
+    .await
+    .unwrap();
 }

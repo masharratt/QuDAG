@@ -4,10 +4,10 @@
 //! integrating crypto, network, and DAG components.
 
 use crate::{
+    config::Config as ProtocolConfig,
     message::Message,
     node::{Node, NodeConfig},
     types::{ProtocolError, ProtocolEvent, ProtocolState},
-    config::Config as ProtocolConfig,
 };
 use qudag_crypto::KeyPair;
 use qudag_dag::QrDag;
@@ -54,7 +54,7 @@ impl Coordinator {
 
         let node = Node::new(node_config).await?;
         let (tx, rx) = mpsc::channel(1000);
-        
+
         Ok(Self {
             node,
             config,
@@ -126,10 +126,8 @@ impl Coordinator {
         debug!("Broadcasting message of {} bytes", message.len());
 
         // Create protocol message
-        let mut proto_message = Message::new(
-            crate::message::MessageType::Data(message.clone()),
-            vec![],
-        );
+        let mut proto_message =
+            Message::new(crate::message::MessageType::Data(message.clone()), vec![]);
 
         // Sign message if crypto is available
         if let Some(ref crypto) = self.crypto {
@@ -138,12 +136,15 @@ impl Coordinator {
         }
 
         // Handle message through node
-        self.node.handle_message(proto_message).await
+        self.node
+            .handle_message(proto_message)
+            .await
             .map_err(|e| ProtocolError::Internal(e.to_string()))?;
 
         // Add to DAG if available
         if let Some(ref mut dag) = self.dag {
-            dag.add_message(message).map_err(|e| ProtocolError::Internal(e.to_string()))?;
+            dag.add_message(message)
+                .map_err(|e| ProtocolError::Internal(e.to_string()))?;
         }
 
         Ok(())
@@ -189,7 +190,6 @@ impl Coordinator {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -212,7 +212,7 @@ mod tests {
     async fn test_coordinator_initialization() {
         let config = ProtocolConfig::default();
         let coordinator = Coordinator::new(config).await.unwrap();
-        
+
         // Initially not initialized
         assert!(!coordinator.is_initialized());
     }

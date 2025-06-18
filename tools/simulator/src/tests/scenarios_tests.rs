@@ -1,6 +1,6 @@
 use super::super::scenarios::{
-    ScenarioConfig, NetworkConditions, 
-    test_basic_connectivity, test_byzantine_tolerance, test_network_partition
+    test_basic_connectivity, test_byzantine_tolerance, test_network_partition, NetworkConditions,
+    ScenarioConfig,
 };
 use std::time::Duration;
 
@@ -16,7 +16,7 @@ async fn test_scenario_config_creation() {
             partition_prob: 0.1,
         },
     };
-    
+
     assert_eq!(config.node_count, 10);
     assert_eq!(config.duration, Duration::from_secs(30));
     assert_eq!(config.msg_rate, 100.0);
@@ -37,10 +37,10 @@ async fn test_basic_connectivity_scenario() {
             partition_prob: 0.0,
         },
     };
-    
+
     let result = test_basic_connectivity(config).await;
     assert!(result.is_ok());
-    
+
     let metrics = result.unwrap();
     // Verify metrics structure is correct
     assert_eq!(metrics.latency.avg_latency, Duration::from_secs(0));
@@ -60,7 +60,7 @@ async fn test_basic_connectivity_single_node() {
             partition_prob: 0.0,
         },
     };
-    
+
     let result = test_basic_connectivity(config).await;
     assert!(result.is_ok());
 }
@@ -77,7 +77,7 @@ async fn test_basic_connectivity_large_network() {
             partition_prob: 0.1,
         },
     };
-    
+
     let result = test_basic_connectivity(config).await;
     assert!(result.is_ok());
 }
@@ -94,10 +94,10 @@ async fn test_byzantine_tolerance_scenario() {
             partition_prob: 0.0,
         },
     };
-    
+
     let result = test_byzantine_tolerance(config).await;
     assert!(result.is_ok());
-    
+
     let metrics = result.unwrap();
     // Verify metrics structure is correct
     assert_eq!(metrics.latency.avg_latency, Duration::from_secs(0));
@@ -118,7 +118,7 @@ async fn test_byzantine_tolerance_minimum_nodes() {
             partition_prob: 0.0,
         },
     };
-    
+
     let result = test_byzantine_tolerance(config).await;
     assert!(result.is_ok());
 }
@@ -135,7 +135,7 @@ async fn test_byzantine_tolerance_high_latency() {
             partition_prob: 0.1,
         },
     };
-    
+
     let result = test_byzantine_tolerance(config).await;
     assert!(result.is_ok());
 }
@@ -152,10 +152,10 @@ async fn test_network_partition_scenario() {
             partition_prob: 0.5,
         },
     };
-    
+
     let result = test_network_partition(config).await;
     assert!(result.is_ok());
-    
+
     let metrics = result.unwrap();
     // Verify metrics structure is correct
     assert_eq!(metrics.latency.avg_latency, Duration::from_secs(0));
@@ -175,7 +175,7 @@ async fn test_network_partition_small_network() {
             partition_prob: 0.5,
         },
     };
-    
+
     let result = test_network_partition(config).await;
     assert!(result.is_ok());
 }
@@ -192,7 +192,7 @@ async fn test_network_partition_high_partition_probability() {
             partition_prob: 0.9, // Very high partition probability
         },
     };
-    
+
     let result = test_network_partition(config).await;
     assert!(result.is_ok());
 }
@@ -210,7 +210,7 @@ async fn test_scenario_config_edge_cases() {
             partition_prob: 0.0,
         },
     };
-    
+
     let result = test_basic_connectivity(config).await;
     assert!(result.is_ok());
 }
@@ -227,7 +227,7 @@ async fn test_scenario_zero_nodes() {
             partition_prob: 0.0,
         },
     };
-    
+
     let result = test_basic_connectivity(config).await;
     assert!(result.is_ok());
 }
@@ -244,7 +244,7 @@ async fn test_scenario_extreme_message_rate() {
             partition_prob: 0.0,
         },
     };
-    
+
     let result = test_basic_connectivity(config).await;
     assert!(result.is_ok());
 }
@@ -261,7 +261,7 @@ async fn test_scenario_extreme_latency() {
             partition_prob: 0.0,
         },
     };
-    
+
     let result = test_basic_connectivity(config).await;
     assert!(result.is_ok());
 }
@@ -278,7 +278,7 @@ async fn test_scenario_maximum_loss_rate() {
             partition_prob: 0.0,
         },
     };
-    
+
     let result = test_basic_connectivity(config).await;
     assert!(result.is_ok());
 }
@@ -290,7 +290,7 @@ fn test_network_conditions_debug() {
         loss_rate: 0.05,
         partition_prob: 0.1,
     };
-    
+
     let debug_str = format!("{:?}", conditions);
     assert!(debug_str.contains("NetworkConditions"));
     assert!(debug_str.contains("latency"));
@@ -310,7 +310,7 @@ fn test_scenario_config_debug() {
             partition_prob: 0.15,
         },
     };
-    
+
     let debug_str = format!("{:?}", config);
     assert!(debug_str.contains("ScenarioConfig"));
     assert!(debug_str.contains("node_count"));
@@ -331,13 +331,16 @@ fn test_scenario_config_clone() {
             partition_prob: 0.2,
         },
     };
-    
+
     let cloned = original.clone();
-    
+
     assert_eq!(original.node_count, cloned.node_count);
     assert_eq!(original.duration, cloned.duration);
     assert_eq!(original.msg_rate, cloned.msg_rate);
     assert_eq!(original.network.latency, cloned.network.latency);
     assert_eq!(original.network.loss_rate, cloned.network.loss_rate);
-    assert_eq!(original.network.partition_prob, cloned.network.partition_prob);
+    assert_eq!(
+        original.network.partition_prob,
+        cloned.network.partition_prob
+    );
 }

@@ -1,6 +1,6 @@
-use std::time::SystemTime;
-use serde::{Serialize, Deserialize};
 use blake3::Hash;
+use serde::{Deserialize, Serialize};
+use std::time::SystemTime;
 
 /// Serializable wrapper for blake3::Hash
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -32,20 +32,20 @@ pub enum NodeState {
 }
 
 /// A node in the DAG containing a transaction or consensus message
-/// 
+///
 /// # Examples
-/// 
+///
 /// ```rust
 /// use qudag_dag::{Node, NodeState};
-/// 
+///
 /// // Create a new node with payload and no parents (genesis node)
 /// let payload = b"Hello, DAG!".to_vec();
 /// let node = Node::new(payload.clone(), vec![]);
-/// 
+///
 /// assert_eq!(node.payload(), &payload);
 /// assert_eq!(node.state(), NodeState::Pending);
 /// assert!(node.parents().is_empty());
-/// 
+///
 /// // Hash is computed deterministically
 /// let hash = node.hash();
 /// assert_eq!(hash.as_bytes().len(), 32);
@@ -66,16 +66,16 @@ pub struct Node {
 
 impl Node {
     /// Creates a new node with the given payload and parents
-    /// 
+    ///
     /// # Examples
-    /// 
+    ///
     /// ```rust
     /// use qudag_dag::Node;
-    /// 
+    ///
     /// // Create a genesis node (no parents)
     /// let payload = b"Genesis block".to_vec();
     /// let node = Node::new(payload, vec![]);
-    /// 
+    ///
     /// // Create a child node
     /// let parent_hash = node.hash();
     /// let child_payload = b"Child block".to_vec();
@@ -111,7 +111,7 @@ impl Node {
 
     /// Returns current state of the node
     pub fn state(&self) -> NodeState {
-        self.state  
+        self.state
     }
 
     /// Returns reference to parent hashes (converted)
@@ -123,17 +123,18 @@ impl Node {
     pub fn update_state(&mut self, new_state: NodeState) -> crate::Result<()> {
         match (self.state, new_state) {
             // Valid transitions
-            (NodeState::Pending, NodeState::Verified) |
-            (NodeState::Verified, NodeState::Final) |
-            (NodeState::Pending, NodeState::Rejected) |
-            (NodeState::Verified, NodeState::Rejected) => {
+            (NodeState::Pending, NodeState::Verified)
+            | (NodeState::Verified, NodeState::Final)
+            | (NodeState::Pending, NodeState::Rejected)
+            | (NodeState::Verified, NodeState::Rejected) => {
                 self.state = new_state;
                 Ok(())
             }
             // Invalid transitions
-            _ => Err(crate::DagError::InvalidStateTransition(
-                format!("{:?} -> {:?}", self.state, new_state)
-            ))
+            _ => Err(crate::DagError::InvalidStateTransition(format!(
+                "{:?} -> {:?}",
+                self.state, new_state
+            ))),
         }
     }
 }
@@ -156,7 +157,7 @@ mod tests {
     #[test]
     fn test_valid_state_transitions() {
         let mut node = Node::new(vec![1, 2, 3], vec![]);
-        
+
         // Pending -> Verified
         assert!(node.update_state(NodeState::Verified).is_ok());
         assert_eq!(node.state(), NodeState::Verified);
@@ -172,10 +173,10 @@ mod tests {
 
         // Can't go from Pending to Final
         assert!(node.update_state(NodeState::Final).is_err());
-        
+
         // Update to Verified
         assert!(node.update_state(NodeState::Verified).is_ok());
-        
+
         // Can't go back to Pending
         assert!(node.update_state(NodeState::Pending).is_err());
     }

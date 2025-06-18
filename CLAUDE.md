@@ -1,259 +1,246 @@
-# QuDAG Protocol - Claude Code Development Guide
+# Claude Code Configuration
 
-## Project Overview
+## Build Commands
+- `npm run build`: Build the project
+- `npm run test`: Run the full test suite
+- `npm run lint`: Run ESLint and format checks
+- `npm run typecheck`: Run TypeScript type checking
+- `./claude-flow --help`: Show all available commands
 
-QuDAG (Quantum DAG) is a quantum-resistant DAG-based anonymous communication protocol implemented in Rust using Test-Driven Development (TDD) methodology.
+## Claude-Flow Complete Command Reference
 
-## Architecture
+### Core System Commands
+- `./claude-flow start [--ui] [--port 3000] [--host localhost]`: Start orchestration system with optional web UI
+- `./claude-flow status`: Show comprehensive system status
+- `./claude-flow monitor`: Real-time system monitoring dashboard
+- `./claude-flow config <subcommand>`: Configuration management (show, get, set, init, validate)
 
-The project follows a modular workspace architecture:
+### Agent Management
+- `./claude-flow agent spawn <type> [--name <name>]`: Create AI agents (researcher, coder, analyst, etc.)
+- `./claude-flow agent list`: List all active agents
+- `./claude-flow spawn <type>`: Quick agent spawning (alias for agent spawn)
 
-- `core/crypto`: Quantum-resistant cryptographic primitives (ML-KEM, ML-DSA, HQC)
-- `core/dag`: DAG consensus implementation with QR-Avalanche algorithm
-- `core/network`: P2P networking layer with anonymous routing
-- `core/protocol`: Main protocol implementation and coordination
-- `tools/cli`: Command-line interface for node operation
-- `tools/simulator`: Network simulation for testing and validation
-- `benchmarks`: Performance benchmarks and regression testing
+### Task Orchestration
+- `./claude-flow task create <type> [description]`: Create and manage tasks
+- `./claude-flow task list`: View active task queue
+- `./claude-flow workflow <file>`: Execute workflow automation files
 
-## Development Principles
+### Memory Management
+- `./claude-flow memory store <key> <data>`: Store persistent data across sessions
+- `./claude-flow memory get <key>`: Retrieve stored information
+- `./claude-flow memory list`: List all memory keys
+- `./claude-flow memory export <file>`: Export memory to file
+- `./claude-flow memory import <file>`: Import memory from file
+- `./claude-flow memory stats`: Memory usage statistics
+- `./claude-flow memory cleanup`: Clean unused memory entries
 
-### 1. Test-Driven Development (TDD)
+### SPARC Development Modes
+- `./claude-flow sparc "<task>"`: Run orchestrator mode (default)
+- `./claude-flow sparc run <mode> "<task>"`: Run specific SPARC mode
+- `./claude-flow sparc tdd "<feature>"`: Test-driven development mode
+- `./claude-flow sparc modes`: List all 17 available SPARC modes
 
-- **RED**: Write failing tests first
-- **GREEN**: Implement minimal code to pass tests
-- **REFACTOR**: Improve code while keeping tests green
+Available SPARC modes: orchestrator, coder, researcher, tdd, architect, reviewer, debugger, tester, analyzer, optimizer, documenter, designer, innovator, swarm-coordinator, memory-manager, batch-executor, workflow-manager
 
-### 2. Security-First Approach
+### Swarm Coordination
+- `./claude-flow swarm "<objective>" [options]`: Multi-agent swarm coordination
+- `--strategy`: research, development, analysis, testing, optimization, maintenance
+- `--mode`: centralized, distributed, hierarchical, mesh, hybrid
+- `--max-agents <n>`: Maximum number of agents (default: 5)
+- `--parallel`: Enable parallel execution
+- `--monitor`: Real-time monitoring
+- `--output <format>`: json, sqlite, csv, html
 
-- All cryptographic operations must be constant-time
-- Memory must be securely cleared after use
-- Side-channel resistance is mandatory
+### MCP Server Integration
+- `./claude-flow mcp start [--port 3000] [--host localhost]`: Start MCP server
+- `./claude-flow mcp status`: Show MCP server status
+- `./claude-flow mcp tools`: List available MCP tools
 
-### 3. Performance Awareness
+### Claude Integration
+- `./claude-flow claude auth`: Authenticate with Claude API
+- `./claude-flow claude models`: List available Claude models
+- `./claude-flow claude chat`: Interactive chat mode
 
-- Profile all critical paths
-- Benchmark against performance targets
-- Monitor for regressions
+### Session Management
+- `./claude-flow session`: Manage terminal sessions
+- `./claude-flow repl`: Start interactive REPL mode
 
-### 4. Documentation-Driven Design
+### Enterprise Features
+- `./claude-flow project <subcommand>`: Project management (Enterprise)
+- `./claude-flow deploy <subcommand>`: Deployment operations (Enterprise)
+- `./claude-flow cloud <subcommand>`: Cloud infrastructure management (Enterprise)
+- `./claude-flow security <subcommand>`: Security and compliance tools (Enterprise)
+- `./claude-flow analytics <subcommand>`: Analytics and insights (Enterprise)
 
-- Update documentation with each feature
-- Include security considerations
-- Provide usage examples
+### Project Initialization
+- `./claude-flow init`: Initialize Claude-Flow project
+- `./claude-flow init --sparc`: Initialize with full SPARC development environment
 
-## Testing Strategy
+## Quick Start Workflows
 
-### Unit Tests
-- Individual function and struct testing
-- Property-based testing with proptest
-- Cryptographic primitive validation
-- Edge case coverage
-
-### Integration Tests
-- Multi-component interaction testing
-- Protocol flow validation
-- Network behavior testing
-- Error condition handling
-
-### Security Tests
-- Timing attack resistance
-- Side-channel analysis
-- Cryptographic compliance
-- Adversarial input handling
-
-### Performance Tests
-- Throughput benchmarking
-- Latency measurement
-- Scalability testing
-- Resource usage monitoring
-
-## Claude Code Commands
-
-### Primary Development Commands
-
-- `/tdd-cycle <module> <feature>`: Execute complete TDD cycle for a feature
-- `/security-audit`: Comprehensive security analysis and testing
-- `/performance-benchmark`: Run all benchmarks and generate reports
-- `/integration-test`: Execute full integration test suite
-- `/deploy-validate`: Validate deployment configuration and test
-
-### Development Workflow Commands
-
-- `/create-test <path> <description>`: Generate test skeleton for new feature
-- `/implement-feature <test-path>`: Implement feature to pass specified tests
-- `/refactor-optimize <module>`: Refactor module while maintaining test coverage
-- `/review-security <module>`: Security-focused code review
-- `/update-docs <module>`: Update documentation for module changes
-
-### Specialized Commands
-
-- `/crypto-validate <algorithm>`: Validate cryptographic implementation
-- `/network-simulate <scenario>`: Run network simulation scenarios
-- `/dag-visualize <state>`: Generate DAG state visualization
-- `/fuzz-test <target>`: Execute fuzzing campaign against target
-
-## Multi-Agent Coordination
-
-### Agent Roles
-
-1. **Crypto Agent**: Handles all cryptographic implementations and validations
-2. **Network Agent**: Manages P2P networking and communication protocols
-3. **Consensus Agent**: Implements and tests DAG consensus mechanisms
-4. **Security Agent**: Performs security analysis and vulnerability assessment
-5. **Performance Agent**: Monitors and optimizes system performance
-6. **Integration Agent**: Coordinates component integration and system testing
-
-### Coordination Protocols
-
-- Use shared context files in `.claude/contexts/` for inter-agent communication
-- Maintain test status in `.claude/test-status.json`
-- Log all agent activities in `.claude/agent-logs/`
-
-## Code Quality Standards
-
-### Rust Best Practices
-
-- Use `#![deny(unsafe_code)]` except where explicitly needed
-- Implement comprehensive error handling with `thiserror`
-- Use `tracing` for structured logging
-- Follow Rust API guidelines
-
-### Security Requirements
-
-- All crypto operations use constant-time implementations
-- Secrets are zeroized on drop
-- No debug prints of sensitive data
-- Memory allocations are minimized for crypto operations
-
-### Performance Requirements
-
-- Sub-second consensus finality (99th percentile)
-- 10,000+ messages/second throughput per node
-- Linear scalability with node count
-- <100MB memory usage for base node
-
-## Testing Requirements
-
-### Coverage Targets
-
-- Unit test coverage: >90%
-- Integration test coverage: >80%
-- Security test coverage: 100% of crypto operations
-- Performance benchmarks: All critical paths
-
-### Test Categories
-
-- **Functional**: Correctness of implementation
-- **Property**: Invariant validation with property-based testing
-- **Adversarial**: Resistance to malicious inputs
-- **Performance**: Throughput, latency, and resource usage
-- **Compatibility**: Interoperability with other implementations
-
-## Deployment Guidelines
-
-### Environment Configuration
-
-- Development: Local testing with simulator
-- Staging: Multi-node testnet deployment
-- Production: Mainnet with monitoring and alerting
-
-### Security Considerations
-
-- Container image scanning
-- Supply chain verification
-- Runtime security monitoring
-- Incident response procedures
-
-## Troubleshooting
-
-### Common Issues
-
-- Build failures: Check Rust version and dependencies
-- Test failures: Verify test data and mock configurations
-- Network issues: Check firewall and NAT configurations
-- Performance degradation: Profile and check for resource exhaustion
-
-### Debug Commands
-
-- `/debug-network`: Diagnose networking issues
-- `/debug-consensus`: Analyze consensus state
-- `/debug-performance`: Profile performance bottlenecks
-- `/debug-security`: Check security configurations
-
-## Contribution Guidelines
-
-### Code Submission Process
-
-1. Create feature branch from `develop`
-2. Implement using TDD methodology
-3. Ensure all tests pass and coverage targets met
-4. Submit pull request with comprehensive description
-5. Address review feedback and security audit results
-
-### Review Criteria
-
-- Code follows TDD principles
-- Security requirements are met
-- Performance targets are achieved
-- Documentation is updated
-- Tests provide adequate coverage
-
-## Quick Start Commands
-
+### Research Workflow
 ```bash
-# Set up the project
-./qudag.sh
+# Start a research swarm with distributed coordination
+./claude-flow swarm "Research modern web frameworks" --strategy research --mode distributed --parallel --monitor
 
-# Navigate to project
-cd qudag-protocol
+# Or use SPARC researcher mode for focused research
+./claude-flow sparc run researcher "Analyze React vs Vue vs Angular performance characteristics"
 
-# Run initial build and tests
-cargo build
-cargo test
-
-# Run specific module tests
-cargo test -p qudag-crypto
-cargo test -p qudag-dag
-cargo test -p qudag-network
-
-# Run benchmarks
-cargo bench
-
-# Check code quality
-cargo clippy -- -D warnings
-cargo fmt --check
+# Store findings in memory for later use
+./claude-flow memory store "research_findings" "Key insights from framework analysis"
 ```
 
-## Development Workflow Example
+### Development Workflow
+```bash
+# Start orchestration system with web UI
+./claude-flow start --ui --port 3000
+
+# Run TDD workflow for new feature
+./claude-flow sparc tdd "User authentication system with JWT tokens"
+
+# Development swarm for complex projects
+./claude-flow swarm "Build e-commerce API with payment integration" --strategy development --mode hierarchical --max-agents 8 --monitor
+
+# Check system status
+./claude-flow status
+```
+
+### Analysis Workflow
+```bash
+# Analyze codebase performance
+./claude-flow sparc run analyzer "Identify performance bottlenecks in current codebase"
+
+# Data analysis swarm
+./claude-flow swarm "Analyze user behavior patterns from logs" --strategy analysis --mode mesh --parallel --output sqlite
+
+# Store analysis results
+./claude-flow memory store "performance_analysis" "Bottlenecks identified in database queries"
+```
+
+### Maintenance Workflow
+```bash
+# System maintenance with safety controls
+./claude-flow swarm "Update dependencies and security patches" --strategy maintenance --mode centralized --monitor
+
+# Security review
+./claude-flow sparc run reviewer "Security audit of authentication system"
+
+# Export maintenance logs
+./claude-flow memory export maintenance_log.json
+```
+
+## Integration Patterns
+
+### Memory-Driven Coordination
+Use Memory to coordinate information across multiple SPARC modes and swarm operations:
 
 ```bash
-# Start TDD cycle for a new cryptographic feature
-/tdd-cycle crypto ml_kem_implementation
+# Store architecture decisions
+./claude-flow memory store "system_architecture" "Microservices with API Gateway pattern"
 
-# Run security audit after implementation
-/security-audit crypto
-
-# Benchmark performance
-/performance-benchmark crypto
-
-# Create integration tests
-/create-test tests/integration/crypto_integration_tests.rs "ML-KEM integration with protocol"
-
-# Run full test suite
-cargo test --all-features --workspace
+# All subsequent operations can reference this decision
+./claude-flow sparc run coder "Implement user service based on system_architecture in memory"
+./claude-flow sparc run tester "Create integration tests for microservices architecture"
 ```
+
+### Multi-Stage Development
+Coordinate complex development through staged execution:
+
+```bash
+# Stage 1: Research and planning
+./claude-flow sparc run researcher "Research authentication best practices"
+./claude-flow sparc run architect "Design authentication system architecture"
+
+# Stage 2: Implementation
+./claude-flow sparc tdd "User registration and login functionality"
+./claude-flow sparc run coder "Implement JWT token management"
+
+# Stage 3: Testing and deployment
+./claude-flow sparc run tester "Comprehensive security testing"
+./claude-flow swarm "Deploy authentication system" --strategy maintenance --mode centralized
+```
+
+### Enterprise Integration
+For enterprise environments with additional tooling:
+
+```bash
+# Project management integration
+./claude-flow project create "authentication-system"
+./claude-flow project switch "authentication-system"
+
+# Security compliance
+./claude-flow security scan
+./claude-flow security audit
+
+# Analytics and monitoring
+./claude-flow analytics dashboard
+./claude-flow deploy production --monitor
+```
+
+## Advanced Batch Tool Patterns
+
+### TodoWrite Coordination
+Always use TodoWrite for complex task coordination:
+
+```javascript
+TodoWrite([
+  {
+    id: "architecture_design",
+    content: "Design system architecture and component interfaces",
+    status: "pending",
+    priority: "high",
+    dependencies: [],
+    estimatedTime: "60min",
+    assignedAgent: "architect"
+  },
+  {
+    id: "frontend_development", 
+    content: "Develop React components and user interface",
+    status: "pending",
+    priority: "medium",
+    dependencies: ["architecture_design"],
+    estimatedTime: "120min",
+    assignedAgent: "frontend_team"
+  }
+]);
+```
+
+### Task and Memory Integration
+Launch coordinated agents with shared memory:
+
+```javascript
+// Store architecture in memory
+Task("System Architect", "Design architecture and store specs in Memory");
+
+// Other agents use memory for coordination
+Task("Frontend Team", "Develop UI using Memory architecture specs");
+Task("Backend Team", "Implement APIs according to Memory specifications");
+```
+
+## Code Style Preferences
+- Use ES modules (import/export) syntax
+- Destructure imports when possible
+- Use TypeScript for all new code
+- Follow existing naming conventions
+- Add JSDoc comments for public APIs
+- Use async/await instead of Promise chains
+- Prefer const/let over var
+
+## Workflow Guidelines
+- Always run typecheck after making code changes
+- Run tests before committing changes
+- Use meaningful commit messages
+- Create feature branches for new functionality
+- Ensure all tests pass before merging
 
 ## Important Notes
+- **Use TodoWrite extensively** for all complex task coordination
+- **Leverage Task tool** for parallel agent execution on independent work
+- **Store all important information in Memory** for cross-agent coordination
+- **Use batch file operations** whenever reading/writing multiple files
+- **Check .claude/commands/** for detailed command documentation
+- **All swarm operations include automatic batch tool coordination**
+- **Monitor progress** with TodoRead during long-running operations
+- **Enable parallel execution** with --parallel flags for maximum efficiency
 
-- Always run `cargo fmt` before committing
-- Use `cargo clippy` to catch common mistakes
-- Run security audit on cryptographic changes
-- Benchmark performance-critical code paths
-- Update documentation with API changes
-
----
-
-For detailed technical specifications, see `docs/architecture/` directory.
-For security considerations, see `docs/security/` directory.
-For performance benchmarks, see `benchmarks/` directory.
+This configuration ensures optimal use of Claude Code's batch tools for swarm orchestration and parallel task execution with full Claude-Flow capabilities.

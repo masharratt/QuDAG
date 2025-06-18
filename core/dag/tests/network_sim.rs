@@ -1,9 +1,9 @@
-use qudag_dag::{Graph, Node, NodeState, QrAvalanche};
-use std::sync::Arc;
-use tokio::sync::mpsc;
-use std::time::Duration;
-use std::collections::HashMap;
 use blake3::Hash;
+use qudag_dag::{Graph, Node, NodeState, QrAvalanche};
+use std::collections::HashMap;
+use std::sync::Arc;
+use std::time::Duration;
+use tokio::sync::mpsc;
 use tokio::time::sleep;
 
 const NETWORK_SIZE: usize = 10;
@@ -61,10 +61,12 @@ impl NetworkSimulator {
 
     async fn simulate_consensus(&mut self, test_node: Node) {
         let node_hash = *test_node.hash();
-        
+
         // Add node to graph
         self.graph.add_node(test_node).unwrap();
-        self.graph.update_node_state(&node_hash, NodeState::Verified).unwrap();
+        self.graph
+            .update_node_state(&node_hash, NodeState::Verified)
+            .unwrap();
 
         // Start consensus on all nodes
         for node in &self.nodes {
@@ -83,7 +85,8 @@ impl NetworkSimulator {
                 for peer_id in peers {
                     if rand::random::<f64>() > PACKET_LOSS_RATE {
                         // Simulate network latency
-                        let latency = rand::random::<u64>() % (LATENCY_MAX - LATENCY_MIN) + LATENCY_MIN;
+                        let latency =
+                            rand::random::<u64>() % (LATENCY_MAX - LATENCY_MIN) + LATENCY_MIN;
                         sleep(Duration::from_millis(latency)).await;
 
                         // Random vote (biased towards acceptance)
@@ -107,15 +110,18 @@ impl NetworkSimulator {
 
     async fn collect_results(&mut self) -> HashMap<Hash, NodeState> {
         let mut results = HashMap::new();
-        
+
         for node in &self.nodes {
-            if let Some(node_state) = node.events_rx.try_recv().ok().and_then(|event| {
-                match event {
+            if let Some(node_state) = node
+                .events_rx
+                .try_recv()
+                .ok()
+                .and_then(|event| match event {
                     ConsensusEvent::NodeFinalized(hash) => Some((hash, NodeState::Final)),
                     ConsensusEvent::NodeRejected(hash) => Some((hash, NodeState::Rejected)),
                     _ => None,
-                }
-            }) {
+                })
+            {
                 results.insert(node.id, node_state.1);
             }
         }
@@ -127,9 +133,9 @@ impl NetworkSimulator {
 #[tokio::test]
 async fn test_network_consensus_basic() {
     let mut sim = NetworkSimulator::new(NETWORK_SIZE);
-    
+
     // Create test node
-    let test_node = Node::new(vec![1,2,3], vec![]);
+    let test_node = Node::new(vec![1, 2, 3], vec![]);
     let node_hash = *test_node.hash();
 
     // Run simulation
@@ -137,14 +143,17 @@ async fn test_network_consensus_basic() {
 
     // Check results
     let results = sim.collect_results().await;
-    
+
     // Verify consensus was reached
-    let finalized = results.values()
+    let finalized = results
+        .values()
         .filter(|&&state| state == NodeState::Final)
         .count();
 
-    assert!(finalized >= (NETWORK_SIZE * 2) / 3, 
-        "Expected at least 2/3 nodes to reach finality");
+    assert!(
+        finalized >= (NETWORK_SIZE * 2) / 3,
+        "Expected at least 2/3 nodes to reach finality"
+    );
 
     // Verify final state in graph
     let node = sim.graph.get_node(&node_hash).unwrap();
@@ -154,7 +163,7 @@ async fn test_network_consensus_basic() {
 #[tokio::test]
 async fn test_network_consensus_with_failures() {
     let mut sim = NetworkSimulator::new(NETWORK_SIZE);
-    
+
     // Create test node with invalid data
     let test_node = Node::new(vec![0; 1024], vec![]); // Large invalid payload
     let node_hash = *test_node.hash();
@@ -164,14 +173,17 @@ async fn test_network_consensus_with_failures() {
 
     // Check results
     let results = sim.collect_results().await;
-    
+
     // Verify rejection
-    let rejected = results.values()
+    let rejected = results
+        .values()
         .filter(|&&state| state == NodeState::Rejected)
         .count();
 
-    assert!(rejected >= (NETWORK_SIZE * 2) / 3,
-        "Expected at least 2/3 nodes to reject invalid node");
+    assert!(
+        rejected >= (NETWORK_SIZE * 2) / 3,
+        "Expected at least 2/3 nodes to reject invalid node"
+    );
 
     // Verify rejected state in graph
     let node = sim.graph.get_node(&node_hash).unwrap();
@@ -181,14 +193,14 @@ async fn test_network_consensus_with_failures() {
 #[tokio::test]
 async fn test_network_consensus_partition() {
     let mut sim = NetworkSimulator::new(NETWORK_SIZE);
-    
+
     // Create network partition by removing half of each node's peers
     for node in &mut sim.nodes {
         node.peers.truncate(node.peers.len() / 2);
     }
 
     // Create test node
-    let test_node = Node::new(vec![1,2,3], vec![]);
+    let test_node = Node::new(vec![1, 2, 3], vec![]);
     let node_hash = *test_node.hash();
 
     // Run simulation
@@ -196,14 +208,17 @@ async fn test_network_consensus_partition() {
 
     // Check results
     let results = sim.collect_results().await;
-    
+
     // Verify consensus cannot be reached with network partition
-    let finalized = results.values()
+    let finalized = results
+        .values()
         .filter(|&&state| state == NodeState::Final)
         .count();
 
-    assert!(finalized < (NETWORK_SIZE * 2) / 3,
-        "Expected consensus to fail under network partition");
+    assert!(
+        finalized < (NETWORK_SIZE * 2) / 3,
+        "Expected consensus to fail under network partition"
+    );
 
     // Verify node remains in Verified state
     let node = sim.graph.get_node(&node_hash).unwrap();

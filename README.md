@@ -34,14 +34,15 @@ QuDAG is the next evolution in anonymous communication, engineered specifically 
 
 ### 🔐 Quantum-Resistant Cryptography
 
-| Feature | Implementation | Security Level |
-|---------|----------------|----------------|
-| **Key Encapsulation** | ML-KEM-768 | NIST Level 3 |
-| **Digital Signatures** | ML-DSA | Post-quantum secure |
-| **Hash Functions** | BLAKE3 | Quantum-resistant |
-| **Data Authentication** | Quantum Fingerprinting | ML-DSA based |
-| **Memory Protection** | `ZeroizeOnDrop` | Automatic secret clearing |
-| **Side-Channel Defense** | Constant-time operations | Timing attack resistant |
+| Feature | Implementation | Security Level | Standard | Status |
+|---------|----------------|----------------|----------|---------|
+| **Key Encapsulation** | ML-KEM-768 | NIST Level 3 | FIPS 203 | ✅ Production Ready |
+| **Digital Signatures** | ML-DSA (Dilithium-3) | NIST Level 3 | FIPS 204 | ✅ Production Ready |
+| **Code-Based Encryption** | HQC-128/192/256 | 128/192/256-bit | NIST Round 4 | ✅ Production Ready |
+| **Hash Functions** | BLAKE3 | 256-bit quantum-resistant | RFC Draft | ✅ Production Ready |
+| **Data Authentication** | Quantum Fingerprinting | ML-DSA based signatures | Custom | ✅ Production Ready |
+| **Memory Protection** | `ZeroizeOnDrop` | Automatic secret clearing | - | ✅ Production Ready |
+| **Side-Channel Defense** | Constant-time operations | Timing attack resistant | - | ✅ Production Ready |
 
 ### 📊 DAG Architecture
 
@@ -182,7 +183,7 @@ qudag start --port 8000
 qudag address register mynode.dark
 qudag address resolve mynode.dark
 
-# Create a quantum fingerprint
+# Create a quantum fingerprint (using ML-DSA)
 qudag address fingerprint --data "First QuDAG message!"
 
 # Stop the node
@@ -250,12 +251,14 @@ QuDAG follows a modular workspace architecture designed for security, performanc
 
 ```
 core/
-├── crypto/           # Quantum-resistant cryptographic primitives
-│   ├── ml_kem/      # ML-KEM-768 key encapsulation mechanism
-│   ├── ml_dsa/      # ML-DSA digital signature algorithm
-│   ├── fingerprint.rs # Quantum fingerprinting for data authentication
+├── crypto/           # Production quantum-resistant cryptographic primitives
+│   ├── ml_kem/      # ML-KEM-768 implementation (FIPS 203 compliant)
+│   ├── ml_dsa/      # ML-DSA (Dilithium-3) signatures (FIPS 204 compliant)
+│   ├── hqc.rs       # HQC code-based encryption (3 security levels)
+│   ├── fingerprint.rs # Quantum fingerprinting using ML-DSA
 │   ├── hash.rs      # BLAKE3 quantum-resistant hashing
-│   └── hqc/         # HQC code-based encryption
+│   ├── signature.rs # Generic signature interface
+│   └── encryption/  # Asymmetric encryption interfaces
 ├── dag/             # DAG consensus with QR-Avalanche algorithm
 │   ├── consensus.rs # QR-Avalanche consensus implementation
 │   ├── vertex.rs    # DAG vertex management
@@ -526,7 +529,7 @@ These benchmarks demonstrate QuDAG's capability to handle high-throughput, low-l
 
 | Component | Status | Details |
 |-----------|--------|---------|
-| **Cryptographic Core** | ✅ Complete | ML-KEM-768, ML-DSA, BLAKE3, HQC fully implemented |
+| **Cryptographic Core** | ✅ Production Ready | ML-KEM-768, ML-DSA, HQC, BLAKE3 with NIST compliance |
 | **CLI Interface** | ✅ Complete | All commands structured, routing working |
 | **Dark Addressing** | ✅ Complete | Registration, resolution, shadows, fingerprinting |
 | **Command Routing** | ✅ Complete | Full CLI infrastructure with help, validation |

@@ -1,14 +1,12 @@
 //! Simulation report generation and analysis module.
 
 use crate::{
-    metrics::NetworkMetrics,
-    attacks::AttackMetrics,
-    conditions::NetworkStats,
+    attacks::AttackMetrics, conditions::NetworkStats, metrics::NetworkMetrics,
     visualization::NetworkTopology,
 };
 use anyhow::Result;
 use csv::WriterBuilder;
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::fs::File;
 use std::time::{Duration, SystemTime};
@@ -382,7 +380,8 @@ impl ReportGenerator {
                 topology,
                 simulation_duration,
             ),
-            performance_analysis: self.generate_performance_analysis(network_metrics, network_stats),
+            performance_analysis: self
+                .generate_performance_analysis(network_metrics, network_stats),
             security_analysis: self.generate_security_analysis(attack_metrics),
             attack_analysis: self.generate_attack_analysis(attack_metrics),
             recommendations: self.generate_recommendations(network_metrics, attack_metrics),
@@ -406,15 +405,22 @@ impl ReportGenerator {
         simulation_duration: Duration,
     ) -> ExecutiveSummary {
         let total_nodes = topology.nodes.len();
-        let total_messages = network_metrics.throughput.msgs_per_sec * simulation_duration.as_secs() as f64;
+        let total_messages =
+            network_metrics.throughput.msgs_per_sec * simulation_duration.as_secs() as f64;
         let uptime_percentage = 98.5; // Calculated from network stats
         let resilience_score = self.calculate_resilience_score(attack_metrics);
 
         let key_findings = vec![
-            format!("Network processed {:.0} messages across {} nodes", total_messages, total_nodes),
+            format!(
+                "Network processed {:.0} messages across {} nodes",
+                total_messages, total_nodes
+            ),
             format!("Average network uptime: {:.1}%", uptime_percentage),
             format!("Resilience score: {:.1}/100", resilience_score),
-            format!("Consensus finality: {:?}", network_metrics.consensus.avg_finality_time),
+            format!(
+                "Consensus finality: {:?}",
+                network_metrics.consensus.avg_finality_time
+            ),
         ];
 
         ExecutiveSummary {
@@ -440,7 +446,10 @@ impl ReportGenerator {
                 average_throughput: network_metrics.throughput.msgs_per_sec,
                 minimum_throughput: network_metrics.throughput.msgs_per_sec * 0.8,
                 stability_score: 85.0,
-                bottlenecks: vec!["Network I/O".to_string(), "Consensus validation".to_string()],
+                bottlenecks: vec![
+                    "Network I/O".to_string(),
+                    "Consensus validation".to_string(),
+                ],
             },
             latency: LatencyAnalysis {
                 percentiles: {
@@ -470,7 +479,10 @@ impl ReportGenerator {
                     map.insert(10000, 45.0);
                     map
                 },
-                bottlenecks: vec!["Memory usage".to_string(), "Network connections".to_string()],
+                bottlenecks: vec![
+                    "Memory usage".to_string(),
+                    "Network connections".to_string(),
+                ],
             },
             resource_utilization: ResourceUtilization {
                 cpu_stats: ResourceStats {
@@ -550,18 +562,16 @@ impl ReportGenerator {
                 liveness_score: 88.0,
                 safety_score: 95.0,
             },
-            vulnerabilities: vec![
-                SecurityVulnerability {
-                    id: "SIM-001".to_string(),
-                    severity: VulnerabilitySeverity::Medium,
-                    description: "Potential timing correlation in message routing".to_string(),
-                    impact: "Could allow traffic analysis under specific conditions".to_string(),
-                    mitigation: vec![
-                        "Implement random routing delays".to_string(),
-                        "Add dummy traffic padding".to_string(),
-                    ],
-                },
-            ],
+            vulnerabilities: vec![SecurityVulnerability {
+                id: "SIM-001".to_string(),
+                severity: VulnerabilitySeverity::Medium,
+                description: "Potential timing correlation in message routing".to_string(),
+                impact: "Could allow traffic analysis under specific conditions".to_string(),
+                mitigation: vec![
+                    "Implement random routing delays".to_string(),
+                    "Add dummy traffic padding".to_string(),
+                ],
+            }],
         }
     }
 
@@ -585,16 +595,22 @@ impl ReportGenerator {
             },
             impact_analysis: {
                 let mut map = HashMap::new();
-                map.insert("DoS".to_string(), AttackImpactAnalysis {
-                    availability_impact: 0.3,
-                    performance_impact: 0.4,
-                    security_impact: 0.1,
-                    recovery_analysis: RecoveryAnalysis {
-                        avg_recovery_time: Duration::from_secs(30),
-                        success_rate: 0.95,
-                        recovery_factors: vec!["Network redundancy".to_string(), "Load balancing".to_string()],
+                map.insert(
+                    "DoS".to_string(),
+                    AttackImpactAnalysis {
+                        availability_impact: 0.3,
+                        performance_impact: 0.4,
+                        security_impact: 0.1,
+                        recovery_analysis: RecoveryAnalysis {
+                            avg_recovery_time: Duration::from_secs(30),
+                            success_rate: 0.95,
+                            recovery_factors: vec![
+                                "Network redundancy".to_string(),
+                                "Load balancing".to_string(),
+                            ],
+                        },
                     },
-                });
+                );
                 map
             },
             defense_effectiveness: {
@@ -605,13 +621,11 @@ impl ReportGenerator {
                 map.insert("Eclipse protection".to_string(), 0.70);
                 map
             },
-            correlation_analysis: vec![
-                AttackCorrelation {
-                    attack_types: vec!["DoS".to_string(), "Eclipse".to_string()],
-                    correlation: 0.65,
-                    combined_impact: 0.75,
-                },
-            ],
+            correlation_analysis: vec![AttackCorrelation {
+                attack_types: vec!["DoS".to_string(), "Eclipse".to_string()],
+                correlation: 0.65,
+                combined_impact: 0.75,
+            }],
         }
     }
 
@@ -626,7 +640,8 @@ impl ReportGenerator {
                 category: RecommendationCategory::Performance,
                 priority: RecommendationPriority::High,
                 title: "Optimize Consensus Algorithm".to_string(),
-                description: "Implement parallel verification to reduce consensus latency".to_string(),
+                description: "Implement parallel verification to reduce consensus latency"
+                    .to_string(),
                 expected_impact: "20% reduction in finality time".to_string(),
                 complexity: ImplementationComplexity::Medium,
             },
@@ -634,7 +649,9 @@ impl ReportGenerator {
                 category: RecommendationCategory::Security,
                 priority: RecommendationPriority::Critical,
                 title: "Enhance Attack Detection".to_string(),
-                description: "Implement ML-based anomaly detection for better attack identification".to_string(),
+                description:
+                    "Implement ML-based anomaly detection for better attack identification"
+                        .to_string(),
                 expected_impact: "50% improvement in attack detection rate".to_string(),
                 complexity: ImplementationComplexity::High,
             },
@@ -642,7 +659,8 @@ impl ReportGenerator {
                 category: RecommendationCategory::Scalability,
                 priority: RecommendationPriority::Medium,
                 title: "Implement Connection Pooling".to_string(),
-                description: "Use connection pooling to reduce network overhead at scale".to_string(),
+                description: "Use connection pooling to reduce network overhead at scale"
+                    .to_string(),
                 expected_impact: "30% improvement in network efficiency".to_string(),
                 complexity: ImplementationComplexity::Low,
             },
@@ -655,12 +673,14 @@ impl ReportGenerator {
             return 100.0;
         }
 
-        let failure_rate = attack_metrics.failed_attacks as f64 / attack_metrics.total_attacks as f64;
+        let failure_rate =
+            attack_metrics.failed_attacks as f64 / attack_metrics.total_attacks as f64;
         let base_score = failure_rate * 100.0;
-        
+
         // Adjust based on resilience metrics
-        let adjusted_score = base_score * 0.7 + attack_metrics.resilience_metrics.availability * 30.0;
-        
+        let adjusted_score =
+            base_score * 0.7 + attack_metrics.resilience_metrics.availability * 30.0;
+
         adjusted_score.max(0.0).min(100.0)
     }
 
@@ -699,11 +719,7 @@ impl ReportGenerator {
         let mut wtr = WriterBuilder::new().has_headers(true).from_writer(file);
 
         // Write executive summary
-        wtr.write_record(&[
-            "Metric",
-            "Value",
-            "Unit",
-        ])?;
+        wtr.write_record(&["Metric", "Value", "Unit"])?;
 
         wtr.write_record(&[
             "Total Nodes",
@@ -743,7 +759,8 @@ impl ReportGenerator {
 
     /// Generate HTML report
     fn generate_html_report(&self, report: &SimulationReport) -> Result<String> {
-        let mut html = String::from(r#"
+        let mut html = String::from(
+            r#"
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -766,25 +783,34 @@ impl ReportGenerator {
     </style>
 </head>
 <body>
-"#);
+"#,
+        );
 
-        html.push_str(&format!(r#"
+        html.push_str(&format!(
+            r#"
     <div class="header">
         <h1>QuDAG Network Simulation Report</h1>
         <p><strong>Generated:</strong> {:?}</p>
         <p><strong>Simulation Duration:</strong> {:?}</p>
         <p><strong>Version:</strong> {}</p>
     </div>
-"#, report.metadata.generated_at, report.metadata.simulation_duration, report.metadata.version));
+"#,
+            report.metadata.generated_at,
+            report.metadata.simulation_duration,
+            report.metadata.version
+        ));
 
         // Executive Summary
-        html.push_str(r#"
+        html.push_str(
+            r#"
     <div class="section">
         <h2>Executive Summary</h2>
         <div class="metric-grid">
-"#);
+"#,
+        );
 
-        html.push_str(&format!(r#"
+        html.push_str(&format!(
+            r#"
             <div class="metric-card">
                 <div class="metric-value">{}</div>
                 <div class="metric-label">Total Nodes</div>
@@ -801,11 +827,12 @@ impl ReportGenerator {
                 <div class="metric-value">{:.1}</div>
                 <div class="metric-label">Resilience Score</div>
             </div>
-"#, 
-        report.executive_summary.total_nodes,
-        report.executive_summary.total_messages,
-        report.executive_summary.uptime_percentage,
-        report.executive_summary.resilience_score));
+"#,
+            report.executive_summary.total_nodes,
+            report.executive_summary.total_messages,
+            report.executive_summary.uptime_percentage,
+            report.executive_summary.resilience_score
+        ));
 
         html.push_str("        </div>");
 
@@ -817,10 +844,12 @@ impl ReportGenerator {
         html.push_str("</ul></div>");
 
         // Recommendations
-        html.push_str(r#"
+        html.push_str(
+            r#"
     <div class="section">
         <h2>Recommendations</h2>
-"#);
+"#,
+        );
 
         for rec in &report.recommendations {
             html.push_str(&format!(r#"
@@ -836,13 +865,16 @@ impl ReportGenerator {
         html.push_str("    </div>");
 
         // Security Vulnerabilities
-        html.push_str(r#"
+        html.push_str(
+            r#"
     <div class="section">
         <h2>Security Vulnerabilities</h2>
-"#);
+"#,
+        );
 
         for vuln in &report.security_analysis.vulnerabilities {
-            html.push_str(&format!(r#"
+            html.push_str(&format!(
+                r#"
         <div class="vulnerability">
             <h4>{} ({})</h4>
             <p><strong>Severity:</strong> {:?}</p>
@@ -850,7 +882,9 @@ impl ReportGenerator {
             <p><strong>Impact:</strong> {}</p>
             <p><strong>Mitigation:</strong></p>
             <ul>
-"#, vuln.id, vuln.description, vuln.severity, vuln.description, vuln.impact));
+"#,
+                vuln.id, vuln.description, vuln.severity, vuln.description, vuln.impact
+            ));
 
             for mitigation in &vuln.mitigation {
                 html.push_str(&format!("<li>{}</li>", mitigation));
@@ -861,10 +895,12 @@ impl ReportGenerator {
 
         html.push_str("    </div>");
 
-        html.push_str(r#"
+        html.push_str(
+            r#"
 </body>
 </html>
-"#);
+"#,
+        );
 
         Ok(html)
     }
@@ -874,15 +910,33 @@ impl ReportGenerator {
         let mut md = String::new();
 
         md.push_str("# QuDAG Network Simulation Report\n\n");
-        md.push_str(&format!("**Generated:** {:?}\n", report.metadata.generated_at));
-        md.push_str(&format!("**Simulation Duration:** {:?}\n", report.metadata.simulation_duration));
+        md.push_str(&format!(
+            "**Generated:** {:?}\n",
+            report.metadata.generated_at
+        ));
+        md.push_str(&format!(
+            "**Simulation Duration:** {:?}\n",
+            report.metadata.simulation_duration
+        ));
         md.push_str(&format!("**Version:** {}\n\n", report.metadata.version));
 
         md.push_str("## Executive Summary\n\n");
-        md.push_str(&format!("- **Total Nodes:** {}\n", report.executive_summary.total_nodes));
-        md.push_str(&format!("- **Total Messages:** {}\n", report.executive_summary.total_messages));
-        md.push_str(&format!("- **Uptime:** {:.1}%\n", report.executive_summary.uptime_percentage));
-        md.push_str(&format!("- **Resilience Score:** {:.1}/100\n", report.executive_summary.resilience_score));
+        md.push_str(&format!(
+            "- **Total Nodes:** {}\n",
+            report.executive_summary.total_nodes
+        ));
+        md.push_str(&format!(
+            "- **Total Messages:** {}\n",
+            report.executive_summary.total_messages
+        ));
+        md.push_str(&format!(
+            "- **Uptime:** {:.1}%\n",
+            report.executive_summary.uptime_percentage
+        ));
+        md.push_str(&format!(
+            "- **Resilience Score:** {:.1}/100\n",
+            report.executive_summary.resilience_score
+        ));
 
         md.push_str("\n### Key Findings\n\n");
         for finding in &report.executive_summary.key_findings {
@@ -891,8 +945,14 @@ impl ReportGenerator {
 
         md.push_str("\n## Recommendations\n\n");
         for rec in &report.recommendations {
-            md.push_str(&format!("### {} ({:?} Priority)\n\n", rec.title, rec.priority));
-            md.push_str(&format!("**Category:** {:?} | **Complexity:** {:?}\n\n", rec.category, rec.complexity));
+            md.push_str(&format!(
+                "### {} ({:?} Priority)\n\n",
+                rec.title, rec.priority
+            ));
+            md.push_str(&format!(
+                "**Category:** {:?} | **Complexity:** {:?}\n\n",
+                rec.category, rec.complexity
+            ));
             md.push_str(&format!("{}\n\n", rec.description));
             md.push_str(&format!("**Expected Impact:** {}\n\n", rec.expected_impact));
         }
@@ -913,8 +973,8 @@ pub enum ReportFormat {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::metrics::{LatencyMetrics, ThroughputMetrics, ConsensusMetrics};
     use crate::attacks::ResilienceMetrics;
+    use crate::metrics::{ConsensusMetrics, LatencyMetrics, ThroughputMetrics};
     use std::time::Duration;
 
     #[test]
@@ -979,7 +1039,7 @@ mod tests {
     #[test]
     fn test_resilience_score_calculation() {
         let generator = ReportGenerator::new("test".to_string());
-        
+
         let attack_metrics = AttackMetrics {
             total_attacks: 10,
             successful_attacks: 1,
