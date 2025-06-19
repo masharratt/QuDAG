@@ -49,7 +49,7 @@ enum Commands {
         log_level: String,
 
         /// Initial peers to connect to
-        #[arg(short = 'p', long = "peer")]
+        #[arg(long = "peer")]
         peers: Vec<String>,
 
         /// Run node in background (daemon mode)
