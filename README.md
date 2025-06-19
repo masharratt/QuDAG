@@ -2,9 +2,9 @@
 
 > The Darkest of Darknets - Built for the Quantum Age
 
-QuDAG is a revolutionary anonymous communication platform designed to keep your conversations private, even from quantum computers. Think of it as the ultimate secure messaging system that protects your identity and data using cutting-edge cryptography that can't be broken by future quantum computing attacks.
+QuDAG is a revolutionary quantum-resistant distributed communication platform built on a Directed Acyclic Graph (DAG) architecture. Unlike traditional blockchain systems that use linear chains, QuDAG uses a DAG structure for parallel message processing and consensus, enabling high throughput while maintaining cryptographic security against quantum computing attacks.
 
-Unlike traditional messaging apps that rely on centralized servers, QuDAG creates a decentralized network where your messages are routed through multiple encrypted layers (like onion routing), making it virtually impossible to trace who's talking to whom. It's built for activists, journalists, privacy advocates, and anyone who needs truly secure communication without compromising on performance.
+The platform creates a decentralized mesh network where messages are processed through a DAG-based consensus mechanism and routed through multiple encrypted layers (onion routing), making communication both scalable and anonymous. It's designed for applications requiring secure, high-performance distributed messaging without centralized infrastructure.
 
 **Key Highlights:**
 - 🔒 Post-quantum cryptography using ML-KEM-768 & ML-DSA with BLAKE3
@@ -94,24 +94,34 @@ Unlike traditional messaging apps that rely on centralized servers, QuDAG create
 
 ## How It Works
 
-### Network Architecture
+### DAG Architecture
 ```
-Peer A ←→ [Multiple Encrypted Paths] ←→ Peer B
-   ↑         ↑         ↑        ↑         ↑
-   └─ ML-KEM-768 Encrypted Segments ─────┘
+     Message C ────┐
+    ╱              ▼
+Message A ───► [DAG Vertex] ◄─── Message D
+    ╲              ▲
+     Message B ────┘
+     
+Each vertex contains:
+- ML-KEM encrypted payload
+- Parent vertex references  
+- ML-DSA signatures
+- Consensus metadata
 ```
 
 ### Core Components
-- Quantum-resistant keypair generation
-- Message encryption and signing
-- DAG-based message ordering
-- P2P network communication
+- **DAG Consensus**: QR-Avalanche algorithm for Byzantine fault tolerance
+- **Vertex Processing**: Parallel message validation and ordering
+- **Quantum Cryptography**: ML-KEM-768 encryption + ML-DSA signatures
+- **P2P Network**: LibP2P mesh with Kademlia DHT discovery
+- **Anonymous Routing**: Multi-hop onion routing through the DAG
 
-### Messaging Flow
-1. Message split into shards
-2. Each shard encrypted with ML-KEM-768
-3. Shards routed through different paths
-4. Reassembly at destination
+### Message Processing Flow
+1. **Message Creation**: Encrypt with ML-KEM-768, sign with ML-DSA
+2. **DAG Insertion**: Create vertex with parent references
+3. **Consensus**: QR-Avalanche validation across network
+4. **Propagation**: Distribute through P2P mesh network
+5. **Finalization**: Achieve consensus finality in DAG structure
 
 ## Current Implementation Status
 
@@ -581,13 +591,13 @@ Dark Addressing Performance
 └── Address Validation:  0.034ms (29,412 ops/sec)
 ```
 
-#### Consensus Performance
+#### DAG Consensus Performance
 ```
-QR-Avalanche Consensus
+QR-Avalanche DAG Consensus
 ├── Vertex Validation:   2.1ms   (476 ops/sec)
 ├── Consensus Round:     145ms   (6.9 ops/sec)
-├── Finality Time:       <1s     (99th percentile)
-└── Throughput:         10,000+  TPS (theoretical)
+├── DAG Finality:        <1s     (99th percentile)
+└── Vertex Throughput:   10,000+ vertices/sec (theoretical)
 ```
 
 #### System Resource Usage
@@ -619,7 +629,7 @@ End-to-End Message Latency
 ├── 5-Hop Onion:        142ms   (median)
 └── 7-Hop Onion:        203ms   (median)
 
-Consensus Finality
+DAG Consensus Finality
 ├── Single Vertex:      150ms   (median)
 ├── Batch Processing:   280ms   (median)
 ├── High Contention:    450ms   (median)
@@ -630,7 +640,7 @@ Consensus Finality
 
 #### Horizontal Scaling
 - **Node Count**: Linear throughput scaling up to 1,000 nodes
-- **Consensus**: Sub-linear scaling with network size (Byzantine consensus)
+- **DAG Consensus**: Sub-linear scaling with network size (Byzantine fault tolerance)
 - **Network**: O(log n) routing with Kademlia DHT
 
 #### Vertical Scaling
@@ -652,11 +662,11 @@ Consensus Finality
 - **Traffic Shaping**: Intelligent batching and timing
 - **Compression**: Efficient message serialization
 
-#### Consensus Optimizations
-- **Parallel Processing**: Concurrent consensus rounds
+#### DAG Consensus Optimizations
+- **Parallel Processing**: Concurrent vertex validation
 - **Early Termination**: Fast finality under good conditions
 - **Adaptive Thresholds**: Dynamic adjustment based on network health
-- **State Pruning**: Efficient memory management for large DAGs
+- **DAG Pruning**: Efficient memory management for large DAG structures
 
 These benchmarks demonstrate QuDAG's capability to handle high-throughput, low-latency anonymous communication while maintaining post-quantum security guarantees.
 
