@@ -4,11 +4,14 @@
 
 QuDAG is a revolutionary quantum-resistant distributed communication platform built on a Directed Acyclic Graph (DAG) architecture. Unlike traditional blockchain systems that use linear chains, QuDAG uses a DAG structure for parallel message processing and consensus, enabling high throughput while maintaining cryptographic security against quantum computing attacks.
 
-The platform creates a decentralized mesh network where messages are processed through a DAG-based consensus mechanism and routed through multiple encrypted layers (onion routing), making communication both scalable and anonymous. It's designed for applications requiring secure, high-performance distributed messaging without centralized infrastructure.
+The platform creates a decentralized mesh network where messages are processed through a DAG-based consensus mechanism and routed through multiple encrypted layers (onion routing), making communication both scalable and anonymous. **What makes QuDAG truly unique is its built-in dark domain system** - allowing you to register and resolve human-readable `.dark` addresses (like `myservice.dark`) without any central authority, creating your own darknet namespace with quantum-resistant authentication.
+
+Think of it as combining the anonymity of Tor with the decentralization of Bitcoin, but built for the quantum age and optimized for high-performance communication rather than financial transactions.
 
 **Key Highlights:**
 - 🔒 Post-quantum cryptography using ML-KEM-768 & ML-DSA with BLAKE3
 - ⚡ High-performance asynchronous DAG with QR-Avalanche consensus
+- 🌐 Built-in `.dark` domain system for decentralized darknet addressing
 - 🕵️ Anonymous onion routing with ChaCha20Poly1305 traffic obfuscation
 - 🛡️ Memory-safe Rust implementation with zero unsafe code
 - 🔗 LibP2P-based networking with Kademlia DHT peer discovery
@@ -26,7 +29,10 @@ The platform creates a decentralized mesh network where messages are processed t
 | | Distributed content storage | Content-addressed storage with quantum fingerprints |
 | | Secure relay networks | Anonymous relay nodes for traffic obfuscation |
 | | Anonymous networking | Onion routing with quantum-resistant encryption |
-| | Dark addressing | `.dark` domains with quantum fingerprints |
+| **🌐 Dark Domain System** | Decentralized naming | Register human-readable `.dark` domains without central authority |
+| | Quantum-resistant DNS | ML-DSA authenticated domain resolution with quantum fingerprints |
+| | Shadow addresses | Temporary `.shadow` domains for ephemeral communication |
+| | Darknet namespaces | Create your own darknet identity and addressing system |
 | **🛡️ Privacy Applications** | Anonymous messaging | Metadata-resistant communication channels |
 | | Private data transfer | Untraceable data exchange between parties |
 | | Secure group coordination | Private collaboration without identity exposure |
@@ -243,11 +249,18 @@ cargo test --features security-tests
 # Start your first node
 qudag start --port 8000
 
-# In another terminal, test dark addressing
+# In another terminal, create your own darknet domain
 qudag address register mynode.dark
+qudag address register secret-service.dark
+qudag address register anonymous-chat.dark
+
+# Resolve any .dark domain to find peers
 qudag address resolve mynode.dark
 
-# Create a quantum fingerprint (using ML-DSA)
+# Generate temporary shadow addresses for ephemeral communication
+qudag address shadow --ttl 3600
+
+# Create quantum-resistant content fingerprints
 qudag address fingerprint --data "First QuDAG message!"
 
 # Stop the node
