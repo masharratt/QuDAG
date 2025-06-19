@@ -1,30 +1,97 @@
-# QuDAG Protocol API Documentation
+# QuDAG API Documentation
 
-This directory contains comprehensive API documentation for the QuDAG quantum-resistant DAG-based anonymous communication protocol.
+Complete reference for the QuDAG JSON-RPC API and P2P protocol interfaces.
 
-## Core Modules
+## JSON-RPC API
 
-- [Cryptography](crypto.md) - Post-quantum cryptographic primitives
-- [DAG](dag.md) - DAG-based consensus implementation
-- [Network](network.md) - P2P networking with anonymous routing
-- [Protocol](protocol.md) - Main protocol implementation
+### Connection
+- **Default Endpoint:** `http://localhost:9090`
+- **Protocol:** JSON-RPC 2.0
+- **Transport:** HTTP, TCP, or Unix sockets
 
-## Documentation Structure
+### Node Management Methods
 
-Each module's documentation includes:
+#### `get_status`
+Get comprehensive node status.
 
-- Public interface definitions
-- Type and error descriptions 
-- Configuration options
-- Usage examples
-- Error handling
-- Security considerations
+**Request:**
+```json
+{
+  "id": 1,
+  "method": "get_status",
+  "params": {}
+}
+```
 
-## Quick Links
+**Response:**
+```json
+{
+  "id": 1,
+  "result": {
+    "node_id": "12D3KooW...",
+    "status": "running",
+    "uptime": 3600,
+    "network": {
+      "peer_count": 5,
+      "listening_addrs": ["/ip4/0.0.0.0/tcp/8000"]
+    },
+    "dag": {
+      "vertex_count": 1234,
+      "consensus_state": "active"
+    }
+  }
+}
+```
 
-- [Getting Started](protocol.md#getting-started)
-- [Error Handling](protocol.md#error-handling)
-- [Security Guidelines](protocol.md#security-guidelines)
-- [Configuration Reference](protocol.md#configuration)
+#### `list_peers`
+List all connected peers.
 
-Refer to individual module documentation for detailed API references and usage patterns.
+**Request:**
+```json
+{
+  "id": 2,
+  "method": "list_peers",
+  "params": {}
+}
+```
+
+#### `add_peer`
+Connect to a new peer.
+
+**Request:**
+```json
+{
+  "id": 3,
+  "method": "add_peer",
+  "params": {
+    "multiaddr": "/ip4/192.168.1.100/tcp/8000"
+  }
+}
+```
+
+### Network Methods
+
+#### `get_network_stats`
+Get network performance statistics.
+
+**Request:**
+```json
+{
+  "id": 4,
+  "method": "get_network_stats",
+  "params": {}
+}
+```
+
+## P2P Protocol API
+
+### Protocol Identifiers
+- `/qudag/req/1.0.0` - Request/response messaging
+- `/kad/1.0.0` - Kademlia DHT
+- `/gossipsub/1.1.0` - Pub/sub messaging
+- `/dark-resolve/1.0.0` - Address resolution
+
+### Security
+All connections use ML-KEM-768 encryption and ML-DSA signatures.
+
+For complete API specification, see the full documentation.

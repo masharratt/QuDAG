@@ -2,7 +2,9 @@
 
 > The Darkest of Darknets - Built for the Quantum Age
 
-QuDAG is the next evolution in anonymous communication, engineered specifically for the quantum internet era. By combining post-quantum cryptography with advanced DAG consensus, it creates a new foundation for private messaging infrastructure.
+QuDAG is a revolutionary anonymous communication platform designed to keep your conversations private, even from quantum computers. Think of it as the ultimate secure messaging system that protects your identity and data using cutting-edge cryptography that can't be broken by future quantum computing attacks.
+
+Unlike traditional messaging apps that rely on centralized servers, QuDAG creates a decentralized network where your messages are routed through multiple encrypted layers (like onion routing), making it virtually impossible to trace who's talking to whom. It's built for activists, journalists, privacy advocates, and anyone who needs truly secure communication without compromising on performance.
 
 **Key Highlights:**
 - 🔒 Post-quantum cryptography using ML-KEM-768 & ML-DSA with BLAKE3
@@ -242,60 +244,186 @@ qudag address fingerprint --data "First QuDAG message!"
 qudag stop
 ```
 
-## CLI Usage
+## CLI & API Overview
 
-### Command Reference
+QuDAG provides multiple interfaces for interacting with the protocol, from command-line tools to programmatic APIs.
 
-| Category | Command | Description | Status |
-|----------|---------|-------------|--------|
-| **Node Management** | | | |
-| | `qudag start [--port PORT] [--data-dir DIR]` | Start a QuDAG node | ⚙️ CLI only |
-| | `qudag stop [--port PORT]` | Stop a running node via RPC | ⚙️ CLI only |
-| | `qudag status` | Get node status and health | ⚙️ CLI only |
-| **Peer Management** | | | |
-| | `qudag peer list` | List connected peers | 🚧 Not implemented |
-| | `qudag peer add <ADDRESS>` | Add a peer by address | 🚧 Not implemented |
-| | `qudag peer remove <ADDRESS>` | Remove a peer | 🚧 Not implemented |
-| **Network Operations** | | | |
-| | `qudag network stats` | Get network statistics | ⚙️ CLI only |
-| | `qudag network test` | Run connectivity tests | ⚙️ CLI only |
-| **Dark Addressing** | | | |
-| | `qudag address register <DOMAIN>` | Register .dark domain | ✅ Fully working |
-| | `qudag address resolve <DOMAIN>` | Resolve .dark domain | ✅ Fully working |
-| | `qudag address shadow [--ttl SECONDS]` | Generate shadow address | ✅ Fully working |
-| | `qudag address fingerprint --data <DATA>` | Create quantum fingerprint | ✅ Fully working |
+### 🖥️ Command Line Interface (CLI)
 
-### Quick Start Examples
+The QuDAG CLI provides comprehensive access to all protocol features:
 
+#### **Node Management**
 ```bash
-# Start a node with custom configuration
-qudag start --port 8000 --data-dir ./my-node-data --log-level debug
-
-# Register and resolve dark addresses
-qudag address register myservice.dark
-qudag address resolve myservice.dark
-
-# Generate temporary shadow addresses
-qudag address shadow --ttl 3600  # 1 hour TTL
-qudag address shadow --ttl 86400 # 24 hour TTL
-
-# Create quantum-resistant fingerprints
-qudag address fingerprint --data "Hello, quantum world!"
-qudag address fingerprint --data "$(cat important-file.txt)"
-
-# Stop the node gracefully
-qudag stop --port 8000
+qudag start --port 8000                    # Start a QuDAG node
+qudag stop                                  # Stop running node
+qudag status                               # Get node health and status
+qudag restart                              # Restart node with same config
 ```
 
-### Configuration Options
+#### **Peer & Network Operations**
+```bash
+qudag peer list                            # List connected peers
+qudag peer add <multiaddr>                 # Connect to peer
+qudag peer remove <peer_id>                # Disconnect from peer
+qudag peer ban <peer_id>                   # Ban peer (blacklist)
+qudag network stats                        # Network performance metrics
+qudag network test                         # Test peer connectivity
+```
 
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `--port` | 8000 | Network port for node communication |
-| `--data-dir` | `./data` | Directory for node data storage |
-| `--log-level` | `info` | Logging level (trace, debug, info, warn, error) |
-| `--max-peers` | 50 | Maximum number of peer connections |
-| `--ttl` | 3600 | Time-to-live for shadow addresses (seconds) |
+#### **Dark Addressing System**
+```bash
+qudag address register mynode.dark         # Register .dark domain
+qudag address resolve domain.dark          # Resolve dark address
+qudag address shadow --ttl 3600           # Generate temporary address
+qudag address fingerprint --data "text"    # Create quantum fingerprint
+qudag address list                        # List registered domains
+```
+
+#### **Advanced Features**
+```bash
+qudag logs --follow                       # Stream node logs
+qudag systemd --output /etc/systemd      # Generate systemd service
+```
+
+**📚 For detailed CLI documentation:** [docs/cli/README.md](docs/cli/README.md)
+
+### 🔌 JSON-RPC API
+
+QuDAG runs a production-ready JSON-RPC server for programmatic access:
+
+#### **Connection Details**
+- **Protocol**: JSON-RPC 2.0 over TCP/HTTP
+- **Default Port**: 9090 
+- **Authentication**: Optional ML-DSA signatures
+- **Transport**: TCP sockets or Unix domain sockets
+
+#### **Available Methods**
+```javascript
+// Node management
+{"method": "get_status", "params": {}}
+{"method": "stop", "params": {}}
+
+// Peer management
+{"method": "list_peers", "params": {}}
+{"method": "add_peer", "params": {"address": "/ip4/.../tcp/8000"}}
+{"method": "remove_peer", "params": {"peer_id": "12D3Koo..."}}
+{"method": "ban_peer", "params": {"peer_id": "12D3Koo..."}}
+
+// Network operations
+{"method": "get_network_stats", "params": {}}
+{"method": "test_network", "params": {}}
+```
+
+#### **Example Usage**
+```bash
+# Get node status
+curl -X POST http://localhost:9090 \
+  -H "Content-Type: application/json" \
+  -d '{"id": 1, "method": "get_status", "params": {}}'
+
+# List connected peers
+curl -X POST http://localhost:9090 \
+  -H "Content-Type: application/json" \
+  -d '{"id": 2, "method": "list_peers", "params": {}}'
+```
+
+**📚 For complete API reference:** [docs/api/README.md](docs/api/README.md)
+
+### 🌐 P2P Protocol API
+
+Direct access to the P2P network layer for advanced integration:
+
+#### **Network Protocols**
+- **Port**: 8000 (default, configurable)
+- **Transport**: libp2p with multiple protocols
+- **Encryption**: ML-KEM-768 for all communications
+- **Discovery**: Kademlia DHT + mDNS
+
+#### **Supported Protocols**
+```
+/qudag/req/1.0.0          # Request-response messaging
+/kad/1.0.0                # Kademlia DHT routing
+/gossipsub/1.1.0          # Publish-subscribe messaging
+/identify/1.0.0           # Peer identification
+/dark-resolve/1.0.0       # Dark address resolution
+```
+
+#### **Message Types**
+- **DAG Messages**: Consensus transactions and vertices
+- **Dark Queries**: Address resolution requests  
+- **Peer Discovery**: Network topology updates
+- **File Transfer**: Large data transmission
+
+**📚 For P2P protocol specification:** [docs/protocol/README.md](docs/protocol/README.md)
+
+### 📊 Monitoring & Metrics
+
+Built-in observability for production deployments:
+
+#### **Real-time Metrics**
+```bash
+qudag network stats      # Network performance metrics
+qudag peer stats <id>    # Individual peer statistics  
+qudag status             # Overall node health
+```
+
+#### **Exportable Data**
+- **Prometheus**: Metrics endpoint at `/metrics`
+- **JSON**: Structured data export
+- **CSV**: Historical data for analysis
+- **Logs**: Structured JSON logging
+
+**📚 For monitoring setup:** [docs/monitoring/README.md](docs/monitoring/README.md)
+
+### 🛠️ SDK & Libraries
+
+Language-specific libraries for application development:
+
+#### **Rust SDK** (Native)
+```rust
+use qudag_protocol::Client;
+
+let client = Client::connect("localhost:9090").await?;
+let status = client.get_status().await?;
+let peers = client.list_peers().await?;
+```
+
+#### **Python SDK**
+```python
+from qudag import QuDAGClient
+
+client = QuDAGClient("localhost:9090")
+status = await client.get_status()
+peers = await client.list_peers()
+```
+
+#### **JavaScript SDK**
+```javascript
+import { QuDAGClient } from '@qudag/client';
+
+const client = new QuDAGClient('ws://localhost:9090');
+const status = await client.getStatus();
+const peers = await client.listPeers();
+```
+
+**📚 For SDK documentation:** [docs/sdk/README.md](docs/sdk/README.md)
+
+### 🔐 Authentication & Security
+
+Production-grade security for all API access:
+
+#### **Authentication Methods**
+- **ML-DSA Signatures**: Quantum-resistant authentication
+- **Token-based**: Bearer tokens for HTTP APIs
+- **mTLS**: Mutual TLS for RPC connections
+- **IP Allowlists**: Network-level access control
+
+#### **Authorization Levels**
+- **Public**: Read-only status and metrics
+- **Operator**: Peer management and network operations
+- **Admin**: Full node control and configuration
+
+**📚 For security configuration:** [docs/security/authentication.md](docs/security/authentication.md)
 
 ## Architecture
 
