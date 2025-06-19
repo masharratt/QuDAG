@@ -6,10 +6,10 @@
 
 use qudag_crypto::{
     fingerprint::Fingerprint,
+    hash::HashFunction,
+    kem::{Ciphertext, KeyEncapsulation, PublicKey, SecretKey, SharedSecret},
     ml_dsa::{MlDsa, MlDsaKeyPair, MlDsaPublicKey},
     ml_kem::MlKem768,
-    kem::{KeyEncapsulation, PublicKey, SecretKey, Ciphertext, SharedSecret},
-    hash::HashFunction,
     CryptoError,
 };
 use rand::{thread_rng, RngCore};
@@ -218,7 +218,10 @@ async fn test_fingerprint_concurrent() {
                         successful_operations += 1;
                     }
                     Err(e) => {
-                        eprintln!("Thread {}: Fingerprint generation failed: {:?}", thread_id, e);
+                        eprintln!(
+                            "Thread {}: Fingerprint generation failed: {:?}",
+                            thread_id, e
+                        );
                     }
                 }
             }
@@ -229,7 +232,10 @@ async fn test_fingerprint_concurrent() {
                 match fingerprint.verify(original_data, public_key) {
                     Ok(()) => successful_verifications += 1,
                     Err(e) => {
-                        eprintln!("Thread {}: Fingerprint verification failed: {:?}", thread_id, e);
+                        eprintln!(
+                            "Thread {}: Fingerprint verification failed: {:?}",
+                            thread_id, e
+                        );
                     }
                 }
             }
@@ -406,7 +412,8 @@ async fn test_crypto_stress_high_contention() {
                             Ok(keypair) => {
                                 let message = b"stress test message";
                                 if let Ok(signature) = keypair.sign(message, &mut rng) {
-                                    let public_key = MlDsaPublicKey::from_bytes(keypair.public_key()).unwrap();
+                                    let public_key =
+                                        MlDsaPublicKey::from_bytes(keypair.public_key()).unwrap();
                                     if public_key.verify(message, &signature).is_ok() {
                                         operations_count += 1;
                                     } else {
@@ -519,7 +526,8 @@ async fn test_crypto_memory_safety_concurrent() {
                             // Use the keypair
                             let message = format!("message_{}", i).into_bytes();
                             if let Ok(signature) = keypair.sign(&message, &mut rng) {
-                                let public_key = MlDsaPublicKey::from_bytes(keypair.public_key()).unwrap();
+                                let public_key =
+                                    MlDsaPublicKey::from_bytes(keypair.public_key()).unwrap();
                                 let _ = public_key.verify(&message, &signature);
                             }
                         }
@@ -527,7 +535,9 @@ async fn test_crypto_memory_safety_concurrent() {
                     2 => {
                         let mut rng = thread_rng();
                         let data = format!("fingerprint_data_{}_{}", thread_id, i).into_bytes();
-                        if let Ok((fingerprint, public_key)) = Fingerprint::generate(&data, &mut rng) {
+                        if let Ok((fingerprint, public_key)) =
+                            Fingerprint::generate(&data, &mut rng)
+                        {
                             allocated_objects.push(format!("fingerprint_{}", i));
                             let _ = fingerprint.verify(&data, &public_key);
                         }

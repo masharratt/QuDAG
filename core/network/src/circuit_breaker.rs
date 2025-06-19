@@ -103,20 +103,20 @@ impl SlidingWindow {
     fn record(&mut self, success: bool) {
         let now = Instant::now();
         self.outcomes.push((now, success));
-        
+
         if success {
             self.success_count += 1;
         } else {
             self.failure_count += 1;
         }
-        
+
         self.cleanup();
     }
 
     fn cleanup(&mut self) {
         let cutoff = Instant::now() - self.duration;
         let mut i = 0;
-        
+
         while i < self.outcomes.len() && self.outcomes[i].0 < cutoff {
             if self.outcomes[i].1 {
                 self.success_count -= 1;
@@ -125,7 +125,7 @@ impl SlidingWindow {
             }
             i += 1;
         }
-        
+
         self.outcomes.drain(0..i);
     }
 
@@ -175,7 +175,7 @@ impl CircuitBreaker {
     /// Create a new circuit breaker
     pub fn new(config: CircuitBreakerConfig) -> Self {
         let window_duration = config.window_duration;
-        
+
         Self {
             config,
             state: Arc::new(RwLock::new(CircuitState::Closed)),
@@ -192,7 +192,7 @@ impl CircuitBreaker {
     /// Check if request should be allowed
     pub fn allow_request(&self) -> bool {
         let current_state = *self.state.read();
-        
+
         match current_state {
             CircuitState::Closed => true,
             CircuitState::Open => {
@@ -239,14 +239,14 @@ impl CircuitBreaker {
         self.window.write().record(success);
 
         let current_state = *self.state.read();
-        
+
         match current_state {
             CircuitState::Closed => {
                 if success {
                     self.consecutive_failures.store(0, Ordering::Release);
                 } else {
                     let failures = self.consecutive_failures.fetch_add(1, Ordering::AcqRel) + 1;
-                    
+
                     // Check failure threshold
                     if failures >= self.config.failure_threshold as usize {
                         self.check_and_open_circuit();
@@ -260,7 +260,7 @@ impl CircuitBreaker {
             CircuitState::HalfOpen => {
                 if success {
                     let successes = self.consecutive_successes.fetch_add(1, Ordering::AcqRel) + 1;
-                    
+
                     if successes >= self.config.success_threshold as usize {
                         self.transition_to_closed();
                     }
@@ -268,7 +268,7 @@ impl CircuitBreaker {
                     // Single failure in half-open state reopens circuit
                     self.transition_to_open();
                 }
-                
+
                 // Decrement half-open request count
                 self.half_open_requests.fetch_sub(1, Ordering::Release);
             }
@@ -280,9 +280,10 @@ impl CircuitBreaker {
         let window = self.window.read();
         let total_requests = window.total_requests();
         let failure_rate = window.failure_rate();
-        
-        if total_requests >= self.config.min_requests as usize &&
-           failure_rate >= self.config.failure_rate_threshold {
+
+        if total_requests >= self.config.min_requests as usize
+            && failure_rate >= self.config.failure_rate_threshold
+        {
             drop(window); // Release read lock before transitioning
             self.transition_to_open();
         }
@@ -292,21 +293,23 @@ impl CircuitBreaker {
     fn transition_to_open(&self) {
         let mut state = self.state.write();
         let previous_state = *state;
-        
+
         if previous_state != CircuitState::Open {
             *state = CircuitState::Open;
             *self.state_changed_at.write() = Instant::now();
-            
+
             // Reset counters
             self.consecutive_failures.store(0, Ordering::Release);
             self.consecutive_successes.store(0, Ordering::Release);
-            
+
             // Update statistics
             self.update_state_stats(previous_state, CircuitState::Open);
-            
-            info!("Circuit breaker opened (failure rate: {:.2}%)", 
-                  self.window.read().failure_rate() * 100.0);
-            
+
+            info!(
+                "Circuit breaker opened (failure rate: {:.2}%)",
+                self.window.read().failure_rate() * 100.0
+            );
+
             // Notify state change
             self.state_change_notify.notify_waiters();
         }
@@ -316,23 +319,23 @@ impl CircuitBreaker {
     fn transition_to_half_open(&self) {
         let mut state = self.state.write();
         let previous_state = *state;
-        
+
         if previous_state == CircuitState::Open {
             *state = CircuitState::HalfOpen;
             *self.state_changed_at.write() = Instant::now();
-            
+
             // Reset counters
             self.consecutive_successes.store(0, Ordering::Release);
             self.half_open_requests.store(0, Ordering::Release);
-            
+
             // Clear sliding window for fresh start
             self.window.write().reset();
-            
+
             // Update statistics
             self.update_state_stats(previous_state, CircuitState::HalfOpen);
-            
+
             info!("Circuit breaker half-opened for testing");
-            
+
             // Notify state change
             self.state_change_notify.notify_waiters();
         }
@@ -342,20 +345,20 @@ impl CircuitBreaker {
     fn transition_to_closed(&self) {
         let mut state = self.state.write();
         let previous_state = *state;
-        
+
         if previous_state != CircuitState::Closed {
             *state = CircuitState::Closed;
             *self.state_changed_at.write() = Instant::now();
-            
+
             // Reset counters
             self.consecutive_failures.store(0, Ordering::Release);
             self.consecutive_successes.store(0, Ordering::Release);
-            
+
             // Update statistics
             self.update_state_stats(previous_state, CircuitState::Closed);
-            
+
             info!("Circuit breaker closed");
-            
+
             // Notify state change
             self.state_change_notify.notify_waiters();
         }
@@ -365,17 +368,17 @@ impl CircuitBreaker {
     fn update_state_stats(&self, from_state: CircuitState, _to_state: CircuitState) {
         let mut stats = self.stats.write();
         stats.state_changes += 1;
-        
+
         if let Some(last_change) = stats.last_state_change {
             let duration = last_change.elapsed();
-            
+
             match from_state {
                 CircuitState::Closed => stats.time_in_closed += duration,
                 CircuitState::Open => stats.time_in_open += duration,
                 CircuitState::HalfOpen => stats.time_in_half_open += duration,
             }
         }
-        
+
         stats.last_state_change = Some(Instant::now());
         stats.failure_rate = self.window.read().failure_rate();
     }
@@ -401,15 +404,15 @@ impl CircuitBreaker {
     pub fn reset(&self) {
         *self.state.write() = CircuitState::Closed;
         *self.state_changed_at.write() = Instant::now();
-        
+
         self.consecutive_failures.store(0, Ordering::Release);
         self.consecutive_successes.store(0, Ordering::Release);
         self.half_open_requests.store(0, Ordering::Release);
-        
+
         self.window.write().reset();
-        
+
         *self.stats.write() = CircuitBreakerStats::default();
-        
+
         self.state_change_notify.notify_waiters();
     }
 }
@@ -458,7 +461,7 @@ impl CircuitBreakerManager {
         let handle = tokio::spawn(async move {
             maintenance_manager.run_maintenance().await;
         });
-        
+
         Self {
             maintenance_handle: Some(handle),
             ..manager
@@ -513,7 +516,7 @@ impl CircuitBreakerManager {
     /// Run maintenance tasks
     async fn run_maintenance(&self) {
         let mut interval = interval(Duration::from_secs(10));
-        
+
         loop {
             interval.tick().await;
             self.update_global_stats();
@@ -527,29 +530,29 @@ impl CircuitBreakerManager {
         let mut open_circuits = 0;
         let mut half_open_circuits = 0;
         let mut total_failure_rate = 0.0;
-        
+
         for entry in self.breakers.iter() {
             let breaker = entry.value();
             let stats = breaker.stats();
-            
+
             total_requests += stats.total_requests;
             total_rejected += stats.rejected_requests;
             total_failure_rate += stats.failure_rate;
-            
+
             match breaker.state() {
                 CircuitState::Open => open_circuits += 1,
                 CircuitState::HalfOpen => half_open_circuits += 1,
                 _ => {}
             }
         }
-        
+
         let total_breakers = self.breakers.len();
         let avg_failure_rate = if total_breakers > 0 {
             total_failure_rate / total_breakers as f64
         } else {
             0.0
         };
-        
+
         let mut global_stats = self.global_stats.write();
         global_stats.total_breakers = total_breakers;
         global_stats.open_circuits = open_circuits;
@@ -587,11 +590,11 @@ mod tests {
     async fn test_circuit_breaker_closed() {
         let config = CircuitBreakerConfig::default();
         let breaker = CircuitBreaker::new(config);
-        
+
         // Circuit should start closed
         assert_eq!(breaker.state(), CircuitState::Closed);
         assert!(breaker.allow_request());
-        
+
         // Record success
         breaker.record_outcome(true);
         assert_eq!(breaker.state(), CircuitState::Closed);
@@ -605,17 +608,17 @@ mod tests {
             ..Default::default()
         };
         let breaker = CircuitBreaker::new(config);
-        
+
         // Record failures
         for _ in 0..3 {
             assert!(breaker.allow_request());
             breaker.record_outcome(false);
         }
-        
+
         // Circuit should be open
         assert_eq!(breaker.state(), CircuitState::Open);
         assert!(!breaker.allow_request());
-        
+
         let stats = breaker.stats();
         assert_eq!(stats.failed_requests, 3);
         assert_eq!(stats.rejected_requests, 1);
@@ -629,16 +632,16 @@ mod tests {
             ..Default::default()
         };
         let breaker = CircuitBreaker::new(config);
-        
+
         // Open circuit
         for _ in 0..2 {
             breaker.record_outcome(false);
         }
         assert_eq!(breaker.state(), CircuitState::Open);
-        
+
         // Wait for timeout
         sleep(Duration::from_millis(150)).await;
-        
+
         // Should transition to half-open
         assert!(breaker.allow_request());
         assert_eq!(breaker.state(), CircuitState::HalfOpen);
@@ -653,21 +656,21 @@ mod tests {
             ..Default::default()
         };
         let breaker = CircuitBreaker::new(config);
-        
+
         // Open circuit
         for _ in 0..2 {
             breaker.record_outcome(false);
         }
-        
+
         // Wait for timeout
         sleep(Duration::from_millis(100)).await;
-        
+
         // Test recovery
         assert!(breaker.allow_request());
         breaker.record_outcome(true);
         assert!(breaker.allow_request());
         breaker.record_outcome(true);
-        
+
         // Circuit should be closed
         assert_eq!(breaker.state(), CircuitState::Closed);
     }
@@ -676,21 +679,21 @@ mod tests {
     async fn test_circuit_breaker_manager() {
         let config = CircuitBreakerConfig::default();
         let manager = CircuitBreakerManager::new(config);
-        
+
         let peer1 = PeerId::random();
         let peer2 = PeerId::random();
-        
+
         // Test request allowance
         assert!(manager.allow_request(peer1));
         assert!(manager.allow_request(peer2));
-        
+
         // Record outcomes
         manager.record_outcome(peer1, true);
         manager.record_outcome(peer2, false);
-        
+
         // Check states
         assert_eq!(manager.get_state(peer1), CircuitState::Closed);
-        
+
         // Check global stats
         let global_stats = manager.get_global_stats();
         assert_eq!(global_stats.total_breakers, 2);
@@ -699,16 +702,16 @@ mod tests {
     #[test]
     fn test_sliding_window() {
         let mut window = SlidingWindow::new(Duration::from_secs(1));
-        
+
         // Record some outcomes
         window.record(true);
         window.record(false);
         window.record(true);
         window.record(false);
-        
+
         assert_eq!(window.total_requests(), 4);
         assert_eq!(window.failure_rate(), 0.5);
-        
+
         // Test reset
         window.reset();
         assert_eq!(window.total_requests(), 0);

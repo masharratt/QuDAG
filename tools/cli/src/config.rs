@@ -1,9 +1,9 @@
 use anyhow::Result;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 use std::fs;
-use tokio::sync::RwLock;
+use std::path::PathBuf;
 use std::sync::Arc;
+use tokio::sync::RwLock;
 use tracing::info;
 
 /// Node configuration (compatibility with protocol module)
@@ -118,7 +118,7 @@ impl NodeConfigManager {
         if let Some(parent) = config_path.parent() {
             fs::create_dir_all(parent)?;
         }
-        
+
         // Load or create default config
         let config = if config_path.exists() {
             NodeConfig::load(config_path.clone())?
@@ -127,18 +127,18 @@ impl NodeConfigManager {
             default.save(config_path.clone())?;
             default
         };
-        
+
         Ok(Self {
             config_path,
             config: Arc::new(RwLock::new(config)),
         })
     }
-    
+
     /// Load current configuration
     pub async fn load_config(&self) -> Result<NodeConfig> {
         Ok(self.config.read().await.clone())
     }
-    
+
     /// Update configuration with a closure
     pub async fn update_config<F>(&self, updater: F) -> Result<()>
     where
@@ -150,7 +150,7 @@ impl NodeConfigManager {
         info!("Configuration updated and saved");
         Ok(())
     }
-    
+
     /// Reload configuration from disk
     pub async fn reload_config(&self) -> Result<()> {
         let new_config = NodeConfig::load(self.config_path.clone())?;
@@ -158,7 +158,7 @@ impl NodeConfigManager {
         info!("Configuration reloaded from disk");
         Ok(())
     }
-    
+
     /// Get configuration path
     pub fn config_path(&self) -> &PathBuf {
         &self.config_path

@@ -8,7 +8,7 @@
 //! - Property-based testing
 
 use proptest::prelude::*;
-use qudag_crypto::ml_dsa::{MlDsa, MlDsaError, MlDsaKeyPair, MlDsaPublicKey};
+use qudag_crypto::ml_dsa::{MlDsaError, MlDsaKeyPair, MlDsaPublicKey};
 use std::time::{Duration, Instant};
 
 // NIST ML-DSA parameter sets
@@ -154,7 +154,10 @@ fn test_ml_dsa_invalid_key_sizes() {
     let invalid_public_key = vec![0u8; ml_dsa_65_params::PUBLIC_KEY_SIZE - 1];
     let result = MlDsaPublicKey::from_bytes(&invalid_public_key);
     assert!(result.is_err());
-    assert!(matches!(result.unwrap_err(), MlDsaError::InvalidKeyLength { .. }));
+    assert!(matches!(
+        result.unwrap_err(),
+        MlDsaError::InvalidKeyLength { .. }
+    ));
 
     // Test invalid signature size
     let mut rng = rand::thread_rng();
@@ -445,7 +448,7 @@ fn test_ml_dsa_performance_benchmarks() {
     // Benchmark verification
     let public_key = MlDsaPublicKey::from_bytes(keypair.public_key()).unwrap();
     let start = Instant::now();
-    let _ = public_key.verify(message, &signature).unwrap();
+    public_key.verify(message, &signature).unwrap();
     let verify_time = start.elapsed();
 
     // Performance requirements (adjust based on actual requirements)

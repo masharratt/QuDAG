@@ -499,22 +499,21 @@ impl Default for CommandRouter {
 impl CommandRouter {
     /// Create new CommandRouter
     pub fn new() -> Self {
-        Self {
-            peer_manager: None,
-        }
+        Self { peer_manager: None }
     }
-    
+
     /// Create CommandRouter with initialized PeerManager
     pub async fn with_peer_manager() -> Result<Self, CliError> {
         let config = PeerManagerConfig::default();
-        let peer_manager = PeerManager::new(config).await
+        let peer_manager = PeerManager::new(config)
+            .await
             .map_err(|e| CliError::Config(format!("Failed to initialize peer manager: {}", e)))?;
-        
+
         Ok(Self {
             peer_manager: Some(Arc::new(Mutex::new(peer_manager))),
         })
     }
-    
+
     /// Get or create peer manager instance
     async fn get_peer_manager(&self) -> Result<Arc<Mutex<PeerManager>>, CliError> {
         if let Some(ref pm) = self.peer_manager {
@@ -523,7 +522,7 @@ impl CommandRouter {
             Err(CliError::Config("Peer manager not initialized".to_string()))
         }
     }
-    
+
     /// Route and execute node status command
     pub async fn handle_node_status(args: StatusArgs) -> Result<String, CliError> {
         info!("Executing node status command with port {}", args.port);
@@ -537,7 +536,7 @@ impl CommandRouter {
     /// Route and execute peer list command
     pub async fn handle_peer_list(&self, port: Option<u16>) -> Result<(), CliError> {
         info!("Executing peer list command");
-        
+
         // Try to use peer manager first for comprehensive peer information
         if let Ok(peer_manager) = self.get_peer_manager().await {
             let manager = peer_manager.lock().await;
@@ -547,36 +546,41 @@ impl CommandRouter {
                         println!("No peers in database");
                     } else {
                         println!("Known Peers ({}):", peers.len());
-                        println!("{:<16} {:<30} {:<12} {:<10} {:<12} {:<20}", 
-                               "Peer ID", "Address", "Trust", "Status", "Latency", "Nickname");
+                        println!(
+                            "{:<16} {:<30} {:<12} {:<10} {:<12} {:<20}",
+                            "Peer ID", "Address", "Trust", "Status", "Latency", "Nickname"
+                        );
                         println!("{}", "-".repeat(110));
-                        
+
                         let now = std::time::SystemTime::now()
                             .duration_since(std::time::UNIX_EPOCH)
                             .unwrap()
                             .as_secs();
-                        
+
                         for peer in peers {
                             let id_short = if peer.id.len() > 16 {
                                 format!("{}...", &peer.id[..13])
                             } else {
                                 peer.id.clone()
                             };
-                            
+
                             let status = if now - peer.last_seen < 300 {
                                 "Active"
                             } else {
                                 "Inactive"
                             };
-                            
-                            let latency = peer.avg_latency_ms
+
+                            let latency = peer
+                                .avg_latency_ms
                                 .map(|l| format!("{:.1}ms", l))
                                 .unwrap_or_else(|| "N/A".to_string());
-                            
+
                             let nickname = peer.nickname.unwrap_or_else(|| "-".to_string());
-                            
-                            println!("{:<16} {:<30} {:<12} {:<10} {:<12} {:<20}", 
-                                   id_short, peer.address, peer.trust_level, status, latency, nickname);
+
+                            println!(
+                                "{:<16} {:<30} {:<12} {:<10} {:<12} {:<20}",
+                                id_short, peer.address, peer.trust_level, status, latency, nickname
+                            );
                         }
                     }
                     return Ok(());
@@ -587,50 +591,68 @@ impl CommandRouter {
                 }
             }
         }
-        
+
         // Fallback to RPC client method
         let port = port.unwrap_or(8000);
-        let client = RpcClient::new_tcp("127.0.0.1".to_string(), port)
-            .with_timeout(Duration::from_secs(30));
-        
+        let client =
+            RpcClient::new_tcp("127.0.0.1".to_string(), port).with_timeout(Duration::from_secs(30));
+
         match client.list_peers().await {
             Ok(peers) => {
                 if peers.is_empty() {
                     println!("No peers connected");
                 } else {
                     println!("Connected Peers ({}):", peers.len());
-                    println!("{:<20} {:<30} {:<15} {:<12} {:<12}", 
-                           "Peer ID", "Address", "Status", "Messages In", "Messages Out");
+                    println!(
+                        "{:<20} {:<30} {:<15} {:<12} {:<12}",
+                        "Peer ID", "Address", "Status", "Messages In", "Messages Out"
+                    );
                     println!("{}", "-".repeat(95));
-                    
+
                     for peer in peers {
-                        println!("{:<20} {:<30} {:<15} {:<12} {:<12}", 
-                               peer.id, peer.address, peer.status,
-                               peer.messages_received, peer.messages_sent);
+                        println!(
+                            "{:<20} {:<30} {:<15} {:<12} {:<12}",
+                            peer.id,
+                            peer.address,
+                            peer.status,
+                            peer.messages_received,
+                            peer.messages_sent
+                        );
                     }
                 }
                 Ok(())
             }
             Err(e) => {
                 warn!("Failed to fetch peer list: {}", e);
-                Err(CliError::Command(format!("Failed to fetch peer list: {}", e)))
+                Err(CliError::Command(format!(
+                    "Failed to fetch peer list: {}",
+                    e
+                )))
             }
         }
     }
 
     /// Route and execute peer add command
-    pub async fn handle_peer_add(&self, address: String, port: Option<u16>, nickname: Option<String>) -> Result<(), CliError> {
+    pub async fn handle_peer_add(
+        &self,
+        address: String,
+        port: Option<u16>,
+        nickname: Option<String>,
+    ) -> Result<(), CliError> {
         info!("Executing peer add command for address: {}", address);
-        
+
         // Validate address format
         if !is_valid_peer_address(&address) {
-            return Err(CliError::Command(format!("Invalid peer address format: {}", address)));
+            return Err(CliError::Command(format!(
+                "Invalid peer address format: {}",
+                address
+            )));
         }
-        
+
         // Try to use peer manager first
         if let Ok(peer_manager) = self.get_peer_manager().await {
             println!("Connecting to peer: {}", address);
-            
+
             let manager = peer_manager.lock().await;
             match manager.add_peer(address.clone(), nickname.clone()).await {
                 Ok(peer_id) => {
@@ -640,12 +662,12 @@ impl CommandRouter {
                     if let Some(nick) = nickname {
                         println!("  Nickname: {}", nick);
                     }
-                    
+
                     // Save peers after successful connection
                     if let Err(e) = manager.save_peers().await {
                         warn!("Failed to save peer data: {}", e);
                     }
-                    
+
                     return Ok(());
                 }
                 Err(e) => {
@@ -654,12 +676,12 @@ impl CommandRouter {
                 }
             }
         }
-        
+
         // Fallback to RPC client method
         let port = port.unwrap_or(8000);
-        let client = RpcClient::new_tcp("127.0.0.1".to_string(), port)
-            .with_timeout(Duration::from_secs(30));
-        
+        let client =
+            RpcClient::new_tcp("127.0.0.1".to_string(), port).with_timeout(Duration::from_secs(30));
+
         match client.add_peer(address.clone()).await {
             Ok(message) => {
                 println!("✓ {}", message);
@@ -673,36 +695,41 @@ impl CommandRouter {
     }
 
     /// Route and execute peer remove command
-    pub async fn handle_peer_remove(&self, peer_id: String, port: Option<u16>, force: bool) -> Result<(), CliError> {
+    pub async fn handle_peer_remove(
+        &self,
+        peer_id: String,
+        port: Option<u16>,
+        force: bool,
+    ) -> Result<(), CliError> {
         info!("Executing peer remove command for peer: {}", peer_id);
-        
+
         // Show confirmation prompt unless forced
         if !force {
             print!("Are you sure you want to remove peer {}? [y/N] ", peer_id);
             use std::io::{self, Write};
             io::stdout().flush().unwrap();
-            
+
             let mut response = String::new();
             io::stdin().read_line(&mut response).unwrap();
-            
+
             if !response.trim().eq_ignore_ascii_case("y") {
                 println!("Operation cancelled");
                 return Ok(());
             }
         }
-        
+
         // Try to use peer manager first
         if let Ok(peer_manager) = self.get_peer_manager().await {
             let manager = peer_manager.lock().await;
             match manager.remove_peer(peer_id.clone()).await {
                 Ok(()) => {
                     println!("✓ Successfully removed peer: {}", peer_id);
-                    
+
                     // Save peers after removal
                     if let Err(e) = manager.save_peers().await {
                         warn!("Failed to save peer data: {}", e);
                     }
-                    
+
                     return Ok(());
                 }
                 Err(e) => {
@@ -711,12 +738,12 @@ impl CommandRouter {
                 }
             }
         }
-        
+
         // Fallback to RPC client method
         let port = port.unwrap_or(8000);
-        let client = RpcClient::new_tcp("127.0.0.1".to_string(), port)
-            .with_timeout(Duration::from_secs(30));
-        
+        let client =
+            RpcClient::new_tcp("127.0.0.1".to_string(), port).with_timeout(Duration::from_secs(30));
+
         match client.remove_peer(peer_id.clone()).await {
             Ok(message) => {
                 println!("✓ {}", message);
@@ -730,13 +757,17 @@ impl CommandRouter {
     }
 
     /// Route and execute network stats command
-    pub async fn handle_network_stats(&self, port: Option<u16>, verbose: bool) -> Result<(), CliError> {
+    pub async fn handle_network_stats(
+        &self,
+        port: Option<u16>,
+        verbose: bool,
+    ) -> Result<(), CliError> {
         info!("Executing network stats command");
-        
+
         let port = port.unwrap_or(8000);
-        let client = RpcClient::new_tcp("127.0.0.1".to_string(), port)
-            .with_timeout(Duration::from_secs(30));
-        
+        let client =
+            RpcClient::new_tcp("127.0.0.1".to_string(), port).with_timeout(Duration::from_secs(30));
+
         match client.get_network_stats().await {
             Ok(stats) => {
                 println!("Network Statistics:");
@@ -745,19 +776,22 @@ impl CommandRouter {
                 println!("Active Connections: {}", stats.active_connections);
                 println!("Messages Sent: {}", stats.messages_sent);
                 println!("Messages Received: {}", stats.messages_received);
-                
+
                 if verbose {
                     println!("Bytes Sent: {}", format_bytes(stats.bytes_sent));
                     println!("Bytes Received: {}", format_bytes(stats.bytes_received));
                     println!("Average Latency: {:.2} ms", stats.average_latency);
                     println!("Uptime: {}", format_duration(stats.uptime));
                 }
-                
+
                 Ok(())
             }
             Err(e) => {
                 warn!("Failed to fetch network stats: {}", e);
-                Err(CliError::Command(format!("Failed to fetch network stats: {}", e)))
+                Err(CliError::Command(format!(
+                    "Failed to fetch network stats: {}",
+                    e
+                )))
             }
         }
     }
@@ -765,56 +799,67 @@ impl CommandRouter {
     /// Route and execute network test command
     pub async fn handle_network_test(&self, port: Option<u16>) -> Result<(), CliError> {
         info!("Executing network test command");
-        
+
         let port = port.unwrap_or(8000);
-        let client = RpcClient::new_tcp("127.0.0.1".to_string(), port)
-            .with_timeout(Duration::from_secs(60)); // Longer timeout for network tests
-        
+        let client =
+            RpcClient::new_tcp("127.0.0.1".to_string(), port).with_timeout(Duration::from_secs(60)); // Longer timeout for network tests
+
         println!("Testing network connectivity...");
-        
+
         match client.test_network().await {
             Ok(results) => {
                 println!("\nNetwork Test Results:");
                 println!("====================\n");
-                
+
                 if results.is_empty() {
                     println!("No peers to test");
                     return Ok(());
                 }
-                
+
                 for result in results {
-                    let status = if result.reachable { "✓ REACHABLE" } else { "✗ UNREACHABLE" };
+                    let status = if result.reachable {
+                        "✓ REACHABLE"
+                    } else {
+                        "✗ UNREACHABLE"
+                    };
                     println!("Peer: {} ({})", result.peer_id, result.address);
                     println!("Status: {}", status);
-                    
+
                     if let Some(latency) = result.latency {
                         println!("Latency: {:.2} ms", latency);
                     }
-                    
+
                     if let Some(error) = result.error {
                         println!("Error: {}", error);
                     }
-                    
+
                     println!();
                 }
-                
+
                 Ok(())
             }
             Err(e) => {
                 warn!("Failed to run network test: {}", e);
-                Err(CliError::Command(format!("Failed to run network test: {}", e)))
+                Err(CliError::Command(format!(
+                    "Failed to run network test: {}",
+                    e
+                )))
             }
         }
     }
-    
+
     /// Route and execute peer info command
-    pub async fn handle_peer_info(&self, peer_id: String, port: Option<u16>) -> Result<(), CliError> {
+    pub async fn handle_peer_info(
+        &self,
+        peer_id: String,
+        port: Option<u16>,
+    ) -> Result<(), CliError> {
         info!("Executing peer info command for peer: {}", peer_id);
-        
+
         let port = port.unwrap_or(8000);
-        let client = RpcClient::new_tcp("127.0.0.1".to_string(), port)
-            .with_timeout(Duration::from_secs(30));
-        
+        let client =
+            RpcClient::new_tcp("127.0.0.1".to_string(), port).with_timeout(Duration::from_secs(30));
+
         match client.get_peer_info(peer_id.clone()).await {
             Ok(peer) => {
                 println!("Peer Information:");
@@ -826,11 +871,11 @@ impl CommandRouter {
                 println!("Messages Sent: {}", peer.messages_sent);
                 println!("Messages Received: {}", peer.messages_received);
                 println!("Last Seen: {} (timestamp)", peer.last_seen);
-                
+
                 if let Some(latency) = peer.latency {
                     println!("Latency: {:.2} ms", latency);
                 }
-                
+
                 Ok(())
             }
             Err(e) => {
@@ -839,11 +884,15 @@ impl CommandRouter {
             }
         }
     }
-    
+
     /// Route and execute peer ban command
-    pub async fn handle_peer_ban(&self, peer_id: String, port: Option<u16>) -> Result<(), CliError> {
+    pub async fn handle_peer_ban(
+        &self,
+        peer_id: String,
+        port: Option<u16>,
+    ) -> Result<(), CliError> {
         info!("Executing peer ban command for peer: {}", peer_id);
-        
+
         // Try to use peer manager first
         if let Ok(peer_manager) = self.get_peer_manager().await {
             let manager = peer_manager.lock().await;
@@ -851,12 +900,12 @@ impl CommandRouter {
                 Ok(()) => {
                     println!("✓ Successfully banned peer: {}", peer_id);
                     println!("  The peer has been blacklisted and disconnected");
-                    
+
                     // Save peers after banning
                     if let Err(e) = manager.save_peers().await {
                         warn!("Failed to save peer data: {}", e);
                     }
-                    
+
                     return Ok(());
                 }
                 Err(e) => {
@@ -865,12 +914,12 @@ impl CommandRouter {
                 }
             }
         }
-        
+
         // Fallback to RPC client method
         let port = port.unwrap_or(8000);
-        let client = RpcClient::new_tcp("127.0.0.1".to_string(), port)
-            .with_timeout(Duration::from_secs(30));
-        
+        let client =
+            RpcClient::new_tcp("127.0.0.1".to_string(), port).with_timeout(Duration::from_secs(30));
+
         match client.ban_peer(peer_id.clone()).await {
             Ok(message) => {
                 println!("✓ {}", message);
@@ -882,11 +931,15 @@ impl CommandRouter {
             }
         }
     }
-    
+
     /// Route and execute peer unban command
-    pub async fn handle_peer_unban(&self, address: String, port: Option<u16>) -> Result<(), CliError> {
+    pub async fn handle_peer_unban(
+        &self,
+        address: String,
+        port: Option<u16>,
+    ) -> Result<(), CliError> {
         info!("Executing peer unban command for address: {}", address);
-        
+
         // Try to use peer manager first
         if let Ok(peer_manager) = self.get_peer_manager().await {
             let manager = peer_manager.lock().await;
@@ -894,12 +947,12 @@ impl CommandRouter {
                 Ok(()) => {
                     println!("✓ Successfully unbanned peer with address: {}", address);
                     println!("  The peer can now connect again");
-                    
+
                     // Save peers after unbanning
                     if let Err(e) = manager.save_peers().await {
                         warn!("Failed to save peer data: {}", e);
                     }
-                    
+
                     return Ok(());
                 }
                 Err(e) => {
@@ -908,12 +961,12 @@ impl CommandRouter {
                 }
             }
         }
-        
+
         // Fallback to RPC client method
         let port = port.unwrap_or(8000);
-        let client = RpcClient::new_tcp("127.0.0.1".to_string(), port)
-            .with_timeout(Duration::from_secs(30));
-        
+        let client =
+            RpcClient::new_tcp("127.0.0.1".to_string(), port).with_timeout(Duration::from_secs(30));
+
         match client.unban_peer(address.clone()).await {
             Ok(message) => {
                 println!("✓ {}", message);
@@ -925,18 +978,18 @@ impl CommandRouter {
             }
         }
     }
-    
+
     /// Route and execute peer import command
     pub async fn handle_peer_import(&self, path: PathBuf, merge: bool) -> Result<(), CliError> {
         info!("Executing peer import command from: {:?}", path);
-        
+
         if !path.exists() {
             return Err(CliError::Command(format!("File not found: {:?}", path)));
         }
-        
+
         let peer_manager = self.get_peer_manager().await?;
         let manager = peer_manager.lock().await;
-        
+
         match manager.import_peers(path.clone(), merge).await {
             Ok(count) => {
                 println!("✓ Successfully imported {} peers from {:?}", count, path);
@@ -953,14 +1006,18 @@ impl CommandRouter {
             }
         }
     }
-    
+
     /// Route and execute peer export command
-    pub async fn handle_peer_export(&self, path: PathBuf, tags: Option<Vec<String>>) -> Result<(), CliError> {
+    pub async fn handle_peer_export(
+        &self,
+        path: PathBuf,
+        tags: Option<Vec<String>>,
+    ) -> Result<(), CliError> {
         info!("Executing peer export command to: {:?}", path);
-        
+
         let peer_manager = self.get_peer_manager().await?;
         let manager = peer_manager.lock().await;
-        
+
         match manager.export_peers(path.clone(), tags.clone()).await {
             Ok(count) => {
                 println!("✓ Successfully exported {} peers to {:?}", count, path);
@@ -975,67 +1032,76 @@ impl CommandRouter {
             }
         }
     }
-    
+
     /// Route and execute peer test command
     pub async fn handle_peer_test(&self) -> Result<(), CliError> {
         info!("Executing peer test command");
-        
+
         let peer_manager = self.get_peer_manager().await?;
         let manager = peer_manager.lock().await;
-        
+
         println!("Testing connectivity to all known peers...");
         println!();
-        
+
         let progress_callback = |current: usize, total: usize| {
             print!("\rTesting peer {}/{}...", current, total);
             use std::io::{self, Write};
             io::stdout().flush().unwrap();
         };
-        
+
         match manager.test_all_peers(progress_callback).await {
             Ok(results) => {
                 println!("\r\nTest Results:");
                 println!("=============\n");
-                
+
                 let mut success_count = 0;
                 let mut total_latency = 0.0;
                 let mut latency_count = 0;
-                
+
                 for (peer_id, success, latency) in &results {
-                    let status = if *success { "✓ SUCCESS" } else { "✗ FAILED" };
-                    print!("{:<16} {}", 
-                        if peer_id.len() > 16 { 
-                            format!("{}...", &peer_id[..13]) 
-                        } else { 
-                            peer_id.clone() 
+                    let status = if *success {
+                        "✓ SUCCESS"
+                    } else {
+                        "✗ FAILED"
+                    };
+                    print!(
+                        "{:<16} {}",
+                        if peer_id.len() > 16 {
+                            format!("{}...", &peer_id[..13])
+                        } else {
+                            peer_id.clone()
                         },
                         status
                     );
-                    
+
                     if let Some(lat) = latency {
                         print!(" ({:.1}ms)", lat);
                         total_latency += lat;
                         latency_count += 1;
                     }
                     println!();
-                    
+
                     if *success {
                         success_count += 1;
                     }
                 }
-                
+
                 println!("\nSummary:");
                 println!("--------");
                 println!("Total peers tested: {}", results.len());
-                println!("Successful connections: {} ({:.1}%)", 
-                    success_count, 
+                println!(
+                    "Successful connections: {} ({:.1}%)",
+                    success_count,
                     (success_count as f64 / results.len() as f64) * 100.0
                 );
-                
+
                 if latency_count > 0 {
-                    println!("Average latency: {:.1}ms", total_latency / latency_count as f64);
+                    println!(
+                        "Average latency: {:.1}ms",
+                        total_latency / latency_count as f64
+                    );
                 }
-                
+
                 Ok(())
             }
             Err(e) => {
@@ -1054,7 +1120,7 @@ pub async fn start_node(
     peers: Vec<String>,
 ) -> Result<(), CliError> {
     use crate::node_manager::{NodeManager, NodeManagerConfig};
-    
+
     info!("Starting QuDAG node...");
 
     // Create node manager with default config
@@ -1073,7 +1139,7 @@ pub async fn start_node(
 
 pub async fn stop_node() -> Result<(), CliError> {
     use crate::node_manager::{NodeManager, NodeManagerConfig};
-    
+
     info!("Stopping QuDAG node...");
 
     // Create node manager
@@ -1092,17 +1158,19 @@ pub async fn stop_node() -> Result<(), CliError> {
 
 pub async fn show_status() -> Result<(), CliError> {
     use crate::node_manager::{NodeManager, NodeManagerConfig};
-    
+
     info!("Fetching node status...");
 
     // First check if node is running locally
     let config = NodeManagerConfig::default();
     let manager = NodeManager::new(config)
         .map_err(|e| CliError::Node(format!("Failed to create node manager: {}", e)))?;
-    
-    let local_status = manager.get_status().await
+
+    let local_status = manager
+        .get_status()
+        .await
         .map_err(|e| CliError::Node(format!("Failed to get local status: {}", e)))?;
-    
+
     if local_status.is_running {
         // Node is running, try to get detailed status via RPC
         let args = StatusArgs::default();
@@ -1206,7 +1274,7 @@ fn is_valid_peer_address(address: &str) -> bool {
         if host.is_empty() || port_str.is_empty() {
             return false;
         }
-        
+
         // Validate port
         if let Ok(port) = port_str.parse::<u16>() {
             if port == 0 {
@@ -1215,18 +1283,20 @@ fn is_valid_peer_address(address: &str) -> bool {
         } else {
             return false;
         }
-        
+
         // Basic validation for host (IP or hostname)
         if host.parse::<std::net::IpAddr>().is_ok() {
             return true; // Valid IP address
         }
-        
+
         // Basic hostname validation
         if host.len() <= 253 && !host.is_empty() {
-            return host.chars().all(|c| c.is_alphanumeric() || c == '.' || c == '-');
+            return host
+                .chars()
+                .all(|c| c.is_alphanumeric() || c == '.' || c == '-');
         }
     }
-    
+
     false
 }
 
@@ -1235,12 +1305,12 @@ fn format_bytes(bytes: u64) -> String {
     const UNITS: &[&str] = &["B", "KB", "MB", "GB", "TB"];
     let mut size = bytes as f64;
     let mut unit_index = 0;
-    
+
     while size >= 1024.0 && unit_index < UNITS.len() - 1 {
         size /= 1024.0;
         unit_index += 1;
     }
-    
+
     if unit_index == 0 {
         format!("{} {}", bytes, UNITS[unit_index])
     } else {
@@ -1254,7 +1324,7 @@ fn format_duration(seconds: u64) -> String {
     let hours = (seconds % 86400) / 3600;
     let minutes = (seconds % 3600) / 60;
     let secs = seconds % 60;
-    
+
     if days > 0 {
         format!("{}d {}h {}m {}s", days, hours, minutes, secs)
     } else if hours > 0 {

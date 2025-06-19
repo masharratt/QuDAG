@@ -1,5 +1,5 @@
 //! Optimized network implementations for high-performance message processing
-//! 
+//!
 //! This module provides optimized implementations with focus on:
 //! - Zero-copy message processing
 //! - Adaptive batching algorithms

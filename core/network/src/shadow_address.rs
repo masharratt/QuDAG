@@ -3,16 +3,16 @@
 //! This module implements a stealth address system that allows generating
 //! one-time addresses for anonymous communication.
 
+use rand::{thread_rng, Rng, RngCore};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::fmt;
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH, Duration};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 use thiserror::Error;
-use tokio::sync::{RwLock, Mutex};
+use tokio::sync::{Mutex, RwLock};
 use tokio::time::interval;
-use rand::{thread_rng, RngCore, Rng};
-use sha2::{Sha256, Digest};
 use x25519_dalek::{EphemeralSecret, PublicKey};
 
 /// Errors that can occur during shadow address operations.
@@ -173,16 +173,16 @@ pub trait ShadowAddressResolver {
 pub struct ShadowAddressPool {
     /// Pool identifier
     pub id: String,
-    
+
     /// Pool size limit
     pub max_size: usize,
-    
+
     /// Active addresses in the pool
     pub addresses: Vec<ShadowAddress>,
-    
+
     /// Pool creation time
     pub created_at: u64,
-    
+
     /// Pool expiration time
     pub expires_at: Option<u64>,
 }
@@ -191,19 +191,19 @@ pub struct ShadowAddressPool {
 pub struct ShadowAddressManager {
     /// Address generator
     generator: Arc<RwLock<DefaultShadowAddressHandler>>,
-    
+
     /// Active addresses mapped by ID
     active_addresses: Arc<RwLock<HashMap<String, ShadowAddress>>>,
-    
+
     /// Address pools for rotation
     address_pools: Arc<RwLock<HashMap<String, ShadowAddressPool>>>,
-    
+
     /// Expired addresses for cleanup
     expired_addresses: Arc<RwLock<Vec<ShadowAddress>>>,
-    
+
     /// Address rotation policies
     rotation_policies: Arc<RwLock<RotationPolicies>>,
-    
+
     /// Cleanup task handle
     #[allow(dead_code)]
     cleanup_handle: Option<tokio::task::JoinHandle<()>>,
@@ -214,13 +214,13 @@ pub struct ShadowAddressManager {
 pub struct RotationPolicies {
     /// Auto-rotate after N uses
     pub rotate_after_uses: Option<u32>,
-    
+
     /// Auto-rotate after duration
     pub rotate_after_duration: Option<Duration>,
-    
+
     /// Minimum addresses in pool
     pub min_pool_size: usize,
-    
+
     /// Maximum addresses in pool
     pub max_pool_size: usize,
 }
@@ -233,7 +233,7 @@ pub struct DefaultShadowAddressHandler {
     /// Master seed for deterministic generation
     #[allow(dead_code)]
     master_seed: [u8; 32],
-    
+
     /// Current derivation counter
     #[allow(dead_code)]
     derivation_counter: Mutex<u32>,
@@ -242,8 +242,8 @@ pub struct DefaultShadowAddressHandler {
 impl DefaultShadowAddressHandler {
     /// Create a new shadow address handler.
     pub fn new(network: NetworkType, master_seed: [u8; 32]) -> Self {
-        Self { 
-            network, 
+        Self {
+            network,
             master_seed,
             derivation_counter: Mutex::new(0),
         }
@@ -263,15 +263,15 @@ impl DefaultShadowAddressHandler {
         hasher.update(b"SHADOW_VIEW_KEY");
         hasher.update(seed);
         let view_key = hasher.finalize().to_vec();
-        
+
         let mut hasher = Sha256::new();
         hasher.update(b"SHADOW_SPEND_KEY");
         hasher.update(seed);
         let spend_key = hasher.finalize().to_vec();
-        
+
         Ok((view_key, spend_key))
     }
-    
+
     /// Generate stealth keys for one-time addresses.
     fn generate_stealth_keys(
         &self,
@@ -281,29 +281,33 @@ impl DefaultShadowAddressHandler {
         // Generate ephemeral keypair
         let ephemeral_secret = EphemeralSecret::random_from_rng(thread_rng());
         let ephemeral_public = PublicKey::from(&ephemeral_secret);
-        
+
         // Create shared secret
-        let recipient_view_pubkey = PublicKey::from(
-            <[u8; 32]>::try_from(recipient_view_key)
-                .map_err(|_| ShadowAddressError::InvalidKeyFormat("Invalid view key length".into()))?
-        );
-        
+        let recipient_view_pubkey =
+            PublicKey::from(<[u8; 32]>::try_from(recipient_view_key).map_err(|_| {
+                ShadowAddressError::InvalidKeyFormat("Invalid view key length".into())
+            })?);
+
         let shared_secret = ephemeral_secret.diffie_hellman(&recipient_view_pubkey);
-        
+
         // Derive one-time keys
         let mut hasher = Sha256::new();
         hasher.update(shared_secret.as_bytes());
         hasher.update(b"STEALTH_VIEW");
         let stealth_view_key = hasher.finalize().to_vec();
-        
+
         let mut hasher = Sha256::new();
         hasher.update(shared_secret.as_bytes());
         hasher.update(b"STEALTH_SPEND");
         let stealth_spend_key = hasher.finalize().to_vec();
-        
-        Ok((stealth_view_key, stealth_spend_key, ephemeral_public.to_bytes()))
+
+        Ok((
+            stealth_view_key,
+            stealth_spend_key,
+            ephemeral_public.to_bytes(),
+        ))
     }
-    
+
     /// Get current timestamp.
     fn current_timestamp() -> u64 {
         SystemTime::now()
@@ -311,7 +315,7 @@ impl DefaultShadowAddressHandler {
             .unwrap()
             .as_secs()
     }
-    
+
     /// Generate address ID.
     fn generate_address_id() -> String {
         let mut rng = thread_rng();
@@ -350,7 +354,7 @@ impl ShadowAddressGenerator for DefaultShadowAddressHandler {
             },
         })
     }
-    
+
     fn generate_temporary_address(
         &self,
         network: NetworkType,
@@ -385,18 +389,18 @@ impl ShadowAddressGenerator for DefaultShadowAddressHandler {
             },
         })
     }
-    
+
     fn generate_stealth_address(
         &self,
         network: NetworkType,
         recipient_view_key: &[u8],
         recipient_spend_key: &[u8],
     ) -> Result<ShadowAddress, ShadowAddressError> {
-        let (stealth_view_key, stealth_spend_key, ephemeral_pubkey) = 
+        let (stealth_view_key, stealth_spend_key, ephemeral_pubkey) =
             self.generate_stealth_keys(recipient_view_key, recipient_spend_key)?;
-        
+
         let current_time = Self::current_timestamp();
-        
+
         // Generate stealth prefix for efficient scanning
         let mut hasher = Sha256::new();
         hasher.update(&ephemeral_pubkey);
@@ -451,7 +455,7 @@ impl ShadowAddressGenerator for DefaultShadowAddressHandler {
             shadow_features: base.shadow_features.clone(),
         })
     }
-    
+
     fn derive_from_master(
         &self,
         master_key: &[u8],
@@ -463,11 +467,11 @@ impl ShadowAddressGenerator for DefaultShadowAddressHandler {
         hasher.update(master_key);
         hasher.update(&index.to_le_bytes());
         let derived_seed = hasher.finalize();
-        
+
         let seed_array: [u8; 32] = derived_seed.into();
         let (view_key, spend_key) = self.derive_keys(&seed_array)?;
         let current_time = Self::current_timestamp();
-        
+
         Ok(ShadowAddress {
             view_key,
             spend_key,
@@ -498,26 +502,26 @@ impl ShadowAddressGenerator for DefaultShadowAddressHandler {
         if address.view_key.len() != 32 || address.spend_key.len() != 32 {
             return Ok(false);
         }
-        
+
         // Check expiration
         if let Some(expires_at) = address.metadata.expires_at {
             if Self::current_timestamp() > expires_at {
                 return Ok(false);
             }
         }
-        
+
         // Check usage limits
         if let Some(max_uses) = address.metadata.max_uses {
             if address.metadata.usage_count >= max_uses {
                 return Ok(false);
             }
         }
-        
+
         // Check network
         if address.metadata.network != self.network {
             return Ok(false);
         }
-        
+
         Ok(true)
     }
 }
@@ -548,7 +552,10 @@ impl ShadowAddressResolver for DefaultShadowAddressHandler {
 impl ShadowAddressManager {
     /// Create a new shadow address manager.
     pub async fn new(network: NetworkType, master_seed: [u8; 32]) -> Self {
-        let generator = Arc::new(RwLock::new(DefaultShadowAddressHandler::new(network, master_seed)));
+        let generator = Arc::new(RwLock::new(DefaultShadowAddressHandler::new(
+            network,
+            master_seed,
+        )));
         let manager = Self {
             generator,
             active_addresses: Arc::new(RwLock::new(HashMap::new())),
@@ -557,19 +564,19 @@ impl ShadowAddressManager {
             rotation_policies: Arc::new(RwLock::new(RotationPolicies::default())),
             cleanup_handle: None,
         };
-        
+
         // Start cleanup task
         let cleanup_manager = manager.clone();
         let cleanup_handle = tokio::spawn(async move {
             cleanup_manager.cleanup_task().await;
         });
-        
+
         Self {
             cleanup_handle: Some(cleanup_handle),
             ..manager
         }
     }
-    
+
     /// Clone for internal use (implements Clone manually for Arc fields).
     fn clone(&self) -> Self {
         Self {
@@ -581,19 +588,25 @@ impl ShadowAddressManager {
             cleanup_handle: None,
         }
     }
-    
+
     /// Create a new temporary address with auto-expiry.
-    pub async fn create_temporary_address(&self, ttl: Duration) -> Result<ShadowAddress, ShadowAddressError> {
+    pub async fn create_temporary_address(
+        &self,
+        ttl: Duration,
+    ) -> Result<ShadowAddress, ShadowAddressError> {
         let generator = self.generator.read().await;
         let address = generator.generate_temporary_address(generator.network, ttl)?;
-        
+
         // Store in active addresses
         let address_id = DefaultShadowAddressHandler::generate_address_id();
-        self.active_addresses.write().await.insert(address_id, address.clone());
-        
+        self.active_addresses
+            .write()
+            .await
+            .insert(address_id, address.clone());
+
         Ok(address)
     }
-    
+
     /// Create a stealth address.
     pub async fn create_stealth_address(
         &self,
@@ -606,11 +619,11 @@ impl ShadowAddressManager {
             recipient_view_key,
             recipient_spend_key,
         )?;
-        
+
         // Stealth addresses are not stored (one-time use)
         Ok(address)
     }
-    
+
     /// Create an address pool for rotation.
     pub async fn create_address_pool(
         &self,
@@ -620,18 +633,18 @@ impl ShadowAddressManager {
     ) -> Result<(), ShadowAddressError> {
         let generator = self.generator.read().await;
         let mut addresses = Vec::new();
-        
+
         for _ in 0..size {
             let mut address = if let Some(ttl) = ttl {
                 generator.generate_temporary_address(generator.network, ttl)?
             } else {
                 generator.generate_address(generator.network)?
             };
-            
+
             address.shadow_features.pool_id = Some(pool_id.clone());
             addresses.push(address);
         }
-        
+
         let current_time = DefaultShadowAddressHandler::current_timestamp();
         let pool = ShadowAddressPool {
             id: pool_id.clone(),
@@ -640,11 +653,11 @@ impl ShadowAddressManager {
             created_at: current_time,
             expires_at: ttl.map(|d| current_time + d.as_secs()),
         };
-        
+
         self.address_pools.write().await.insert(pool_id, pool);
         Ok(())
     }
-    
+
     /// Get a random address from pool.
     pub async fn get_pool_address(&self, pool_id: &str) -> Option<ShadowAddress> {
         let pools = self.address_pools.read().await;
@@ -657,7 +670,7 @@ impl ShadowAddressManager {
         }
         None
     }
-    
+
     /// Rotate addresses in a pool.
     pub async fn rotate_pool(&self, pool_id: &str) -> Result<(), ShadowAddressError> {
         let mut pools = self.address_pools.write().await;
@@ -668,11 +681,11 @@ impl ShadowAddressManager {
                 let current = DefaultShadowAddressHandler::current_timestamp();
                 Duration::from_secs(exp.saturating_sub(current))
             });
-            
+
             // Move old addresses to expired
             let old_addresses = std::mem::take(&mut pool.addresses);
             self.expired_addresses.write().await.extend(old_addresses);
-            
+
             // Generate new addresses
             for _ in 0..size {
                 let mut address = if let Some(ttl) = ttl {
@@ -680,22 +693,24 @@ impl ShadowAddressManager {
                 } else {
                     generator.generate_address(generator.network)?
                 };
-                
+
                 address.shadow_features.pool_id = Some(pool_id.to_string());
                 pool.addresses.push(address);
             }
-            
+
             Ok(())
         } else {
-            Err(ShadowAddressError::ResolutionFailed("Pool not found".into()))
+            Err(ShadowAddressError::ResolutionFailed(
+                "Pool not found".into(),
+            ))
         }
     }
-    
+
     /// Mark address as used.
     pub async fn mark_address_used(&self, address: &mut ShadowAddress) {
         address.metadata.usage_count += 1;
         address.metadata.last_used = Some(DefaultShadowAddressHandler::current_timestamp());
-        
+
         // Check rotation policies
         let policies = self.rotation_policies.read().await;
         if let Some(max_uses) = policies.rotate_after_uses {
@@ -706,17 +721,17 @@ impl ShadowAddressManager {
             }
         }
     }
-    
+
     /// Cleanup expired addresses.
     async fn cleanup_task(&self) {
         let mut cleanup_interval = interval(Duration::from_secs(60)); // Every minute
-        
+
         loop {
             cleanup_interval.tick().await;
-            
+
             // Clean expired addresses
             let current_time = DefaultShadowAddressHandler::current_timestamp();
-            
+
             // Check active addresses
             let mut active = self.active_addresses.write().await;
             let expired: Vec<_> = active
@@ -730,13 +745,13 @@ impl ShadowAddressManager {
                 })
                 .map(|(id, _)| id.clone())
                 .collect();
-            
+
             for id in expired {
                 if let Some(addr) = active.remove(&id) {
                     self.expired_addresses.write().await.push(addr);
                 }
             }
-            
+
             // Clean expired pools
             let mut pools = self.address_pools.write().await;
             let expired_pools: Vec<_> = pools
@@ -750,11 +765,11 @@ impl ShadowAddressManager {
                 })
                 .map(|(id, _)| id.clone())
                 .collect();
-            
+
             for id in expired_pools {
                 pools.remove(&id);
             }
-            
+
             // Limit expired address storage
             let mut expired = self.expired_addresses.write().await;
             if expired.len() > 1000 {
@@ -779,7 +794,7 @@ impl Default for RotationPolicies {
 pub struct ShadowAddressMixer {
     /// Mixing rounds
     rounds: usize,
-    
+
     /// Mixing delay
     delay: Duration,
 }
@@ -789,23 +804,23 @@ impl ShadowAddressMixer {
     pub fn new(rounds: usize, delay: Duration) -> Self {
         Self { rounds, delay }
     }
-    
+
     /// Mix addresses for unlinkability.
     pub async fn mix_addresses(
         &self,
         addresses: Vec<ShadowAddress>,
     ) -> Result<Vec<ShadowAddress>, ShadowAddressError> {
         let mut mixed = addresses;
-        
+
         for _round in 0..self.rounds {
             // Shuffle addresses
             let mut rng = thread_rng();
             use rand::seq::SliceRandom;
             mixed.shuffle(&mut rng);
-            
+
             // Add mixing delay
             tokio::time::sleep(self.delay).await;
-            
+
             // Apply mixing transformation
             mixed = mixed
                 .into_iter()
@@ -817,7 +832,7 @@ impl ShadowAddressMixer {
                 })
                 .collect();
         }
-        
+
         Ok(mixed)
     }
 }
@@ -962,154 +977,156 @@ mod tests {
             prop_assert!(matches);
         }
     }
-    
+
     #[test]
     fn test_temporary_address_generation() {
         let seed = [0u8; 32];
         let handler = DefaultShadowAddressHandler::new(NetworkType::Testnet, seed);
         let ttl = Duration::from_secs(300);
-        let addr = handler.generate_temporary_address(NetworkType::Testnet, ttl).unwrap();
-        
+        let addr = handler
+            .generate_temporary_address(NetworkType::Testnet, ttl)
+            .unwrap();
+
         assert!(addr.shadow_features.is_temporary);
         assert_eq!(addr.metadata.ttl, Some(300));
         assert!(addr.metadata.expires_at.is_some());
         assert_eq!(addr.metadata.flags & 0x01, 0x01); // Temporary flag
     }
-    
+
     #[test]
     fn test_stealth_address_generation() {
         let seed = [0u8; 32];
         let handler = DefaultShadowAddressHandler::new(NetworkType::Testnet, seed);
         let view_key = [1u8; 32];
         let spend_key = [2u8; 32];
-        
-        let addr = handler.generate_stealth_address(
-            NetworkType::Testnet,
-            &view_key,
-            &spend_key,
-        ).unwrap();
-        
+
+        let addr = handler
+            .generate_stealth_address(NetworkType::Testnet, &view_key, &spend_key)
+            .unwrap();
+
         assert_eq!(addr.metadata.version, 2); // Stealth version
         assert_eq!(addr.metadata.flags & 0x02, 0x02); // Stealth flag
         assert!(addr.shadow_features.stealth_prefix.is_some());
         assert!(addr.shadow_features.mixing_enabled);
         assert_eq!(addr.metadata.max_uses, Some(1)); // One-time use
     }
-    
+
     #[test]
     fn test_hierarchical_derivation() {
         let master_key = [42u8; 32];
         let handler = DefaultShadowAddressHandler::new(NetworkType::Testnet, master_key);
-        
+
         // Derive multiple addresses
         let addr1 = handler.derive_from_master(&master_key, 0).unwrap();
         let addr2 = handler.derive_from_master(&master_key, 1).unwrap();
         let addr3 = handler.derive_from_master(&master_key, 0).unwrap();
-        
+
         // Same index should produce same address
         assert_eq!(addr1.view_key, addr3.view_key);
         assert_eq!(addr1.spend_key, addr3.spend_key);
-        
+
         // Different indices should produce different addresses
         assert_ne!(addr1.view_key, addr2.view_key);
         assert_ne!(addr1.spend_key, addr2.spend_key);
-        
+
         // Check derivation metadata
         assert_eq!(addr1.shadow_features.derivation_index, Some(0));
         assert_eq!(addr2.shadow_features.derivation_index, Some(1));
         assert_eq!(addr1.metadata.flags & 0x04, 0x04); // HD derived flag
     }
-    
+
     #[test]
     fn test_address_expiration_validation() {
         let seed = [0u8; 32];
         let handler = DefaultShadowAddressHandler::new(NetworkType::Testnet, seed);
-        
+
         // Create expired address
         let mut addr = create_test_address();
         addr.metadata.expires_at = Some(1); // Past timestamp
-        
+
         let is_valid = handler.validate_address(&addr).unwrap();
         assert!(!is_valid);
-        
+
         // Create future expiry address
         addr.metadata.expires_at = Some(u64::MAX);
         let is_valid = handler.validate_address(&addr).unwrap();
         assert!(is_valid);
     }
-    
+
     #[test]
     fn test_usage_limit_validation() {
         let seed = [0u8; 32];
         let handler = DefaultShadowAddressHandler::new(NetworkType::Testnet, seed);
-        
+
         // Create address with usage limit
         let mut addr = create_test_address();
         addr.metadata.max_uses = Some(5);
         addr.metadata.usage_count = 5;
-        
+
         let is_valid = handler.validate_address(&addr).unwrap();
         assert!(!is_valid); // Reached limit
-        
+
         addr.metadata.usage_count = 4;
         let is_valid = handler.validate_address(&addr).unwrap();
         assert!(is_valid); // Under limit
     }
-    
+
     #[tokio::test]
     async fn test_shadow_address_manager() {
         let seed = [0u8; 32];
         let manager = ShadowAddressManager::new(NetworkType::Testnet, seed).await;
-        
+
         // Create temporary address
-        let temp_addr = manager.create_temporary_address(Duration::from_secs(60)).await.unwrap();
+        let temp_addr = manager
+            .create_temporary_address(Duration::from_secs(60))
+            .await
+            .unwrap();
         assert!(temp_addr.shadow_features.is_temporary);
         assert!(temp_addr.metadata.expires_at.is_some());
-        
+
         // Create address pool
-        manager.create_address_pool(
-            "test_pool".to_string(),
-            3,
-            Some(Duration::from_secs(120)),
-        ).await.unwrap();
-        
+        manager
+            .create_address_pool("test_pool".to_string(), 3, Some(Duration::from_secs(120)))
+            .await
+            .unwrap();
+
         // Get address from pool
         let pool_addr = manager.get_pool_address("test_pool").await;
         assert!(pool_addr.is_some());
-        
+
         // Rotate pool
         manager.rotate_pool("test_pool").await.unwrap();
     }
-    
+
     #[tokio::test]
     async fn test_address_mixing() {
         let mixer = ShadowAddressMixer::new(2, Duration::from_millis(10));
-        
+
         let addresses = vec![
             create_test_address(),
             create_test_address(),
             create_test_address(),
         ];
-        
+
         let mixed = mixer.mix_addresses(addresses.clone()).await.unwrap();
-        
+
         assert_eq!(mixed.len(), addresses.len());
         for addr in &mixed {
             assert!(addr.shadow_features.mixing_enabled);
             assert_eq!(addr.metadata.flags & 0x08, 0x08); // Mixed flag
         }
     }
-    
+
     #[tokio::test]
     async fn test_address_usage_tracking() {
         let seed = [0u8; 32];
         let manager = ShadowAddressManager::new(NetworkType::Testnet, seed).await;
-        
+
         let mut addr = create_test_address();
         let initial_count = addr.metadata.usage_count;
-        
+
         manager.mark_address_used(&mut addr).await;
-        
+
         assert_eq!(addr.metadata.usage_count, initial_count + 1);
         assert!(addr.metadata.last_used.is_some());
     }

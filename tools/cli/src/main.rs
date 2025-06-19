@@ -1,15 +1,28 @@
 use clap::{Parser, Subcommand};
 use qudag_crypto::fingerprint::Fingerprint;
+use qudag_dag::Dag;
 use qudag_network::dark_resolver::{DarkResolver, DarkResolverError};
 use qudag_network::types::NetworkAddress;
-use qudag_protocol::NodeConfig;
+use qudag_network::P2PNode;
 use rand::{thread_rng, Rng};
 use std::path::PathBuf;
-use tracing::info;
+use std::sync::Arc;
+use tokio::signal;
+use tokio::sync::RwLock;
+use tracing::{error, info};
 use tracing_subscriber::fmt::format::FmtSpan;
 
 // Import the CLI module for peer management
 // (CLI module is available as crate root)
+
+/// Simple node configuration for CLI
+#[derive(Debug, Clone)]
+pub struct NodeConfig {
+    pub data_dir: PathBuf,
+    pub network_port: u16,
+    pub max_peers: usize,
+    pub initial_peers: Vec<String>,
+}
 
 #[derive(Parser)]
 #[command(name = "qudag")]
@@ -34,11 +47,11 @@ enum Commands {
         /// Log level
         #[arg(short, long, default_value = "info")]
         log_level: String,
-        
+
         /// Initial peers to connect to
         #[arg(short = 'p', long = "peer")]
         peers: Vec<String>,
-        
+
         /// Run node in background (daemon mode)
         #[arg(short = 'b', long = "background")]
         background: bool,
@@ -50,43 +63,43 @@ enum Commands {
         #[arg(short, long)]
         force: bool,
     },
-    
+
     /// Restart a running node
     Restart {
         /// Force kill during restart
         #[arg(short, long)]
         force: bool,
     },
-    
+
     /// Show node logs
     Logs {
         /// Number of lines to show
         #[arg(short = 'n', long, default_value = "50")]
         lines: usize,
-        
+
         /// Follow log output
         #[arg(short, long)]
         follow: bool,
     },
-    
+
     /// Generate systemd service file
     Systemd {
         /// Output file path
         #[arg(short, long)]
         output: Option<PathBuf>,
     },
-    
+
     /// Run node process (internal command)
     #[command(hide = true)]
     RunNode {
         /// Port to listen on
         #[arg(long)]
         port: u16,
-        
+
         /// Data directory
         #[arg(long)]
         data_dir: String,
-        
+
         /// Initial peers
         #[arg(long)]
         peer: Vec<String>,
@@ -165,7 +178,7 @@ enum PeerCommands {
         #[arg(long)]
         output: Option<PathBuf>,
     },
-    
+
     /// Import peer list
     Import {
         /// Input file
@@ -174,10 +187,10 @@ enum PeerCommands {
         #[arg(long)]
         merge: bool,
     },
-    
+
     /// Test connectivity to all peers
     Test,
-    
+
     /// Unban a peer
     Unban {
         /// Peer address
@@ -244,74 +257,94 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
             peers,
             background,
         } => {
-            use qudag_cli::node_manager::{NodeManager, NodeManagerConfig};
-            
             // Set log level
             std::env::set_var("RUST_LOG", &log_level);
-            
+
             if background {
+                use qudag_cli::node_manager::{NodeManager, NodeManagerConfig};
+
                 info!("Starting QuDAG node in background on port {}", port);
-                
+
                 // Create node manager
                 let config = NodeManagerConfig::default();
                 let manager = NodeManager::new(config)?;
-                
+
                 // Start in background
-                manager.start_node(Some(port), data_dir, peers, false).await?;
-                
+                manager
+                    .start_node(Some(port), data_dir, peers, false)
+                    .await?;
+
                 println!("✓ QuDAG node started in background");
                 println!("  Use 'qudag status' to check node status");
                 println!("  Use 'qudag logs' to view logs");
                 println!("  Use 'qudag stop' to stop the node");
             } else {
                 info!("Starting QuDAG node in foreground on port {}", port);
-                
-                // Use the commands module function which runs in foreground
-                qudag_cli::start_node(data_dir, Some(port), peers).await?;
+
+                // Create NodeConfig from CLI args
+                let node_config = NodeConfig {
+                    data_dir: data_dir.unwrap_or_else(|| PathBuf::from("./data")),
+                    network_port: port,
+                    max_peers: 50,
+                    initial_peers: peers,
+                };
+
+                // Start the real node
+                run_node(node_config).await?;
             }
         }
 
         Commands::Stop { force } => {
-            use qudag_cli::node_manager::{NodeManager, NodeManagerConfig};
-            
             info!("Stopping QuDAG node");
-            
-            let config = NodeManagerConfig::default();
-            let manager = NodeManager::new(config)?;
-            
-            manager.stop_node(force).await?;
-            println!("✓ QuDAG node stopped");
+
+            // Try to connect to RPC server and send stop command
+            match stop_node_via_rpc(force).await {
+                Ok(()) => {
+                    println!("✓ QuDAG node stopped");
+                }
+                Err(e) => {
+                    if force {
+                        error!(
+                            "Failed to stop node gracefully, but force=true. Error: {}",
+                            e
+                        );
+                        println!("✗ Failed to stop node gracefully (use system tools if needed)");
+                    } else {
+                        return Err(e);
+                    }
+                }
+            }
         }
-        
+
         Commands::Restart { force } => {
             use qudag_cli::node_manager::{NodeManager, NodeManagerConfig};
-            
+
             info!("Restarting QuDAG node");
-            
+
             let config = NodeManagerConfig::default();
             let manager = NodeManager::new(config)?;
-            
+
             manager.restart_node(force).await?;
             println!("✓ QuDAG node restarted");
         }
-        
+
         Commands::Logs { lines, follow } => {
             use qudag_cli::node_manager::{NodeManager, NodeManagerConfig};
-            
+
             let config = NodeManagerConfig::default();
             let manager = NodeManager::new(config)?;
-            
+
             manager.tail_logs(lines, follow).await?;
         }
-        
+
         Commands::Systemd { output } => {
             use qudag_cli::node_manager::{NodeManager, NodeManagerConfig};
-            
+
             let config = NodeManagerConfig::default();
             let manager = NodeManager::new(config)?;
-            
+
             let service_content = manager.generate_systemd_service(output.clone()).await?;
-            
+
             if output.is_none() {
                 println!("{}", service_content);
                 println!("\n# To install this service:");
@@ -321,30 +354,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 println!("# 4. Run: sudo systemctl start qudag");
             }
         }
-        
-        Commands::RunNode { port, data_dir, peer } => {
+
+        Commands::RunNode {
+            port,
+            data_dir,
+            peer,
+        } => {
             // This is the actual node process that runs
             info!("Running QuDAG node process on port {}", port);
-            
-            // TODO: Replace with actual node implementation
+
             let config = NodeConfig {
                 data_dir: PathBuf::from(data_dir),
                 network_port: port,
                 max_peers: 50,
                 initial_peers: peer,
             };
-            
-            // For now, just create a dummy node that logs and waits
-            println!("QuDAG node running:");
-            println!("  Port: {}", port);
-            println!("  Data directory: {:?}", config.data_dir);
-            println!("  Initial peers: {:?}", config.initial_peers);
-            
-            // Keep the process running
-            loop {
-                tokio::time::sleep(tokio::time::Duration::from_secs(60)).await;
-                info!("Node heartbeat - still running on port {}", port);
-            }
+
+            // Start the real node runner
+            run_node(config).await?;
         }
 
         Commands::Status => {
@@ -361,17 +388,18 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     std::process::exit(1);
                 }
             };
-            
+
             match command {
-                PeerCommands::List { status: _, format: _ } => {
-                    match router.handle_peer_list(None).await {
-                        Ok(()) => {}
-                        Err(e) => {
-                            eprintln!("Error listing peers: {}", e);
-                            std::process::exit(1);
-                        }
+                PeerCommands::List {
+                    status: _,
+                    format: _,
+                } => match router.handle_peer_list(None).await {
+                    Ok(()) => {}
+                    Err(e) => {
+                        eprintln!("Error listing peers: {}", e);
+                        std::process::exit(1);
                     }
-                }
+                },
                 PeerCommands::Add {
                     address,
                     file,
@@ -397,7 +425,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                             }
                         }
                     }
-                },
+                }
                 PeerCommands::Remove { address, force } => {
                     match router.handle_peer_remove(address, None, force).await {
                         Ok(()) => {}
@@ -444,15 +472,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                     }
                 }
-                PeerCommands::Test => {
-                    match router.handle_peer_test().await {
-                        Ok(()) => {}
-                        Err(e) => {
-                            eprintln!("Error testing peers: {}", e);
-                            std::process::exit(1);
-                        }
+                PeerCommands::Test => match router.handle_peer_test().await {
+                    Ok(()) => {}
+                    Err(e) => {
+                        eprintln!("Error testing peers: {}", e);
+                        std::process::exit(1);
                     }
-                }
+                },
                 PeerCommands::Unban { address } => {
                     match router.handle_peer_unban(address, None).await {
                         Ok(()) => {}
@@ -463,33 +489,29 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     }
                 }
             }
-        },
+        }
 
         Commands::Network { command } => {
             // Create a new CommandRouter instance for network commands
             let router = qudag_cli::CommandRouter::new();
-            
+
             match command {
-                NetworkCommands::Stats => {
-                    match router.handle_network_stats(None, false).await {
-                        Ok(()) => {}
-                        Err(e) => {
-                            eprintln!("Error getting network stats: {}", e);
-                            std::process::exit(1);
-                        }
+                NetworkCommands::Stats => match router.handle_network_stats(None, false).await {
+                    Ok(()) => {}
+                    Err(e) => {
+                        eprintln!("Error getting network stats: {}", e);
+                        std::process::exit(1);
                     }
-                }
-                NetworkCommands::Test => {
-                    match router.handle_network_test(None).await {
-                        Ok(()) => {}
-                        Err(e) => {
-                            eprintln!("Error running network test: {}", e);
-                            std::process::exit(1);
-                        }
+                },
+                NetworkCommands::Test => match router.handle_network_test(None).await {
+                    Ok(()) => {}
+                    Err(e) => {
+                        eprintln!("Error running network test: {}", e);
+                        std::process::exit(1);
                     }
-                }
+                },
             }
-        },
+        }
 
         Commands::Address { command } => match command {
             AddressCommands::Register { domain } => {
@@ -499,21 +521,28 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 let resolver = DarkResolver::new();
                 let test_address = NetworkAddress::new([127, 0, 0, 1], 8080);
                 let mut rng = thread_rng();
-                
+
                 // Extract custom name from domain (remove .dark suffix if present)
                 let custom_name = if domain.ends_with(".dark") {
                     Some(&domain[..domain.len() - 5])
                 } else {
                     Some(domain.as_str())
                 };
-                
+
                 // Create test values for registration
                 let addresses = vec![test_address];
                 let alias = Some(format!("Test node at {}", domain));
                 let ttl = 3600; // 1 hour
                 let owner_id = qudag_network::types::PeerId::random();
 
-                match resolver.register_domain(custom_name, addresses, alias, ttl, owner_id, &mut rng) {
+                match resolver.register_domain(
+                    custom_name,
+                    addresses,
+                    alias,
+                    ttl,
+                    owner_id,
+                    &mut rng,
+                ) {
                     Ok(dark_address) => {
                         println!("✓ Successfully registered dark address");
                         println!("  Domain: {}", dark_address.domain);
@@ -549,8 +578,14 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     Ok(record) => {
                         println!("✓ Domain found:");
                         println!("  Domain: {}", domain);
-                        println!("  Signing public key size: {} bytes", record.signing_public_key.len());
-                        println!("  Encryption public key size: {} bytes", record.encryption_public_key.len());
+                        println!(
+                            "  Signing public key size: {} bytes",
+                            record.signing_public_key.len()
+                        );
+                        println!(
+                            "  Encryption public key size: {} bytes",
+                            record.encryption_public_key.len()
+                        );
                         println!("  Number of addresses: {}", record.addresses.len());
                         if let Some(alias) = &record.alias {
                             println!("  Alias: {}", alias);
@@ -633,6 +668,272 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
         },
+    }
+
+    Ok(())
+}
+
+/// Start a real node with P2P networking and DAG processing
+async fn run_node(node_config: NodeConfig) -> Result<(), Box<dyn std::error::Error>> {
+    info!("Starting QuDAG node on port {}", node_config.network_port);
+
+    // Create data directory if it doesn't exist
+    tokio::fs::create_dir_all(&node_config.data_dir)
+        .await
+        .map_err(|e| format!("Failed to create data directory: {}", e))?;
+
+    // Create P2P network configuration
+    let p2p_config = qudag_network::p2p::NetworkConfig {
+        listen_addrs: vec![format!("/ip4/0.0.0.0/tcp/{}", node_config.network_port)],
+        bootstrap_peers: node_config.initial_peers.clone(),
+        max_connections: node_config.max_peers,
+        ..Default::default()
+    };
+
+    // Create DAG instance
+    let dag = Arc::new(RwLock::new(Dag::new(100))); // Max 100 concurrent operations
+
+    // Create Dark Resolver
+    let _dark_resolver = Arc::new(RwLock::new(DarkResolver::new()));
+
+    println!("QuDAG node starting:");
+    println!("  P2P Port: {}", node_config.network_port);
+    println!("  Data directory: {:?}", node_config.data_dir);
+    println!("  Initial peers: {:?}", node_config.initial_peers);
+    println!("  Max peers: {}", node_config.max_peers);
+
+    println!("Creating P2P network configuration...");
+
+    // Create and start P2P node
+    println!("Initializing P2P node...");
+    let (mut p2p_node, p2p_handle) = P2PNode::new(p2p_config)
+        .await
+        .map_err(|e| format!("Failed to create P2P node: {}", e))?;
+
+    println!("Starting P2P networking...");
+    p2p_node
+        .start()
+        .await
+        .map_err(|e| format!("Failed to start P2P node: {}", e))?;
+
+    let p2p_handle = Arc::new(p2p_handle);
+
+    println!("✓ QuDAG node started successfully");
+    println!("  P2P networking: Active");
+    println!("  DAG consensus: Active");
+    println!("  Dark resolver: Active");
+    println!();
+    println!("Node is processing DAG messages and accepting P2P connections...");
+    println!("Press Ctrl+C to stop the node");
+
+    // Set up shutdown handler
+    let shutdown_signal = Arc::new(RwLock::new(false));
+    let shutdown_flag = Arc::clone(&shutdown_signal);
+
+    // Set up signal handler for graceful shutdown
+    tokio::spawn(async move {
+        match signal::ctrl_c().await {
+            Ok(()) => {
+                info!("Received Ctrl+C, initiating graceful shutdown...");
+                println!("\\nReceived Ctrl+C, shutting down gracefully...");
+
+                // Signal shutdown
+                *shutdown_flag.write().await = true;
+
+                println!("✓ QuDAG node stopped");
+                std::process::exit(0);
+            }
+            Err(e) => {
+                error!("Error setting up signal handler: {}", e);
+            }
+        }
+    });
+
+    // Run the P2P node in a background task
+    let node_handle = tokio::spawn(async move {
+        if let Err(e) = p2p_node.run().await {
+            error!("P2P node error: {}", e);
+        }
+    });
+
+    // Main event loop - process P2P events and DAG operations
+    let mut last_heartbeat = std::time::Instant::now();
+
+    // Show initial heartbeat immediately
+    println!("✓ Node is running - listening for P2P connections and processing events...");
+
+    loop {
+        // Check if shutdown was requested
+        if *shutdown_signal.read().await {
+            break;
+        }
+
+        // Process P2P events with timeout to avoid blocking
+        let event_future = p2p_handle.next_event();
+        let timeout_future = tokio::time::sleep(std::time::Duration::from_millis(100));
+
+        tokio::select! {
+            event_opt = event_future => {
+                if let Some(event) = event_opt {
+                info!("Processing P2P event: {:?}", event);
+
+                // In a real implementation, you would:
+                // 1. Convert P2P messages to DAG messages
+                // 2. Submit them to the DAG for consensus
+                // 3. Broadcast consensus results back to the network
+
+                // For now, just log the event
+                match event {
+                    qudag_network::P2PEvent::MessageReceived { peer_id, topic, data } => {
+                        info!("Received message from {} on topic {} ({} bytes)", peer_id, topic, data.len());
+
+                        // Submit to DAG (simplified)
+                        let dag_lock = dag.write().await;
+                        let message = qudag_dag::DagMessage {
+                            id: qudag_dag::VertexId::new(),
+                            payload: data,
+                            parents: Default::default(),
+                            timestamp: std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .unwrap()
+                                .as_secs(),
+                        };
+
+                        if let Err(e) = dag_lock.submit_message(message).await {
+                            error!("Failed to submit message to DAG: {}", e);
+                        }
+                    }
+                    qudag_network::P2PEvent::PeerConnected(peer_id) => {
+                        info!("Peer connected: {}", peer_id);
+                    }
+                    qudag_network::P2PEvent::PeerDisconnected(peer_id) => {
+                        info!("Peer disconnected: {}", peer_id);
+                    }
+                    _ => {
+                        info!("Other P2P event received");
+                    }
+                }
+                }
+            }
+            _ = timeout_future => {
+                // Timeout - continue with heartbeat check
+            }
+        }
+
+        // Heartbeat every 30 seconds
+        if last_heartbeat.elapsed() >= std::time::Duration::from_secs(30) {
+            let vertex_count = {
+                let dag_lock = dag.read().await;
+                let vertices_guard = dag_lock.vertices.read().await;
+                vertices_guard.len()
+            };
+
+            println!(
+                "💓 Node heartbeat - DAG: {} vertices, waiting for peer connections...",
+                vertex_count
+            );
+            info!("Node heartbeat - DAG: {} vertices", vertex_count);
+            last_heartbeat = std::time::Instant::now();
+        }
+    }
+
+    // Wait for the P2P node task to complete
+    let _ = node_handle.await;
+
+    info!("Node event loop stopped");
+    Ok(())
+}
+
+/// Stop a running node via RPC or process signal
+async fn stop_node_via_rpc(force: bool) -> Result<(), Box<dyn std::error::Error>> {
+    use std::time::Duration;
+
+    info!("Attempting to stop QuDAG node...");
+
+    // For now, we'll use a simple approach since RPC server isn't fully working
+    // In the future, this should connect to the RPC server and send a stop command
+
+    if force {
+        println!("Force stop requested - attempting to find and kill node process");
+
+        // Try to find the process
+        match tokio::process::Command::new("pgrep")
+            .arg("-f")
+            .arg("qudag")
+            .output()
+            .await
+        {
+            Ok(output) => {
+                if output.status.success() {
+                    let pids = String::from_utf8_lossy(&output.stdout);
+                    for pid in pids.trim().lines() {
+                        if let Ok(pid_num) = pid.parse::<u32>() {
+                            info!("Found QuDAG process with PID: {}", pid_num);
+                            match tokio::process::Command::new("kill")
+                                .arg("-TERM")
+                                .arg(pid)
+                                .output()
+                                .await
+                            {
+                                Ok(_) => {
+                                    info!("Sent SIGTERM to process {}", pid_num);
+
+                                    // Wait a moment, then check if it's still running
+                                    tokio::time::sleep(Duration::from_secs(3)).await;
+
+                                    match tokio::process::Command::new("kill")
+                                        .arg("-0") // Just check if process exists
+                                        .arg(pid)
+                                        .output()
+                                        .await
+                                    {
+                                        Ok(check_output) => {
+                                            if !check_output.status.success() {
+                                                // Process is gone
+                                                info!("Process {} stopped successfully", pid_num);
+                                            } else {
+                                                // Force kill
+                                                info!(
+                                                    "Process {} still running, sending SIGKILL",
+                                                    pid_num
+                                                );
+                                                let _ = tokio::process::Command::new("kill")
+                                                    .arg("-KILL")
+                                                    .arg(pid)
+                                                    .output()
+                                                    .await;
+                                            }
+                                        }
+                                        Err(_) => {
+                                            // Assume it stopped
+                                            info!("Process {} appears to have stopped", pid_num);
+                                        }
+                                    }
+                                }
+                                Err(e) => {
+                                    error!("Failed to kill process {}: {}", pid_num, e);
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    println!("No QuDAG processes found running");
+                }
+            }
+            Err(e) => {
+                error!("Failed to search for QuDAG processes: {}", e);
+                return Err(format!("Failed to search for running processes: {}", e).into());
+            }
+        }
+    } else {
+        println!("Graceful shutdown not yet implemented (RPC server needs to be fixed)");
+        println!(
+            "Use --force to attempt forceful shutdown, or send SIGTERM to the process manually"
+        );
+        return Err(
+            "Graceful shutdown via RPC not available. Use --force or Ctrl+C on the running node."
+                .into(),
+        );
     }
 
     Ok(())

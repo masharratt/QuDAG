@@ -1,15 +1,11 @@
+use blake3::Hasher;
+use pqcrypto_hqc::{hqc128, hqc192, hqc256};
+use pqcrypto_traits::kem::{
+    Ciphertext as CiphertextTrait, PublicKey as PublicKeyTrait, SecretKey as SecretKeyTrait,
+    SharedSecret as SharedSecretTrait,
+};
 use rand::{CryptoRng, RngCore};
 use thiserror::Error;
-use blake3::Hasher;
-use pqcrypto_hqc::{
-    hqc128, hqc192, hqc256,
-};
-use pqcrypto_traits::kem::{
-    Ciphertext as CiphertextTrait, 
-    PublicKey as PublicKeyTrait, 
-    SecretKey as SecretKeyTrait, 
-    SharedSecret as SharedSecretTrait
-};
 
 /// Security parameter sets for HQC as defined in the NIST submission
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -153,7 +149,7 @@ impl Hqc {
         #[allow(unused_variables)] _rng: &mut R,
     ) -> Result<(PublicKey, SecretKey), HqcError> {
         let params = self.params.clone();
-        
+
         match params.security {
             SecurityParameter::Hqc128 => {
                 let (pk, sk) = hqc128::keypair();
@@ -214,11 +210,11 @@ impl Hqc {
                 let pk_bytes = hqc128::PublicKey::from_bytes(&pk.inner)
                     .map_err(|_| HqcError::InvalidPublicKey)?;
                 let (shared_secret, kem_ciphertext) = hqc128::encapsulate(&pk_bytes);
-                
+
                 // Derive encryption key from shared secret using BLAKE3
                 let key = self.derive_key(shared_secret.as_bytes());
                 let encrypted_message = self.xor_encrypt(message, &key);
-                
+
                 Ok(Ciphertext {
                     kem_ciphertext: kem_ciphertext.as_bytes().to_vec(),
                     encrypted_message,
@@ -229,10 +225,10 @@ impl Hqc {
                 let pk_bytes = hqc192::PublicKey::from_bytes(&pk.inner)
                     .map_err(|_| HqcError::InvalidPublicKey)?;
                 let (shared_secret, kem_ciphertext) = hqc192::encapsulate(&pk_bytes);
-                
+
                 let key = self.derive_key(shared_secret.as_bytes());
                 let encrypted_message = self.xor_encrypt(message, &key);
-                
+
                 Ok(Ciphertext {
                     kem_ciphertext: kem_ciphertext.as_bytes().to_vec(),
                     encrypted_message,
@@ -243,10 +239,10 @@ impl Hqc {
                 let pk_bytes = hqc256::PublicKey::from_bytes(&pk.inner)
                     .map_err(|_| HqcError::InvalidPublicKey)?;
                 let (shared_secret, kem_ciphertext) = hqc256::encapsulate(&pk_bytes);
-                
+
                 let key = self.derive_key(shared_secret.as_bytes());
                 let encrypted_message = self.xor_encrypt(message, &key);
-                
+
                 Ok(Ciphertext {
                     kem_ciphertext: kem_ciphertext.as_bytes().to_vec(),
                     encrypted_message,
@@ -264,13 +260,13 @@ impl Hqc {
                     .map_err(|_| HqcError::InvalidSecretKey)?;
                 let kem_ct = hqc128::Ciphertext::from_bytes(&ct.kem_ciphertext)
                     .map_err(|_| HqcError::InvalidCiphertext)?;
-                
+
                 let shared_secret = hqc128::decapsulate(&kem_ct, &sk_bytes);
-                
+
                 // Derive the same key from shared secret
                 let key = self.derive_key(shared_secret.as_bytes());
                 let message = self.xor_decrypt(&ct.encrypted_message, &key);
-                
+
                 Ok(message)
             }
             SecurityParameter::Hqc192 => {
@@ -278,12 +274,12 @@ impl Hqc {
                     .map_err(|_| HqcError::InvalidSecretKey)?;
                 let kem_ct = hqc192::Ciphertext::from_bytes(&ct.kem_ciphertext)
                     .map_err(|_| HqcError::InvalidCiphertext)?;
-                
+
                 let shared_secret = hqc192::decapsulate(&kem_ct, &sk_bytes);
-                
+
                 let key = self.derive_key(shared_secret.as_bytes());
                 let message = self.xor_decrypt(&ct.encrypted_message, &key);
-                
+
                 Ok(message)
             }
             SecurityParameter::Hqc256 => {
@@ -291,12 +287,12 @@ impl Hqc {
                     .map_err(|_| HqcError::InvalidSecretKey)?;
                 let kem_ct = hqc256::Ciphertext::from_bytes(&ct.kem_ciphertext)
                     .map_err(|_| HqcError::InvalidCiphertext)?;
-                
+
                 let shared_secret = hqc256::decapsulate(&kem_ct, &sk_bytes);
-                
+
                 let key = self.derive_key(shared_secret.as_bytes());
                 let message = self.xor_decrypt(&ct.encrypted_message, &key);
-                
+
                 Ok(message)
             }
         }
@@ -340,7 +336,7 @@ impl PublicKey {
     pub fn from_bytes(bytes: &[u8]) -> Result<Self, HqcError> {
         // Default to HQC256 if no other information is available
         let params = Parameters::new(SecurityParameter::Hqc256);
-        
+
         if bytes.len() != params.public_key_len() {
             return Err(HqcError::InvalidPublicKey);
         }
@@ -350,11 +346,14 @@ impl PublicKey {
             params,
         })
     }
-    
+
     /// Create public key from bytes with specific security level
-    pub fn from_bytes_with_params(bytes: &[u8], security: SecurityParameter) -> Result<Self, HqcError> {
+    pub fn from_bytes_with_params(
+        bytes: &[u8],
+        security: SecurityParameter,
+    ) -> Result<Self, HqcError> {
         let params = Parameters::new(security);
-        
+
         if bytes.len() != params.public_key_len() {
             return Err(HqcError::InvalidPublicKey);
         }
@@ -370,11 +369,14 @@ impl SecretKey {
     pub fn as_bytes(&self) -> Vec<u8> {
         self.inner.clone()
     }
-    
+
     /// Create secret key from bytes with specific security level
-    pub fn from_bytes_with_params(bytes: &[u8], security: SecurityParameter) -> Result<Self, HqcError> {
+    pub fn from_bytes_with_params(
+        bytes: &[u8],
+        security: SecurityParameter,
+    ) -> Result<Self, HqcError> {
         let params = Parameters::new(security);
-        
+
         if bytes.len() != params.secret_key_len() {
             return Err(HqcError::InvalidSecretKey);
         }
@@ -397,18 +399,21 @@ impl Ciphertext {
         result.extend_from_slice(&self.encrypted_message);
         result
     }
-    
+
     /// Create ciphertext from bytes with specific security level
-    pub fn from_bytes_with_params(bytes: &[u8], security: SecurityParameter) -> Result<Self, HqcError> {
+    pub fn from_bytes_with_params(
+        bytes: &[u8],
+        security: SecurityParameter,
+    ) -> Result<Self, HqcError> {
         let params = Parameters::new(security);
-        
+
         if bytes.len() < 4 + params.ciphertext_len() {
             return Err(HqcError::InvalidCiphertext);
         }
 
         // Read message length
         let msg_len = u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]) as usize;
-        
+
         if bytes.len() < 4 + params.ciphertext_len() + msg_len {
             return Err(HqcError::InvalidCiphertext);
         }
@@ -445,23 +450,23 @@ impl Hqc256 {
     pub const PUBLIC_KEY_SIZE: usize = hqc256::public_key_bytes();
     pub const SECRET_KEY_SIZE: usize = hqc256::secret_key_bytes();
     pub const CIPHERTEXT_SIZE: usize = hqc256::ciphertext_bytes();
-    
+
     /// Generate a key pair
     pub fn keygen() -> Result<(PublicKey, SecretKey), HqcError> {
         let hqc = Hqc::new(SecurityParameter::Hqc256);
         let mut rng = rand::thread_rng();
         hqc.generate_keypair(&mut rng)
     }
-    
+
     /// Encrypt a message
     pub fn encrypt(pk: &PublicKey, message: &[u8]) -> Result<Vec<u8>, HqcError> {
         let hqc = Hqc::new(SecurityParameter::Hqc256);
         let mut rng = rand::thread_rng();
-        
+
         let ciphertext = hqc.encrypt(message, pk, &mut rng)?;
         Ok(ciphertext.as_bytes())
     }
-    
+
     /// Decrypt a ciphertext
     pub fn decrypt(sk: &SecretKey, ciphertext: &[u8]) -> Result<Vec<u8>, HqcError> {
         let hqc = Hqc::new(SecurityParameter::Hqc256);
@@ -478,7 +483,7 @@ impl Hqc128 {
     pub const PUBLIC_KEY_SIZE: usize = hqc128::public_key_bytes();
     pub const SECRET_KEY_SIZE: usize = hqc128::secret_key_bytes();
     pub const CIPHERTEXT_SIZE: usize = hqc128::ciphertext_bytes();
-    
+
     /// Generate a key pair
     pub fn keygen() -> Result<(PublicKey, SecretKey), HqcError> {
         let hqc = Hqc::new(SecurityParameter::Hqc128);
@@ -491,7 +496,7 @@ impl Hqc192 {
     pub const PUBLIC_KEY_SIZE: usize = hqc192::public_key_bytes();
     pub const SECRET_KEY_SIZE: usize = hqc192::secret_key_bytes();
     pub const CIPHERTEXT_SIZE: usize = hqc192::ciphertext_bytes();
-    
+
     /// Generate a key pair
     pub fn keygen() -> Result<(PublicKey, SecretKey), HqcError> {
         let hqc = Hqc::new(SecurityParameter::Hqc192);
@@ -511,11 +516,11 @@ mod tests {
         let params128 = Parameters::new(SecurityParameter::Hqc128);
         let params192 = Parameters::new(SecurityParameter::Hqc192);
         let params256 = Parameters::new(SecurityParameter::Hqc256);
-        
+
         // Verify that different security levels have different sizes
         assert_ne!(params128.public_key_size, params192.public_key_size);
         assert_ne!(params192.public_key_size, params256.public_key_size);
-        
+
         // Verify sizes are reasonable
         assert!(params128.public_key_size > 0);
         assert!(params128.secret_key_size > 0);
@@ -598,11 +603,12 @@ mod tests {
         let pk_bytes = pk.as_bytes();
         let sk_bytes = sk.as_bytes();
 
-        assert!(pk_bytes.len() > 0);
-        assert!(sk_bytes.len() > 0);
+        assert!(!pk_bytes.is_empty());
+        assert!(!sk_bytes.is_empty());
 
         // Test public key round-trip
-        let pk_restored = PublicKey::from_bytes_with_params(&pk_bytes, SecurityParameter::Hqc256).unwrap();
+        let pk_restored =
+            PublicKey::from_bytes_with_params(&pk_bytes, SecurityParameter::Hqc256).unwrap();
         assert_eq!(pk.inner, pk_restored.inner);
     }
 
@@ -616,7 +622,8 @@ mod tests {
         let ct = hqc.encrypt(message, &pk, &mut rng).unwrap();
 
         let ct_bytes = ct.as_bytes();
-        let ct_restored = Ciphertext::from_bytes_with_params(&ct_bytes, SecurityParameter::Hqc256).unwrap();
+        let ct_restored =
+            Ciphertext::from_bytes_with_params(&ct_bytes, SecurityParameter::Hqc256).unwrap();
 
         let decrypted = hqc.decrypt(&ct_restored, &sk).unwrap();
         assert_eq!(message, &decrypted[..]);
@@ -670,10 +677,8 @@ mod tests {
         let ct = hqc.encrypt(message, &pk1, &mut rng).unwrap();
         // In the real HQC implementation, using wrong secret key may panic or return error
         // This is expected behavior for post-quantum cryptographic systems
-        let decryption_result = std::panic::catch_unwind(|| {
-            hqc.decrypt(&ct, &sk2)
-        });
-        
+        let decryption_result = std::panic::catch_unwind(|| hqc.decrypt(&ct, &sk2));
+
         // Either it panics (which we catch) or it succeeds with wrong data
         match decryption_result {
             Ok(Ok(decrypted)) => {

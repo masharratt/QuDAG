@@ -1,6 +1,6 @@
-use thiserror::Error;
-use crate::vertex::VertexError;
 use crate::consensus::ConsensusError;
+use crate::vertex::VertexError;
+use thiserror::Error;
 
 /// Errors that can occur during DAG operations
 #[derive(Error, Debug)]

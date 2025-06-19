@@ -27,7 +27,9 @@ pub struct NetworkSimulator {
 /// Handle to a simulated node
 struct NodeHandle {
     id: String,
+    #[allow(dead_code)] // May be used in future node implementations
     config: ProtocolConfig,
+    #[allow(dead_code)] // May be used in future message routing implementations
     msg_tx: mpsc::Sender<Vec<u8>>,
 }
 
@@ -39,7 +41,10 @@ pub enum SimulatorEvent {
     /// Node left the network
     NodeLeft(String),
     /// Network partition occurred
-    Partition { nodes: Vec<String> },
+    Partition {
+        /// List of nodes in the partition
+        nodes: Vec<String>,
+    },
     /// Network healed
     Heal,
 }

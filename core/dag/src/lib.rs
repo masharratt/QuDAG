@@ -78,12 +78,14 @@ pub use graph::{Graph, GraphMetrics, StorageConfig};
 pub use node::{Node, NodeState, SerializableHash};
 
 pub use consensus::{
-    Confidence, Consensus, ConsensusError, ConsensusMetrics, ConsensusStatus, QRAvalanche, 
+    Confidence, Consensus, ConsensusError, ConsensusMetrics, ConsensusStatus, QRAvalanche,
     QRAvalancheConfig, VotingRecord,
 };
 pub use dag::{Dag, DagError as DagModuleError, DagMessage};
-pub use tip_selection::{AdvancedTipSelection, ParentSelectionAlgorithm, TipSelection, 
-    TipSelectionConfig, TipSelectionError, VertexWeight};
+pub use tip_selection::{
+    AdvancedTipSelection, ParentSelectionAlgorithm, TipSelection, TipSelectionConfig,
+    TipSelectionError, VertexWeight,
+};
 pub use vertex::{Vertex, VertexError, VertexId, VertexOps};
 
 /// Alias for QR-Avalanche DAG consensus implementation

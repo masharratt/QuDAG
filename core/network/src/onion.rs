@@ -1,14 +1,14 @@
+use qudag_crypto::kem::{PublicKey as KEMPublicKey, SecretKey as KEMSecretKey};
+use qudag_crypto::ml_kem::MlKem768;
 use rand::{thread_rng, Rng, RngCore};
 use ring::aead::{Aad, LessSafeKey, Nonce, UnboundKey, CHACHA20_POLY1305};
 use ring::rand::{SecureRandom, SystemRandom};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+use std::sync::Arc;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use thiserror::Error;
-use std::collections::HashMap;
 use tokio::sync::Mutex as TokioMutex;
-use std::sync::Arc;
-use qudag_crypto::ml_kem::{MlKem768};
-use qudag_crypto::kem::{PublicKey as KEMPublicKey, SecretKey as KEMSecretKey};
 
 /// Error types for onion routing operations
 #[derive(Error, Debug)]
@@ -181,10 +181,10 @@ impl MLKEMOnionRouter {
         // Generate ML-KEM keypair for this node
         let (public_key, secret_key) = MlKem768::keygen()
             .map_err(|e| OnionError::MLKEMError(format!("Key generation failed: {:?}", e)))?;
-        
+
         let circuit_manager = Arc::new(TokioMutex::new(CircuitManager::new()));
         let directory_client = Arc::new(DirectoryClient::new());
-        
+
         Ok(Self {
             ml_kem_secret_key: secret_key,
             ml_kem_public_key: public_key,
@@ -210,17 +210,17 @@ impl MLKEMOnionRouter {
     /// Derive symmetric key from ML-KEM shared secret using KDF
     fn derive_symmetric_key(&self, shared_secret: &[u8]) -> Result<[u8; 32], OnionError> {
         use ring::hkdf;
-        
+
         let salt = ring::hkdf::Salt::new(hkdf::HKDF_SHA256, b"QuDAG-Onion-v1");
         let prk = salt.extract(shared_secret);
-        
+
         let mut key = [0u8; 32];
         let info = [&b"symmetric-key"[..]];
         prk.expand(&info[..], hkdf::HKDF_SHA256)
             .map_err(|_| OnionError::EncryptionError("Key derivation failed".into()))?
             .fill(&mut key)
             .map_err(|_| OnionError::EncryptionError("Key derivation failed".into()))?;
-        
+
         Ok(key)
     }
 
@@ -294,7 +294,6 @@ impl MLKEMOnionRouter {
 
         // Build layers from innermost to outermost (reverse order)
         for (i, _hop_pubkey) in route.iter().rev().enumerate() {
-
             // Create nonce for this layer
             let mut nonce = [0u8; 12];
             self.rng
@@ -302,14 +301,16 @@ impl MLKEMOnionRouter {
                 .map_err(|e| OnionError::RngError(e.to_string()))?;
 
             // Get public key for this hop
-            let hop_public_key = self.directory_client.get_public_key(&route[route.len() - i - 1])
+            let hop_public_key = self
+                .directory_client
+                .get_public_key(&route[route.len() - i - 1])
                 .await
                 .map_err(|e| OnionError::RouteError(format!("Failed to get public key: {}", e)))?;
-            
+
             // ML-KEM encapsulation for this layer
             let (kem_ciphertext, shared_secret) = MlKem768::encapsulate(&hop_public_key)
                 .map_err(|e| OnionError::MLKEMError(format!("Encapsulation failed: {:?}", e)))?;
-            
+
             // Derive symmetric key from shared secret
             let symmetric_key = self.derive_symmetric_key(shared_secret.as_bytes())?;
 
@@ -318,11 +319,17 @@ impl MLKEMOnionRouter {
             let hop_info = HopMetadata {
                 circuit_id,
                 hop_number: i as u8,
-                next_hop: if i == 0 { None } else { Some(route[route.len() - i].clone()) },
+                next_hop: if i == 0 {
+                    None
+                } else {
+                    Some(route[route.len() - i].clone())
+                },
                 flags: LayerFlags::default(),
             };
-            let metadata = self.create_metadata(bincode::serialize(&hop_info)
-                .map_err(|e| OnionError::InvalidFormat(e.to_string()))?)?;
+            let metadata = self.create_metadata(
+                bincode::serialize(&hop_info)
+                    .map_err(|e| OnionError::InvalidFormat(e.to_string()))?,
+            )?;
 
             // Determine next hop (empty for last layer)
             let next_hop = if i == 0 {
@@ -369,10 +376,10 @@ impl MLKEMOnionRouter {
         // ML-KEM decapsulation using the node's secret key
         let kem_ciphertext = qudag_crypto::kem::Ciphertext::from_bytes(&layer.kem_ciphertext)
             .map_err(|_| OnionError::MLKEMError("Invalid KEM ciphertext".into()))?;
-        
+
         let shared_secret = MlKem768::decapsulate(&self.ml_kem_secret_key, &kem_ciphertext)
             .map_err(|e| OnionError::MLKEMError(format!("Decapsulation failed: {:?}", e)))?;
-        
+
         // Derive symmetric key from shared secret
         let symmetric_key = self.derive_symmetric_key(shared_secret.as_bytes())?;
 
@@ -428,8 +435,10 @@ impl OnionRouter for MLKEMOnionRouter {
         })
     }
 
-    fn decrypt_layer(&self, layer: OnionLayer)
-        -> Result<(Vec<u8>, Option<OnionLayer>), OnionError> {
+    fn decrypt_layer(
+        &self,
+        layer: OnionLayer,
+    ) -> Result<(Vec<u8>, Option<OnionLayer>), OnionError> {
         self.decrypt_layer(layer)
     }
 
@@ -1046,11 +1055,17 @@ impl CircuitManager {
     }
 
     /// Build a new circuit with specified number of hops
-    pub async fn build_circuit(&mut self, hops: usize, directory: &DirectoryClient) -> Result<u64, OnionError> {
+    pub async fn build_circuit(
+        &mut self,
+        hops: usize,
+        directory: &DirectoryClient,
+    ) -> Result<u64, OnionError> {
         // Rate limiting
         let elapsed = self.last_creation.elapsed().as_secs_f64();
         if elapsed < 1.0 / self.creation_rate {
-            return Err(OnionError::RouteError("Circuit creation rate limit exceeded".into()));
+            return Err(OnionError::RouteError(
+                "Circuit creation rate limit exceeded".into(),
+            ));
         }
 
         // Check circuit limit
@@ -1064,7 +1079,7 @@ impl CircuitManager {
 
         // Select random nodes for the circuit
         let nodes = directory.select_random_nodes(hops).await?;
-        
+
         // Create circuit
         let circuit_id = thread_rng().next_u64();
         let circuit = Circuit {
@@ -1085,11 +1100,15 @@ impl CircuitManager {
 
     /// Activate a circuit after successful building
     pub fn activate_circuit(&mut self, circuit_id: u64) -> Result<(), OnionError> {
-        let circuit = self.circuits.get_mut(&circuit_id)
+        let circuit = self
+            .circuits
+            .get_mut(&circuit_id)
             .ok_or_else(|| OnionError::RouteError("Circuit not found".into()))?;
-        
+
         if circuit.state != CircuitState::Building {
-            return Err(OnionError::RouteError("Circuit not in building state".into()));
+            return Err(OnionError::RouteError(
+                "Circuit not in building state".into(),
+            ));
         }
 
         circuit.state = CircuitState::Active;
@@ -1099,22 +1118,25 @@ impl CircuitManager {
 
     /// Tear down a circuit
     pub async fn teardown_circuit(&mut self, circuit_id: u64) -> Result<(), OnionError> {
-        let circuit = self.circuits.get_mut(&circuit_id)
+        let circuit = self
+            .circuits
+            .get_mut(&circuit_id)
             .ok_or_else(|| OnionError::RouteError("Circuit not found".into()))?;
-        
+
         circuit.state = CircuitState::TearingDown;
-        
+
         // In a real implementation, this would send teardown messages to all hops
         // For now, just mark as closed
         circuit.state = CircuitState::Closed;
-        
+
         Ok(())
     }
 
     /// Get an active circuit for use
     pub fn get_active_circuit(&mut self) -> Option<&mut Circuit> {
         // Find best active circuit based on quality score and age
-        self.circuits.values_mut()
+        self.circuits
+            .values_mut()
             .filter(|c| c.state == CircuitState::Active)
             .filter(|c| c.created_at.elapsed() < self.circuit_lifetime)
             .max_by(|a, b| a.quality_score.partial_cmp(&b.quality_score).unwrap())
@@ -1125,7 +1147,7 @@ impl CircuitManager {
         if let Some(circuit) = self.circuits.get_mut(&circuit_id) {
             circuit.last_activity = Instant::now();
             circuit.bandwidth_used += bytes_sent;
-            
+
             // Update quality score based on success rate
             if success {
                 circuit.quality_score = (circuit.quality_score * 0.95 + 1.0 * 0.05).min(1.0);
@@ -1137,7 +1159,8 @@ impl CircuitManager {
 
     /// Check if circuits need rotation
     pub fn needs_rotation(&self) -> bool {
-        self.circuits.values()
+        self.circuits
+            .values()
             .filter(|c| c.state == CircuitState::Active)
             .any(|c| c.created_at.elapsed() >= self.rotation_interval)
     }
@@ -1145,29 +1168,29 @@ impl CircuitManager {
     /// Cleanup inactive or expired circuits
     pub fn cleanup_inactive_circuits(&mut self) {
         let _now = Instant::now();
-        self.circuits.retain(|_, circuit| {
-            match circuit.state {
-                CircuitState::Closed | CircuitState::Failed(_) => false,
-                _ => circuit.created_at.elapsed() < self.circuit_lifetime * 2,
-            }
+        self.circuits.retain(|_, circuit| match circuit.state {
+            CircuitState::Closed | CircuitState::Failed(_) => false,
+            _ => circuit.created_at.elapsed() < self.circuit_lifetime * 2,
         });
     }
 
     /// Get circuit statistics
     pub fn get_stats(&self) -> CircuitStats {
-        let active_count = self.circuits.values()
+        let active_count = self
+            .circuits
+            .values()
             .filter(|c| c.state == CircuitState::Active)
             .count();
-        
-        let total_bandwidth = self.circuits.values()
-            .map(|c| c.bandwidth_used)
-            .sum();
-        
+
+        let total_bandwidth = self.circuits.values().map(|c| c.bandwidth_used).sum();
+
         let avg_quality = if active_count > 0 {
-            self.circuits.values()
+            self.circuits
+                .values()
                 .filter(|c| c.state == CircuitState::Active)
                 .map(|c| c.quality_score)
-                .sum::<f64>() / active_count as f64
+                .sum::<f64>()
+                / active_count as f64
         } else {
             0.0
         };
@@ -1260,7 +1283,8 @@ impl DirectoryClient {
     /// Get public key for a node
     pub async fn get_public_key(&self, node_id: &[u8]) -> Result<KEMPublicKey, String> {
         let nodes = self.nodes.lock().await;
-        nodes.get(node_id)
+        nodes
+            .get(node_id)
             .map(|info| info.public_key.clone())
             .ok_or_else(|| "Node not found in directory".to_string())
     }
@@ -1269,15 +1293,16 @@ impl DirectoryClient {
     pub async fn select_random_nodes(&self, count: usize) -> Result<Vec<Vec<u8>>, OnionError> {
         // Update directory if needed
         self.update_directory_if_needed().await?;
-        
+
         let nodes = self.nodes.lock().await;
-        
+
         // Filter active nodes
-        let active_nodes: Vec<_> = nodes.values()
+        let active_nodes: Vec<_> = nodes
+            .values()
             .filter(|n| n.last_seen.elapsed() < Duration::from_secs(3600))
             .filter(|n| n.flags.stable)
             .collect();
-        
+
         if active_nodes.len() < count {
             return Err(OnionError::RouteError("Not enough active nodes".into()));
         }
@@ -1285,20 +1310,21 @@ impl DirectoryClient {
         // Select nodes with bandwidth weighting
         let mut selected = Vec::new();
         let mut available = active_nodes.clone();
-        
+
         for i in 0..count {
             // For entry guard, prefer nodes with guard flag
             if i == 0 {
-                let guards: Vec<_> = available.iter()
+                let guards: Vec<_> = available
+                    .iter()
                     .filter(|n| n.flags.guard)
                     .copied()
                     .collect();
-                
+
                 if !guards.is_empty() {
                     available = guards;
                 }
             }
-            
+
             // For exit node, require exit flag
             if i == count - 1 {
                 available.retain(|n| n.flags.exit);
@@ -1306,11 +1332,11 @@ impl DirectoryClient {
                     return Err(OnionError::RouteError("No exit nodes available".into()));
                 }
             }
-            
+
             // Select node weighted by bandwidth
             let total_bandwidth: u64 = available.iter().map(|n| n.bandwidth).sum();
             let mut target = thread_rng().gen_range(0..total_bandwidth);
-            
+
             for (idx, node) in available.iter().enumerate() {
                 if target < node.bandwidth {
                     selected.push(node.public_key.as_bytes().to_vec());
@@ -1320,22 +1346,22 @@ impl DirectoryClient {
                 target -= node.bandwidth;
             }
         }
-        
+
         Ok(selected)
     }
 
     /// Update directory from directory servers
     async fn update_directory_if_needed(&self) -> Result<(), OnionError> {
         let last_update = *self.last_update.lock().await;
-        
+
         if last_update.elapsed() < self.update_interval {
             return Ok(());
         }
-        
+
         // In a real implementation, this would fetch from directory servers
         // For now, we'll simulate with some dummy nodes
         self.populate_dummy_nodes().await;
-        
+
         *self.last_update.lock().await = Instant::now();
         Ok(())
     }
@@ -1343,11 +1369,11 @@ impl DirectoryClient {
     /// Populate dummy nodes for testing
     async fn populate_dummy_nodes(&self) {
         let mut nodes = self.nodes.lock().await;
-        
+
         for i in 0..20 {
             let (public_key, _) = MlKem768::keygen().unwrap();
             let node_id = vec![i as u8; 32];
-            
+
             let info = NodeInfo {
                 id: node_id.clone(),
                 public_key,
@@ -1363,7 +1389,7 @@ impl DirectoryClient {
                 },
                 last_seen: Instant::now(),
             };
-            
+
             nodes.insert(node_id, info);
         }
     }
@@ -1373,7 +1399,8 @@ impl DirectoryClient {
         // In a real implementation, this would perform actual bandwidth testing
         // For now, return the stored bandwidth
         let nodes = self.nodes.lock().await;
-        nodes.get(node_id)
+        nodes
+            .get(node_id)
             .map(|info| info.bandwidth)
             .ok_or_else(|| OnionError::RouteError("Node not found".into()))
     }
@@ -1382,8 +1409,9 @@ impl DirectoryClient {
     pub async fn get_load_balancing_weights(&self) -> HashMap<Vec<u8>, f64> {
         let nodes = self.nodes.lock().await;
         let total_bandwidth: u64 = nodes.values().map(|n| n.bandwidth).sum();
-        
-        nodes.iter()
+
+        nodes
+            .iter()
             .map(|(id, info)| {
                 let weight = info.bandwidth as f64 / total_bandwidth as f64;
                 (id.clone(), weight)

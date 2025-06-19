@@ -167,9 +167,7 @@ impl AsyncOptimizer {
 
 /// Type alias for stream processing function
 type ProcessorFn<T> = Arc<
-    dyn Fn(Vec<T>) -> Pin<Box<dyn Future<Output = Result<(), AsyncError>> + Send>>
-        + Send
-        + Sync,
+    dyn Fn(Vec<T>) -> Pin<Box<dyn Future<Output = Result<(), AsyncError>> + Send>> + Send + Sync,
 >;
 
 /// Optimized stream processing

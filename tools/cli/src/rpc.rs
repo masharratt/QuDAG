@@ -6,7 +6,7 @@ use std::sync::Arc;
 use tokio::io::AsyncWriteExt;
 use tokio::net::{TcpStream, UnixStream};
 use tokio::sync::Mutex;
-use tokio::time::{timeout, Duration, sleep};
+use tokio::time::{sleep, timeout, Duration};
 use tracing::{debug, warn};
 use uuid::Uuid;
 
@@ -337,11 +337,15 @@ impl RpcClient {
         }
 
         let mut last_error = None;
-        
+
         for attempt in 0..self.retry_attempts {
             if attempt > 0 {
                 sleep(self.retry_delay).await;
-                debug!("Retrying RPC request, attempt {}/{}", attempt + 1, self.retry_attempts);
+                debug!(
+                    "Retrying RPC request, attempt {}/{}",
+                    attempt + 1,
+                    self.retry_attempts
+                );
             }
 
             match self.send_request_once(method, params.clone()).await {
@@ -389,7 +393,7 @@ impl RpcClient {
         let response_len = timeout(self.timeout, stream.read_u32())
             .await
             .map_err(|_| anyhow!("Response read timeout"))??;
-        
+
         if response_len > 10 * 1024 * 1024 {
             return Err(anyhow!("Response too large: {} bytes", response_len));
         }
@@ -592,7 +596,9 @@ impl RpcClient {
 
 /// Check if node is running
 pub async fn is_node_running(port: u16) -> bool {
-    TcpStream::connect(format!("127.0.0.1:{}", port)).await.is_ok()
+    TcpStream::connect(format!("127.0.0.1:{}", port))
+        .await
+        .is_ok()
 }
 
 /// Wait for node to start

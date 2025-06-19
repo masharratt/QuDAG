@@ -12,8 +12,10 @@ pub mod instrumentation;
 pub mod message;
 pub mod metrics;
 pub mod node;
-pub mod rpc_server;
+pub mod node_runner;
+pub mod node_runner_adapter;
 pub mod persistence;
+pub mod rpc_server;
 pub mod state;
 pub mod synchronization;
 pub mod types;
@@ -29,13 +31,16 @@ pub use handshake::{
 pub use instrumentation::{MemoryMetrics, MemoryTracker};
 pub use message::{Message, MessageError, MessageFactory, MessageType, ProtocolVersion};
 pub use node::{Node, NodeConfig, NodeStateProvider};
-// pub use crate::rpc_server::{RpcServer, RpcCommand};
-pub use persistence::{
-    MemoryBackend, PersistenceError, PersistenceManager, PersistedDagState, PersistedPeer,
-    PersistedState, SqliteBackend, StatePersistence, StateProvider, CURRENT_STATE_VERSION,
-};
+pub use node_runner_adapter::NodeRunnerAdapter;
 #[cfg(feature = "rocksdb")]
 pub use persistence::RocksDbBackend;
+pub use persistence::{
+    FileStateStore, MemoryStateStore, PeerInfo as PersistencePeerInfo, PersistenceError,
+    PersistentNodeRunner, Result as PersistenceResult, StartupState, StateStore, StorageStats,
+};
+pub use rpc_server::{
+    NetworkStats, NodeRunnerTrait, PeerInfo as RpcPeerInfo, RpcCommand, RpcServer, RpcTransport,
+};
 pub use state::{ProtocolState, ProtocolStateMachine, StateError, StateMachineConfig};
 pub use types::{ProtocolError, ProtocolEvent};
 pub use versioning::{
@@ -44,3 +49,6 @@ pub use versioning::{
 
 // Re-export coordinator for test compatibility
 pub use coordinator::Coordinator;
+
+// Re-export node runner types
+pub use node_runner::{NodeRunner, NodeRunnerConfig, NodeRunnerError};

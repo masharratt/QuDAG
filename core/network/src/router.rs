@@ -1,10 +1,10 @@
+use crate::onion::{CircuitManager, DirectoryClient, MLKEMOnionRouter};
 use crate::types::{NetworkError, NetworkMessage, PeerId, RoutingStrategy};
-use crate::onion::{MLKEMOnionRouter, CircuitManager, DirectoryClient};
 use rand::seq::{IteratorRandom, SliceRandom};
 use rand::thread_rng;
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
-use tokio::sync::{RwLock, Mutex};
+use tokio::sync::{Mutex, RwLock};
 
 /// Information about a hop in a route
 #[derive(Debug, Clone)]
@@ -45,12 +45,13 @@ pub struct Router {
 impl Router {
     /// Create a new router with ML-KEM onion routing
     pub async fn new() -> Result<Self, NetworkError> {
-        let onion_router = MLKEMOnionRouter::new().await
-            .map_err(|e| NetworkError::RoutingError(format!("Failed to create onion router: {:?}", e)))?;
-        
+        let onion_router = MLKEMOnionRouter::new().await.map_err(|e| {
+            NetworkError::RoutingError(format!("Failed to create onion router: {:?}", e))
+        })?;
+
         let circuit_manager = Arc::new(Mutex::new(CircuitManager::new()));
         let directory_client = Arc::new(DirectoryClient::new());
-        
+
         Ok(Self {
             peers: Arc::new(RwLock::new(HashSet::new())),
             hop_info: Arc::new(RwLock::new(HashMap::new())),
@@ -176,27 +177,32 @@ impl Router {
 
         // Build a circuit using the circuit manager
         let mut circuit_mgr = self.circuit_manager.lock().await;
-        let circuit_id = circuit_mgr.build_circuit(actual_hops, &self.directory_client).await
+        let circuit_id = circuit_mgr
+            .build_circuit(actual_hops, &self.directory_client)
+            .await
             .map_err(|e| NetworkError::RoutingError(format!("Circuit build failed: {:?}", e)))?;
-        
+
         // Activate the circuit
-        circuit_mgr.activate_circuit(circuit_id)
-            .map_err(|e| NetworkError::RoutingError(format!("Circuit activation failed: {:?}", e)))?;
-        
+        circuit_mgr.activate_circuit(circuit_id).map_err(|e| {
+            NetworkError::RoutingError(format!("Circuit activation failed: {:?}", e))
+        })?;
+
         // Get circuit hops
-        let circuit = circuit_mgr.get_active_circuit()
+        let circuit = circuit_mgr
+            .get_active_circuit()
             .ok_or_else(|| NetworkError::RoutingError("No active circuit available".into()))?;
-        
+
         // Create onion layers for the message
         let onion_router = self.onion_router.lock().await;
-        let _layers = onion_router.encrypt_layers(
-            message.payload.clone(),
-            circuit.hops.clone()
-        ).await
+        let _layers = onion_router
+            .encrypt_layers(message.payload.clone(), circuit.hops.clone())
+            .await
             .map_err(|e| NetworkError::RoutingError(format!("Onion encryption failed: {:?}", e)))?;
-        
+
         // Convert node IDs to PeerIds for routing
-        let route: Vec<PeerId> = circuit.hops.iter()
+        let route: Vec<PeerId> = circuit
+            .hops
+            .iter()
             .filter_map(|node_id| {
                 if node_id.len() == 32 {
                     let mut peer_id_bytes = [0u8; 32];
@@ -207,10 +213,10 @@ impl Router {
                 }
             })
             .collect();
-        
+
         // Update circuit metrics
         circuit_mgr.update_circuit_metrics(circuit_id, message.payload.len() as u64, true);
-        
+
         Ok(route)
     }
 
@@ -248,7 +254,6 @@ impl Router {
             .ok_or_else(|| NetworkError::RoutingError("Hop information not found".into()))
     }
 }
-
 
 #[cfg(test)]
 mod tests {

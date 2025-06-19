@@ -5,37 +5,57 @@
 
 // Test that all core types can be imported
 use crate::{
-    // Main DAG types
-    QrDag, Dag, DagMessage, DagError as DagModuleError,
-    
-    // Vertex types
-    Vertex, VertexId, VertexError, VertexOps,
-    
+    AdvancedTipSelection,
+    Confidence,
+
     // Consensus types
-    Consensus, QRAvalanche, ConsensusError, ConsensusStatus, ConsensusMetrics,
-    QRAvalancheConfig, VotingRecord, Confidence,
-    
-    // Graph types
-    Graph, GraphMetrics, StorageConfig,
-    
-    // Node types
-    Node, NodeState, SerializableHash,
-    
-    // Edge types
-    Edge,
-    
-    // Tip selection types
-    TipSelection, TipSelectionConfig, TipSelectionError, 
-    AdvancedTipSelection, ParentSelectionAlgorithm, VertexWeight,
-    
+    Consensus,
     // Configuration types
     ConsensusConfig,
-    
+
+    ConsensusError,
+    ConsensusMetrics,
+    ConsensusStatus,
+    Dag,
+    DagError as DagModuleError,
+
     // Error types
     DagError,
-    
+
+    DagMessage,
+    // Edge types
+    Edge,
+
+    // Graph types
+    Graph,
+    GraphMetrics,
+    // Node types
+    Node,
+    NodeState,
+    ParentSelectionAlgorithm,
+    QRAvalanche,
+    QRAvalancheConfig,
+    // Main DAG types
+    QrDag,
     // Result type
     Result,
+    SerializableHash,
+
+    StorageConfig,
+
+    // Tip selection types
+    TipSelection,
+    TipSelectionConfig,
+    TipSelectionError,
+    // Vertex types
+    Vertex,
+    VertexError,
+    VertexId,
+    VertexOps,
+
+    VertexWeight,
+
+    VotingRecord,
 };
 
 /// Compile-time test function that uses all major types
@@ -43,30 +63,34 @@ use crate::{
 fn _compile_test() -> Result<()> {
     // Test basic type construction
     let _vertex_id: VertexId = VertexId::new();
-    let _vertex: Vertex = Vertex::new(_vertex_id.clone(), vec![1, 2, 3], std::collections::HashSet::new());
+    let _vertex: Vertex = Vertex::new(
+        _vertex_id.clone(),
+        vec![1, 2, 3],
+        std::collections::HashSet::new(),
+    );
     let _dag: QrDag = QrDag::new();
     let _consensus: QRAvalanche = QRAvalanche::new();
     let _graph: Graph = Graph::new();
     let _node: Node = Node::new(vec![1, 2, 3], vec![]);
-    
+
     // Test configuration types
     let _dag_config: ConsensusConfig = ConsensusConfig::default();
     let _qr_config: QRAvalancheConfig = QRAvalancheConfig::default();
     let _storage_config: StorageConfig = StorageConfig::default();
     let _tip_config: TipSelectionConfig = TipSelectionConfig::default();
-    
+
     // Test enum types
     let _consensus_status: ConsensusStatus = ConsensusStatus::Pending;
     let _node_state: NodeState = NodeState::Pending;
-    
+
     // Test error types
     let _vertex_error: VertexError = VertexError::InvalidParent;
     let _consensus_error: ConsensusError = ConsensusError::InvalidVertex;
     let _dag_error: DagError = DagError::NodeExists("test".to_string());
-    
+
     // Test result type
     let _result: Result<()> = Ok(());
-    
+
     Ok(())
 }
 
@@ -76,7 +100,7 @@ fn _trait_test() {
     fn _use_consensus<T: Consensus>(_consensus: T) {}
     fn _use_tip_selection<T: TipSelection>(_tip_selection: T) {}
     fn _use_vertex_ops<T: VertexOps>(_vertex_ops: T) {}
-    
+
     // Ensure traits are object-safe by testing dynamic dispatch
     let _consensus_trait: Box<dyn Consensus> = panic!("compile test only");
     // Note: TipSelection and VertexOps traits are not object-safe due to associated functions
@@ -88,17 +112,17 @@ fn _trait_test() {
 fn _standard_traits_test() {
     // Test Debug trait (required for most types)
     fn _test_debug<T: std::fmt::Debug>(_t: T) {}
-    
+
     _test_debug(VertexId::new());
     _test_debug(ConsensusStatus::Pending);
     _test_debug(NodeState::Pending);
     _test_debug(VertexError::InvalidParent);
     _test_debug(ConsensusError::InvalidVertex);
     _test_debug(DagError::NodeExists("test".to_string()));
-    
+
     // Test Clone trait (for types that should be cloneable)
     fn _test_clone<T: Clone>(_t: T) {}
-    
+
     _test_clone(VertexId::new());
     _test_clone(ConsensusStatus::Pending);
     _test_clone(NodeState::Pending);
@@ -111,7 +135,7 @@ fn _standard_traits_test() {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn compilation_test() {
         // This test simply ensures the module compiles

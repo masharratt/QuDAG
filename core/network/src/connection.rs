@@ -5,8 +5,10 @@ use crate::types::{
     ThroughputMetrics,
 };
 use anyhow::Result;
+use async_trait::async_trait;
 use bytes::{Buf, BufMut, Bytes, BytesMut};
 use dashmap::DashMap;
+use futures::future::Future;
 use parking_lot::RwLock as ParkingRwLock;
 use quinn::{Connection, Endpoint};
 use ring::{aead, agreement, rand as ring_rand};
@@ -15,10 +17,8 @@ use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::{mpsc, RwLock as TokioRwLock, Semaphore};
-use tracing::{debug, error, info, warn};
 use tokio::time::sleep;
-use futures::future::Future;
-use async_trait::async_trait;
+use tracing::{debug, error, info, warn};
 
 /// Secure connection configuration
 #[derive(Clone)]
@@ -380,7 +380,7 @@ impl SecureConnection {
 /// - Back pressure handling for overload protection
 /// - Connection warming and preemptive scaling
 /// - Request multiplexing and stream management
-/// 
+///
 /// # Production Features
 /// - Zero-downtime connection pool updates
 /// - Graceful degradation under load
@@ -390,14 +390,14 @@ impl SecureConnection {
 /// - Comprehensive observability and monitoring
 /// - Memory-efficient connection reuse
 /// - Adaptive connection limits based on system resources
-/// 
+///
 /// # Multiplexing Support
 /// - Stream-based connection multiplexing
 /// - Request prioritization and queuing
 /// - Concurrent request handling
 /// - Flow control and backpressure
 /// - Stream lifecycle management
-/// 
+///
 /// # High-performance connection manager with pooling, metrics tracking and back pressure handling.
 ///
 /// The ConnectionManager provides a comprehensive solution for managing network connections with:
@@ -530,7 +530,12 @@ impl ConnectionInfo {
     }
 
     /// Update connection activity and performance metrics
-    pub fn update_activity(&mut self, success: bool, response_time: Duration, bytes_transferred: u64) {
+    pub fn update_activity(
+        &mut self,
+        success: bool,
+        response_time: Duration,
+        bytes_transferred: u64,
+    ) {
         self.last_activity = Instant::now();
         self.bandwidth_usage += bytes_transferred;
 
@@ -561,7 +566,7 @@ impl ConnectionInfo {
 
         // Base score on success rate
         let success_rate = self.success_count as f64 / total_ops as f64;
-        
+
         // Penalty for high response times (above 100ms)
         let response_penalty = if self.avg_response_time.as_millis() > 100 {
             0.2 * (self.avg_response_time.as_millis() as f64 / 1000.0)
@@ -574,8 +579,8 @@ impl ConnectionInfo {
 
     /// Check if connection is healthy
     pub fn is_healthy(&self) -> bool {
-        self.quality_score > 0.5 && 
-        self.last_activity.elapsed() < Duration::from_secs(300) // 5 minutes
+        self.quality_score > 0.5 && self.last_activity.elapsed() < Duration::from_secs(300)
+        // 5 minutes
     }
 }
 
@@ -1098,22 +1103,26 @@ impl Default for PingHealthCheck {
 impl HealthCheck for PingHealthCheck {
     async fn check(&self, _peer_id: &PeerId, connection: &ConnectionInfo) -> HealthCheckResult {
         let start = Instant::now();
-        
+
         // Simulate ping check (in real implementation, this would send actual ping)
         let success = connection.is_healthy() && rand::random::<f64>() > 0.1;
         let response_time = start.elapsed();
-        
+
         HealthCheckResult {
             timestamp: Instant::now(),
             success,
             response_time,
-            error: if success { None } else { Some("Ping timeout".to_string()) },
+            error: if success {
+                None
+            } else {
+                Some("Ping timeout".to_string())
+            },
             health_score: if success { 1.0 } else { 0.0 },
         }
     }
 }
 
-use std::collections::{HashMap, BTreeMap, VecDeque};
+use std::collections::{BTreeMap, HashMap, VecDeque};
 use tokio::sync::RwLock;
 
 impl ConnectionManager {
@@ -1185,8 +1194,10 @@ impl ConnectionManager {
                     // Check if connection is healthy based on activity and quality
                     if !conn_info.is_healthy() {
                         unhealthy_peers.push(peer_id);
-                        debug!("Detected unhealthy connection for peer {:?} (quality: {:.2})", 
-                               peer_id, conn_info.quality_score);
+                        debug!(
+                            "Detected unhealthy connection for peer {:?} (quality: {:.2})",
+                            peer_id, conn_info.quality_score
+                        );
                     }
                 }
             }
@@ -1274,7 +1285,7 @@ impl ConnectionManager {
             max_total: max_connections,
             ..Default::default()
         };
-        
+
         Self {
             max_connections,
             connections: Arc::new(DashMap::new()),
@@ -1343,17 +1354,20 @@ impl ConnectionManager {
                 // Connection is still valid and healthy, reuse it
                 self.connections.insert(peer_id, conn_info.clone());
                 debug!("Reusing pooled healthy connection for peer {:?}", peer_id);
-                
+
                 // Record successful circuit breaker operation
                 if let Some(mut circuit_breaker) = self.circuit_breakers.get_mut(&peer_id) {
                     circuit_breaker.record_result(true);
                 }
-                
+
                 return Ok(());
             } else {
                 // Connection expired or unhealthy, remove from pool
                 self.connection_pool.remove(&peer_id);
-                debug!("Removing expired/unhealthy connection for peer {:?}", peer_id);
+                debug!(
+                    "Removing expired/unhealthy connection for peer {:?}",
+                    peer_id
+                );
             }
         }
 
@@ -1377,27 +1391,32 @@ impl ConnectionManager {
 
         // Simulate connection success/failure (90% success rate)
         let success = rand::random::<f64>() > 0.1;
-        
+
         if success {
             // Update to connected status on success
             let mut connected_info = ConnectionInfo::new(ConnectionStatus::Connected);
             connected_info.update_activity(true, connection_time, 0);
-            
+
             self.connections.insert(peer_id, connected_info.clone());
-            self.quality_scores.insert(peer_id, connected_info.quality_score);
-            
+            self.quality_scores
+                .insert(peer_id, connected_info.quality_score);
+
             // Record successful circuit breaker operation
             self.circuit_breakers
                 .entry(peer_id)
                 .or_insert_with(CircuitBreaker::default)
                 .record_result(true);
 
-            debug!("Successfully connected to peer {:?} in {:?}", peer_id, connection_time);
+            debug!(
+                "Successfully connected to peer {:?} in {:?}",
+                peer_id, connection_time
+            );
         } else {
             // Handle connection failure
-            let failed_info = ConnectionInfo::new(ConnectionStatus::Failed("Connection timeout".into()));
+            let failed_info =
+                ConnectionInfo::new(ConnectionStatus::Failed("Connection timeout".into()));
             self.connections.insert(peer_id, failed_info);
-            
+
             // Record failed circuit breaker operation
             self.circuit_breakers
                 .entry(peer_id)
@@ -1453,10 +1472,10 @@ impl ConnectionManager {
             if let Some(rt) = response_time {
                 let success = matches!(status, ConnectionStatus::Connected);
                 conn_info.update_activity(success, rt, bytes_transferred);
-                
+
                 // Update quality score cache
                 self.quality_scores.insert(peer_id, conn_info.quality_score);
-                
+
                 // Update circuit breaker
                 if let Some(mut circuit_breaker) = self.circuit_breakers.get_mut(&peer_id) {
                     circuit_breaker.record_result(success);
@@ -1475,9 +1494,11 @@ impl ConnectionManager {
         // Update metrics with high-performance lock
         let mut metrics = self.metrics.write();
         metrics.connections = self.connections.len();
-        
+
         // Count active (healthy) connections
-        let active_count = self.connections.iter()
+        let active_count = self
+            .connections
+            .iter()
             .filter(|entry| entry.value().is_healthy())
             .count();
         metrics.active_connections = active_count;
@@ -1490,16 +1511,17 @@ impl ConnectionManager {
                 "Disconnected from peer {:?} with status {:?} (quality: {:.2})",
                 peer_id, conn_info.status, conn_info.quality_score
             );
-            
+
             // Move connection to pool if it was healthy (for potential reuse)
             if conn_info.is_healthy() {
-                self.connection_pool.insert(*peer_id, (conn_info, Instant::now()));
+                self.connection_pool
+                    .insert(*peer_id, (conn_info, Instant::now()));
             }
         }
 
         // Remove quality score and circuit breaker entries
         self.quality_scores.remove(peer_id);
-        
+
         // Keep circuit breaker for future connection attempts
         // but reset if it was in a good state
         if let Some(circuit_breaker) = self.circuit_breakers.get_mut(peer_id) {
@@ -1515,9 +1537,11 @@ impl ConnectionManager {
         // Update metrics with high-performance lock
         let mut metrics = self.metrics.write();
         metrics.connections = self.connections.len();
-        
+
         // Count active (healthy) connections
-        let active_count = self.connections.iter()
+        let active_count = self
+            .connections
+            .iter()
             .filter(|entry| entry.value().is_healthy())
             .count();
         metrics.active_connections = active_count;
@@ -1563,16 +1587,16 @@ impl ConnectionManager {
     /// Get all healthy connections sorted by quality score
     pub fn get_healthy_connections(&self) -> Vec<(PeerId, f64)> {
         let mut healthy_peers = Vec::new();
-        
+
         for entry in self.connections.iter() {
             let peer_id = *entry.key();
             let conn_info = entry.value();
-            
+
             if conn_info.is_healthy() {
                 healthy_peers.push((peer_id, conn_info.quality_score));
             }
         }
-        
+
         // Sort by quality score in descending order
         healthy_peers.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
         healthy_peers
@@ -1645,88 +1669,103 @@ impl ConnectionManager {
     }
 
     /// Enhanced API methods for production features
-    
     /// Open a multiplexed stream on a connection
-    pub async fn open_stream(&self, peer_id: PeerId, priority: Priority) -> Result<StreamId, NetworkError> {
+    pub async fn open_stream(
+        &self,
+        peer_id: PeerId,
+        priority: Priority,
+    ) -> Result<StreamId, NetworkError> {
         // Ensure connection exists and is healthy
         if !self.connections.contains_key(&peer_id) {
             // Attempt to establish connection first
             self.connect(peer_id).await?;
         }
-        
+
         // Use multiplexer to open stream
         self.multiplexer.open_stream(peer_id, priority).await
     }
-    
+
     /// Close a multiplexed stream
     pub async fn close_stream(&self, stream_id: StreamId) -> Result<(), NetworkError> {
         self.multiplexer.close_stream(stream_id).await
     }
-    
+
     /// Send data on a specific stream
-    pub async fn send_stream_data(&self, stream_id: StreamId, data: Bytes) -> Result<(), NetworkError> {
+    pub async fn send_stream_data(
+        &self,
+        stream_id: StreamId,
+        data: Bytes,
+    ) -> Result<(), NetworkError> {
         // Get stream info to validate
-        let stream_info = self.multiplexer.get_stream_info(stream_id)
+        let stream_info = self
+            .multiplexer
+            .get_stream_info(stream_id)
             .ok_or_else(|| NetworkError::ConnectionError("Stream not found".into()))?;
-        
+
         if stream_info.state != StreamState::Active {
             return Err(NetworkError::ConnectionError("Stream not active".into()));
         }
-        
+
         // In a real implementation, this would send data on the specific stream
         // For now, we'll simulate stream-based sending
         info!("Sending {} bytes on stream {:?}", data.len(), stream_id);
         Ok(())
     }
-    
+
     /// Execute connection operation with retry logic
     pub async fn retry_connect(&self, peer_id: PeerId) -> Result<(), NetworkError> {
         let retry_manager = self.retry_manager.clone();
-        
-        retry_manager.retry_operation(peer_id, || async {
-            self.connect(peer_id).await
-        }).await
+
+        retry_manager
+            .retry_operation(peer_id, || async { self.connect(peer_id).await })
+            .await
     }
-    
+
     /// Select best connection using load balancer
     pub async fn select_best_connection(&self, available_peers: &[PeerId]) -> Option<PeerId> {
         self.load_balancer.select_connection(available_peers).await
     }
-    
+
     /// Start health monitoring for a peer
     pub async fn start_health_monitoring(&self, peer_id: PeerId) {
         self.health_monitor.start_monitoring(peer_id).await;
     }
-    
+
     /// Perform health check on a connection
     pub async fn check_connection_health(&self, peer_id: PeerId) -> Option<HealthCheckResult> {
         if let Some(connection_info) = self.get_connection_info(&peer_id) {
-            Some(self.health_monitor.check_health(peer_id, &connection_info).await)
+            Some(
+                self.health_monitor
+                    .check_health(peer_id, &connection_info)
+                    .await,
+            )
         } else {
             None
         }
     }
-    
+
     /// Warm up connections for a peer
     pub async fn warm_connections(&self, peer_id: PeerId) -> Result<(), NetworkError> {
         self.warming_manager.warm_connection(peer_id).await
     }
-    
+
     /// Get warming state for a peer
     pub fn get_warming_state(&self, peer_id: &PeerId) -> WarmingState {
         self.warming_manager.get_warming_state(peer_id)
     }
-    
+
     /// Get comprehensive connection statistics
     pub async fn get_connection_statistics(&self) -> ConnectionStatistics {
         let health_stats = self.health_monitor.stats.read().await.clone();
         let retry_stats = self.retry_manager.stats.read().await.clone();
         let warming_stats = self.warming_manager.stats.read().await.clone();
         let load_balancing_stats = self.load_balancer.stats.read().await.clone();
-        
+
         ConnectionStatistics {
             total_connections: self.connections.len(),
-            active_connections: self.connections.iter()
+            active_connections: self
+                .connections
+                .iter()
                 .filter(|entry| entry.value().is_healthy())
                 .count(),
             pooled_connections: self.enhanced_pool.len(),
@@ -1736,13 +1775,13 @@ impl ConnectionManager {
             load_balancing_stats,
         }
     }
-    
+
     /// Configure connection limits
     pub fn set_connection_limits(&mut self, limits: ConnectionLimits) {
         self.max_connections = limits.max_total;
         self.connection_limits = limits;
     }
-    
+
     /// Get current connection limits
     pub fn get_connection_limits(&self) -> &ConnectionLimits {
         &self.connection_limits
@@ -1981,21 +2020,32 @@ impl ConnectionMultiplexer {
     }
 
     /// Open a new stream on a connection
-    pub async fn open_stream(&self, peer_id: PeerId, priority: Priority) -> Result<StreamId, NetworkError> {
-        let mut connection = self.connections.get_mut(&peer_id)
+    pub async fn open_stream(
+        &self,
+        peer_id: PeerId,
+        priority: Priority,
+    ) -> Result<StreamId, NetworkError> {
+        let mut connection = self
+            .connections
+            .get_mut(&peer_id)
             .ok_or_else(|| NetworkError::ConnectionError("Connection not found".into()))?;
-        
+
         if connection.streams.len() >= self.max_streams_per_connection as usize {
-            return Err(NetworkError::ConnectionError("Maximum streams reached".into()));
+            return Err(NetworkError::ConnectionError(
+                "Maximum streams reached".into(),
+            ));
         }
-        
+
         // Acquire stream permit
-        let _ = connection.stream_semaphore.acquire().await
+        let _ = connection
+            .stream_semaphore
+            .acquire()
+            .await
             .map_err(|_| NetworkError::ConnectionError("Stream semaphore closed".into()))?;
-        
+
         let stream_id = StreamId(connection.next_stream_id);
         connection.next_stream_id += 1;
-        
+
         let stream_info = StreamInfo {
             id: stream_id,
             priority,
@@ -2004,34 +2054,40 @@ impl ConnectionMultiplexer {
             last_activity: Instant::now(),
             bytes_transferred: 0,
         };
-        
+
         connection.streams.insert(stream_id, stream_info);
         self.stream_routes.insert(stream_id, peer_id);
-        
+
         // Add to priority queue
         let mut queue = self.priority_queue.write().await;
-        queue.entry(priority).or_insert_with(VecDeque::new).push_back(stream_id);
-        
+        queue
+            .entry(priority)
+            .or_insert_with(VecDeque::new)
+            .push_back(stream_id);
+
         Ok(stream_id)
     }
 
     /// Close a stream
     pub async fn close_stream(&self, stream_id: StreamId) -> Result<(), NetworkError> {
-        let peer_id = self.stream_routes.remove(&stream_id)
+        let peer_id = self
+            .stream_routes
+            .remove(&stream_id)
             .ok_or_else(|| NetworkError::ConnectionError("Stream not found".into()))?
             .1;
-        
+
         if let Some(mut connection) = self.connections.get_mut(&peer_id) {
             if let Some(stream) = connection.streams.get_mut(&stream_id) {
                 stream.state = StreamState::Closed;
                 stream.last_activity = Instant::now();
             }
             connection.streams.remove(&stream_id);
-            
+
             // Update connection utilization
-            connection.utilization = connection.streams.len() as f64 / self.max_streams_per_connection as f64;
+            connection.utilization =
+                connection.streams.len() as f64 / self.max_streams_per_connection as f64;
         }
-        
+
         Ok(())
     }
 
@@ -2054,28 +2110,26 @@ impl RetryManager {
     }
 
     /// Execute operation with retry logic
-    pub async fn retry_operation<F, Fut, T, E>(
-        &self,
-        peer_id: PeerId,
-        operation: F,
-    ) -> Result<T, E>
+    pub async fn retry_operation<F, Fut, T, E>(&self, peer_id: PeerId, operation: F) -> Result<T, E>
     where
         F: Fn() -> Fut + Send + Sync,
         Fut: Future<Output = Result<T, E>> + Send,
         E: std::fmt::Debug,
     {
-        let config = self.retry_configs.get(&peer_id)
+        let config = self
+            .retry_configs
+            .get(&peer_id)
             .map(|entry| entry.value().clone())
             .unwrap_or_else(|| self.default_config.clone());
-        
+
         let mut attempt = 0;
         let mut backoff = config.initial_backoff;
-        
+
         loop {
             let start = Instant::now();
             let result = operation().await;
             let _duration = start.elapsed();
-            
+
             match result {
                 Ok(value) => {
                     // Update success statistics
@@ -2093,19 +2147,21 @@ impl RetryManager {
                         stats.failed_retries += 1;
                         return Err(error);
                     }
-                    
+
                     // Calculate backoff with jitter
                     let jitter = (rand::random::<f64>() - 0.5) * 2.0 * config.jitter_factor;
                     let backoff_with_jitter = Duration::from_millis(
-                        ((backoff.as_millis() as f64) * (1.0 + jitter)) as u64
+                        ((backoff.as_millis() as f64) * (1.0 + jitter)) as u64,
                     );
-                    
+
                     sleep(backoff_with_jitter).await;
-                    
+
                     // Exponential backoff
                     backoff = std::cmp::min(
-                        Duration::from_millis((backoff.as_millis() as f64 * config.backoff_multiplier) as u64),
-                        config.max_backoff
+                        Duration::from_millis(
+                            (backoff.as_millis() as f64 * config.backoff_multiplier) as u64,
+                        ),
+                        config.max_backoff,
                     );
                 }
             }
@@ -2142,7 +2198,7 @@ impl LoadBalancer {
         if available_peers.is_empty() {
             return None;
         }
-        
+
         let selected = match self.strategy {
             LoadBalancingStrategy::RoundRobin => {
                 let index = self.round_robin_counter.fetch_add(1, Ordering::Relaxed) as usize;
@@ -2161,12 +2217,12 @@ impl LoadBalancer {
                 self.select_least_utilized(available_peers).await
             }
         };
-        
+
         // Update statistics
         let mut stats = self.stats.write().await;
         stats.total_requests += 1;
         *stats.peer_distribution.entry(selected).or_insert(0) += 1;
-        
+
         Some(selected)
     }
 
@@ -2174,15 +2230,17 @@ impl LoadBalancer {
     async fn select_weighted_round_robin(&self, peers: &[PeerId]) -> PeerId {
         let mut total_weight = 0.0;
         let mut weighted_peers = Vec::new();
-        
+
         for &peer_id in peers {
-            let weight = self.weights.get(&peer_id)
+            let weight = self
+                .weights
+                .get(&peer_id)
                 .map(|entry| *entry.value())
                 .unwrap_or(1.0);
             total_weight += weight;
             weighted_peers.push((peer_id, weight));
         }
-        
+
         let mut target = rand::random::<f64>() * total_weight;
         for (peer_id, weight) in weighted_peers {
             target -= weight;
@@ -2190,7 +2248,7 @@ impl LoadBalancer {
                 return peer_id;
             }
         }
-        
+
         peers[0] // Fallback
     }
 
@@ -2205,7 +2263,7 @@ impl LoadBalancer {
         let stats = self.stats.read().await;
         let mut best_peer = peers[0];
         let mut best_time = Duration::from_secs(u64::MAX);
-        
+
         for &peer_id in peers {
             if let Some(avg_time) = stats.avg_response_times.get(&peer_id) {
                 if *avg_time < best_time {
@@ -2214,7 +2272,7 @@ impl LoadBalancer {
                 }
             }
         }
-        
+
         best_peer
     }
 
@@ -2242,18 +2300,26 @@ impl HealthMonitor {
     /// Start health monitoring for a peer
     pub async fn start_monitoring(&self, peer_id: PeerId) {
         let mut scheduler = self.scheduler.write().await;
-        scheduler.scheduled_checks.insert(peer_id, Instant::now() + self.config.interval);
-        scheduler.check_intervals.insert(peer_id, self.config.interval);
+        scheduler
+            .scheduled_checks
+            .insert(peer_id, Instant::now() + self.config.interval);
+        scheduler
+            .check_intervals
+            .insert(peer_id, self.config.interval);
     }
 
     /// Perform health check on a peer
-    pub async fn check_health(&self, peer_id: PeerId, connection: &ConnectionInfo) -> HealthCheckResult {
+    pub async fn check_health(
+        &self,
+        peer_id: PeerId,
+        connection: &ConnectionInfo,
+    ) -> HealthCheckResult {
         let checker = PingHealthCheck::default();
         let result = checker.check(&peer_id, connection).await;
-        
+
         // Store result
         self.results.insert(peer_id, result.clone());
-        
+
         // Update statistics
         let mut stats = self.stats.write().await;
         stats.total_checks += 1;
@@ -2262,12 +2328,13 @@ impl HealthMonitor {
         } else {
             stats.failed_checks += 1;
         }
-        
+
         // Update average response time
         let total_time = stats.avg_response_time.as_millis() as f64 * stats.total_checks as f64;
-        let new_avg = (total_time + result.response_time.as_millis() as f64) / (stats.total_checks + 1) as f64;
+        let new_avg = (total_time + result.response_time.as_millis() as f64)
+            / (stats.total_checks + 1) as f64;
         stats.avg_response_time = Duration::from_millis(new_avg as u64);
-        
+
         result
     }
 
@@ -2305,39 +2372,48 @@ impl WarmingManager {
         if !self.config.enabled {
             return Ok(());
         }
-        
+
         // Set warming state
         self.warming_states.insert(peer_id, WarmingState::Warming);
-        
+
         // Simulate connection warming (in real implementation, this would pre-establish connections)
         let start = Instant::now();
         sleep(Duration::from_millis(100)).await; // Simulate warming time
         let warming_time = start.elapsed();
-        
+
         // Update statistics
         let mut stats = self.stats.write().await;
         stats.total_attempts += 1;
-        
-        if rand::random::<f64>() > 0.1 { // 90% success rate
+
+        if rand::random::<f64>() > 0.1 {
+            // 90% success rate
             self.warming_states.insert(peer_id, WarmingState::Warm);
             stats.successful_warmings += 1;
-            
+
             // Update average warming time
-            let total_time = stats.avg_warming_time.as_millis() as f64 * stats.successful_warmings as f64;
-            let new_avg = (total_time + warming_time.as_millis() as f64) / (stats.successful_warmings + 1) as f64;
+            let total_time =
+                stats.avg_warming_time.as_millis() as f64 * stats.successful_warmings as f64;
+            let new_avg = (total_time + warming_time.as_millis() as f64)
+                / (stats.successful_warmings + 1) as f64;
             stats.avg_warming_time = Duration::from_millis(new_avg as u64);
-            
+
             Ok(())
         } else {
-            self.warming_states.insert(peer_id, WarmingState::FailedToWarm("Warming timeout".to_string()));
+            self.warming_states.insert(
+                peer_id,
+                WarmingState::FailedToWarm("Warming timeout".to_string()),
+            );
             stats.failed_warmings += 1;
-            Err(NetworkError::ConnectionError("Connection warming failed".into()))
+            Err(NetworkError::ConnectionError(
+                "Connection warming failed".into(),
+            ))
         }
     }
 
     /// Get warming state for a peer
     pub fn get_warming_state(&self, peer_id: &PeerId) -> WarmingState {
-        self.warming_states.get(peer_id)
+        self.warming_states
+            .get(peer_id)
             .map(|entry| entry.value().clone())
             .unwrap_or(WarmingState::Cold)
     }

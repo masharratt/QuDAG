@@ -1,23 +1,24 @@
 // Test file to understand ml-kem API
-use ml_kem::{MlKem768, KemCore, kem::{Encapsulate, Decapsulate}};
+use qudag_crypto::ml_kem::MlKem768;
 
 fn main() {
     let mut rng = rand::thread_rng();
-    
+
     // Generate key pair
-    let (dk, ek) = MlKem768::generate(&mut rng);
-    
-    println!("Decapsulation key length: {}", dk.as_bytes().len());
-    println!("Encapsulation key length: {}", ek.as_bytes().len());
-    
+    let (pk, sk) = MlKem768::generate_keypair(&mut rng);
+
+    println!("Public key generated");
+    println!("Secret key generated");
+
     // Encapsulate
-    let (ct, ss1) = ek.encapsulate(&mut rng).unwrap();
-    
-    println!("Ciphertext length: {}", ct.as_bytes().len());
-    println!("Shared secret length: {}", ss1.as_bytes().len());
-    
+    let (ciphertext, shared_secret1) = MlKem768::encapsulate(&pk, &mut rng);
+
+    println!("Ciphertext generated");
+    println!("Shared secret 1 generated");
+
     // Decapsulate
-    let ss2 = dk.decapsulate(&ct).unwrap();
-    
-    println!("Shared secrets match: {}", ss1 == ss2);
+    let shared_secret2 = MlKem768::decapsulate(&ciphertext, &sk);
+
+    println!("Shared secret 2 generated");
+    println!("Shared secrets match: {}", shared_secret1 == shared_secret2);
 }

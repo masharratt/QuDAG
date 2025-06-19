@@ -4,8 +4,8 @@ use qudag_network::{
     message::{MessageQueue, NetworkMessage},
     onion::{MixMessage, MixMessageType, MixNode},
     traffic_obfuscation::{
-        ObfuscationPattern, TrafficObfuscationConfig, TrafficObfuscator,
-        DEFAULT_MESSAGE_SIZE, STANDARD_MESSAGE_SIZES,
+        ObfuscationPattern, TrafficObfuscationConfig, TrafficObfuscator, DEFAULT_MESSAGE_SIZE,
+        STANDARD_MESSAGE_SIZES,
     },
     types::MessagePriority,
 };
@@ -19,9 +19,9 @@ async fn test_message_size_normalization() {
         standard_message_size: DEFAULT_MESSAGE_SIZE,
         ..Default::default()
     };
-    
+
     let obfuscator = TrafficObfuscator::new(config);
-    
+
     // Test small message padding
     let small_msg = NetworkMessage {
         id: "test1".to_string(),
@@ -31,10 +31,10 @@ async fn test_message_size_normalization() {
         priority: MessagePriority::Normal,
         ttl: Duration::from_secs(60),
     };
-    
+
     let result = obfuscator.obfuscate_message(small_msg.clone()).await;
     assert!(result.is_ok());
-    
+
     // Check statistics
     let stats = obfuscator.get_stats().await;
     assert_eq!(stats.normalized_messages, 1);
@@ -50,13 +50,13 @@ async fn test_dummy_traffic_generation() {
         mix_batch_size: 10,
         ..Default::default()
     };
-    
+
     let obfuscator = TrafficObfuscator::new(config);
     obfuscator.start().await;
-    
+
     // Wait for dummy traffic generation
     sleep(Duration::from_millis(500)).await;
-    
+
     let stats = obfuscator.get_stats().await;
     assert!(stats.dummy_messages > 0);
 }
@@ -68,9 +68,9 @@ async fn test_traffic_shaping_delays() {
         traffic_delay_range: (50, 100), // 50-100ms delays
         ..Default::default()
     };
-    
+
     let obfuscator = TrafficObfuscator::new(config);
-    
+
     let msg = NetworkMessage {
         id: "delay_test".to_string(),
         source: vec![1],
@@ -79,11 +79,11 @@ async fn test_traffic_shaping_delays() {
         priority: MessagePriority::Normal,
         ttl: Duration::from_secs(60),
     };
-    
+
     let start = tokio::time::Instant::now();
     let _ = obfuscator.obfuscate_message(msg).await.unwrap();
     let elapsed = start.elapsed();
-    
+
     // Should have at least minimum delay
     assert!(elapsed >= Duration::from_millis(50));
     // Should not exceed maximum delay by too much
@@ -98,10 +98,10 @@ async fn test_mix_network_batching() {
         mix_batch_timeout: Duration::from_millis(200),
         ..Default::default()
     };
-    
+
     let obfuscator = TrafficObfuscator::new(config);
     obfuscator.start().await;
-    
+
     // Send messages to fill a batch
     for i in 0..5 {
         let msg = NetworkMessage {
@@ -112,16 +112,16 @@ async fn test_mix_network_batching() {
             priority: MessagePriority::Normal,
             ttl: Duration::from_secs(60),
         };
-        
+
         let result = obfuscator.obfuscate_message(msg).await.unwrap();
         // Should return empty (batching)
         assert!(result.is_empty());
     }
-    
+
     // Process the batch
     let batch = obfuscator.process_batch().await.unwrap();
     assert!(!batch.is_empty());
-    
+
     let stats = obfuscator.get_stats().await;
     assert_eq!(stats.batches_processed, 1);
 }
@@ -135,7 +135,7 @@ async fn test_protocol_obfuscation_patterns() {
         ObfuscationPattern::Dns,
         ObfuscationPattern::Custom(vec![0xDE, 0xAD, 0xBE, 0xEF]),
     ];
-    
+
     for pattern in patterns {
         let config = TrafficObfuscationConfig {
             enable_protocol_obfuscation: true,
@@ -143,9 +143,9 @@ async fn test_protocol_obfuscation_patterns() {
             enable_mix_batching: false, // Disable batching for this test
             ..Default::default()
         };
-        
+
         let obfuscator = TrafficObfuscator::new(config);
-        
+
         let msg = NetworkMessage {
             id: "proto_test".to_string(),
             source: vec![1],
@@ -154,10 +154,10 @@ async fn test_protocol_obfuscation_patterns() {
             priority: MessagePriority::Normal,
             ttl: Duration::from_secs(60),
         };
-        
+
         let obfuscated = obfuscator.obfuscate_message(msg).await.unwrap();
         assert!(!obfuscated.is_empty());
-        
+
         // Verify pattern-specific characteristics
         match pattern {
             ObfuscationPattern::Http => {
@@ -192,9 +192,9 @@ async fn test_message_queue_with_obfuscation() {
         enable_dummy_traffic: false, // Disable for predictable test
         ..Default::default()
     };
-    
+
     let (queue, mut rx) = MessageQueue::with_obfuscation(config);
-    
+
     // Spawn receiver
     let receiver_handle = tokio::spawn(async move {
         let mut count = 0;
@@ -206,7 +206,7 @@ async fn test_message_queue_with_obfuscation() {
         }
         count
     });
-    
+
     // Send messages
     for i in 0..3 {
         let msg = NetworkMessage {
@@ -217,17 +217,17 @@ async fn test_message_queue_with_obfuscation() {
             priority: MessagePriority::Normal,
             ttl: Duration::from_secs(60),
         };
-        
+
         queue.enqueue(msg).await.unwrap();
     }
-    
+
     // Wait for processing
     let count = timeout(Duration::from_secs(5), receiver_handle)
         .await
         .unwrap()
         .unwrap();
     assert_eq!(count, 3);
-    
+
     // Check obfuscation stats
     let stats = queue.get_obfuscation_stats().await.unwrap();
     assert_eq!(stats.total_messages, 3);
@@ -244,11 +244,11 @@ async fn test_burst_prevention() {
         traffic_delay_range: (10, 20),
         ..Default::default()
     };
-    
+
     let obfuscator = TrafficObfuscator::new(config);
-    
+
     let start = tokio::time::Instant::now();
-    
+
     // Send burst of messages
     for i in 0..10 {
         let msg = NetworkMessage {
@@ -259,12 +259,12 @@ async fn test_burst_prevention() {
             priority: MessagePriority::High,
             ttl: Duration::from_secs(60),
         };
-        
+
         let _ = obfuscator.obfuscate_message(msg).await.unwrap();
     }
-    
+
     let elapsed = start.elapsed();
-    
+
     // Should have applied burst prevention delays
     assert!(elapsed > Duration::from_millis(100));
 }
@@ -277,9 +277,9 @@ async fn test_size_normalization_standard_sizes() {
             standard_message_size: target_size,
             ..Default::default()
         };
-        
+
         let obfuscator = TrafficObfuscator::new(config);
-        
+
         // Test message smaller than target
         let small_msg = NetworkMessage {
             id: format!("size_test_{}", target_size),
@@ -289,9 +289,9 @@ async fn test_size_normalization_standard_sizes() {
             priority: MessagePriority::Normal,
             ttl: Duration::from_secs(60),
         };
-        
+
         let _ = obfuscator.obfuscate_message(small_msg).await.unwrap();
-        
+
         let stats = obfuscator.get_stats().await;
         assert!(stats.normalized_messages > 0);
         assert_eq!(stats.total_padding_bytes as usize, target_size / 2);
@@ -301,7 +301,7 @@ async fn test_size_normalization_standard_sizes() {
 #[tokio::test]
 async fn test_mix_node_integration() {
     let mut mix_node = MixNode::new(vec![1, 2, 3, 4]);
-    
+
     // Add messages
     for i in 0..5 {
         let msg = MixMessage {
@@ -311,16 +311,17 @@ async fn test_mix_node_integration() {
             message_type: MixMessageType::Real,
             normalized_size: 0,
         };
-        
+
         mix_node.add_message(msg).await.unwrap();
     }
-    
+
     // Flush batch
     let batch = mix_node.flush_batch().await.unwrap();
     assert!(!batch.is_empty());
-    
+
     // Check for dummy messages
-    let dummy_count = batch.iter()
+    let dummy_count = batch
+        .iter()
         .filter(|msg| matches!(msg.message_type, MixMessageType::Dummy))
         .count();
     assert!(dummy_count > 0);
@@ -336,14 +337,18 @@ async fn test_traffic_analysis_resistance() {
         enable_protocol_obfuscation: true,
         ..Default::default()
     };
-    
+
     let obfuscator = TrafficObfuscator::new(config);
     obfuscator.start().await;
-    
+
     // Send variety of messages
-    let priorities = [MessagePriority::High, MessagePriority::Normal, MessagePriority::Low];
+    let priorities = [
+        MessagePriority::High,
+        MessagePriority::Normal,
+        MessagePriority::Low,
+    ];
     let sizes = [100, 500, 1000, 2000, 5000];
-    
+
     for (i, (&priority, &size)) in priorities.iter().zip(sizes.iter()).enumerate() {
         let msg = NetworkMessage {
             id: format!("resist_{}", i),
@@ -353,13 +358,13 @@ async fn test_traffic_analysis_resistance() {
             priority,
             ttl: Duration::from_secs(300),
         };
-        
+
         let _ = obfuscator.obfuscate_message(msg).await.unwrap();
     }
-    
+
     // Wait for processing
     sleep(Duration::from_millis(200)).await;
-    
+
     let stats = obfuscator.get_stats().await;
     assert!(stats.total_messages >= 5);
     assert!(stats.normalized_messages > 0);

@@ -1,10 +1,12 @@
 use crate::{
     message::{Message, MessageError, MessageType},
-    persistence::{MemoryBackend, PersistenceError, PersistenceManager, PersistedState, SqliteBackend, StatePersistence, StateProvider},
+    persistence::{
+        MemoryBackend, PersistedState, PersistenceError, PersistenceManager, SqliteBackend,
+        StatePersistence, StateProvider,
+    },
     state::ProtocolStateMachine,
     types::{ProtocolError, ProtocolEvent},
 };
-use async_trait::async_trait;
 use qudag_crypto::ml_kem::MlKem768;
 use qudag_dag::Consensus;
 use qudag_network::Transport;
@@ -105,13 +107,13 @@ impl Node {
     /// Create new node
     pub async fn new(config: NodeConfig) -> Result<Self, ProtocolError> {
         let (tx, rx) = mpsc::channel(1000);
-        
+
         // Generate node ID
         let node_id = Self::generate_node_id();
-        
+
         // Initialize state machine
         let state_machine = Arc::new(RwLock::new(ProtocolStateMachine::new(
-            crate::message::ProtocolVersion::CURRENT
+            crate::message::ProtocolVersion::CURRENT,
         )));
 
         Ok(Self {
@@ -125,43 +127,49 @@ impl Node {
             node_id,
         })
     }
-    
+
     /// Create new node with persistence
     pub async fn with_persistence(config: NodeConfig) -> Result<Self, ProtocolError> {
         let mut node = Self::new(config.clone()).await?;
-        
+
         // Create persistence backend based on configuration
         let backend: Arc<dyn StatePersistence> = if config.data_dir.join("state.db").exists() {
             // Use SQLite for lightweight persistence
             let db_path = config.data_dir.join("state.db");
-            Arc::new(SqliteBackend::new(db_path).await
-                .map_err(|e| ProtocolError::Internal(format!("Failed to create SQLite backend: {}", e)))?)
+            Arc::new(SqliteBackend::new(db_path).await.map_err(|e| {
+                ProtocolError::Internal(format!("Failed to create SQLite backend: {}", e))
+            })?)
         } else {
             // Use memory backend for testing
             Arc::new(MemoryBackend::default())
         };
-        
+
         // Create persistence manager
-        let persistence_manager = PersistenceManager::new(backend.clone());
-        
+        let persistence_manager: PersistenceManager = backend;
+
         // Try to recover state
-        if let Some(recovered_state) = persistence_manager.recover_state().await
-            .map_err(|e| ProtocolError::Internal(format!("Failed to recover state: {}", e)))? {
+        if let Some(recovered_state) = persistence_manager
+            .recover_state()
+            .await
+            .map_err(|e| ProtocolError::Internal(format!("Failed to recover state: {}", e)))?
+        {
             info!("Recovered state from persistence");
-            
+
             // Restore state machine
             let _state_machine = node.state_machine.write().await;
             // TODO: Implement proper state restoration
             // For now, just log the recovery
-            debug!("Recovered {} peers and {} sessions", 
-                   recovered_state.peers.len(), 
-                   recovered_state.sessions.len());
+            debug!(
+                "Recovered {} peers and {} sessions",
+                recovered_state.peers.len(),
+                recovered_state.sessions.len()
+            );
         }
-        
+
         node.persistence = Some(persistence_manager);
         Ok(node)
     }
-    
+
     fn generate_node_id() -> Vec<u8> {
         use rand::RngCore;
         let mut rng = rand::thread_rng();
@@ -185,37 +193,47 @@ impl Node {
 
         // Update state machine - transition through proper states
         let mut state_machine = self.state_machine.write().await;
-        
+
         // First transition to Handshake
-        state_machine.transition_to(
-            crate::state::ProtocolState::Handshake(crate::state::HandshakeState::Waiting),
-            "Node starting handshake".to_string()
-        ).map_err(|e| ProtocolError::StateError(e.to_string()))?;
-        
+        state_machine
+            .transition_to(
+                crate::state::ProtocolState::Handshake(crate::state::HandshakeState::Waiting),
+                "Node starting handshake".to_string(),
+            )
+            .map_err(|e| ProtocolError::StateError(e.to_string()))?;
+
         // Skip through handshake states for now
-        state_machine.transition_to(
-            crate::state::ProtocolState::Handshake(crate::state::HandshakeState::InProgress),
-            "Handshake in progress".to_string()
-        ).map_err(|e| ProtocolError::StateError(e.to_string()))?;
-        
-        state_machine.transition_to(
-            crate::state::ProtocolState::Handshake(crate::state::HandshakeState::Processing),
-            "Processing handshake".to_string()
-        ).map_err(|e| ProtocolError::StateError(e.to_string()))?;
-        
-        state_machine.transition_to(
-            crate::state::ProtocolState::Handshake(crate::state::HandshakeState::Completed),
-            "Handshake completed".to_string()
-        ).map_err(|e| ProtocolError::StateError(e.to_string()))?;
-        
+        state_machine
+            .transition_to(
+                crate::state::ProtocolState::Handshake(crate::state::HandshakeState::InProgress),
+                "Handshake in progress".to_string(),
+            )
+            .map_err(|e| ProtocolError::StateError(e.to_string()))?;
+
+        state_machine
+            .transition_to(
+                crate::state::ProtocolState::Handshake(crate::state::HandshakeState::Processing),
+                "Processing handshake".to_string(),
+            )
+            .map_err(|e| ProtocolError::StateError(e.to_string()))?;
+
+        state_machine
+            .transition_to(
+                crate::state::ProtocolState::Handshake(crate::state::HandshakeState::Completed),
+                "Handshake completed".to_string(),
+            )
+            .map_err(|e| ProtocolError::StateError(e.to_string()))?;
+
         // Now transition to active
-        state_machine.transition_to(
-            crate::state::ProtocolState::Active(crate::state::ActiveState::Normal),
-            "Node started".to_string()
-        ).map_err(|e| ProtocolError::StateError(e.to_string()))?;
-        
+        state_machine
+            .transition_to(
+                crate::state::ProtocolState::Active(crate::state::ActiveState::Normal),
+                "Node started".to_string(),
+            )
+            .map_err(|e| ProtocolError::StateError(e.to_string()))?;
+
         drop(state_machine);
-        
+
         // Start auto-save if persistence is enabled
         // Note: Auto-save would need to be started externally with a proper Arc<Node>
         // to avoid self-referential issues
@@ -230,18 +248,22 @@ impl Node {
 
         // Update state machine
         let mut state_machine = self.state_machine.write().await;
-        state_machine.transition_to(
-            crate::state::ProtocolState::Shutdown,
-            "Node stopping".to_string()
-        ).map_err(|e| ProtocolError::StateError(e.to_string()))?;
+        state_machine
+            .transition_to(
+                crate::state::ProtocolState::Shutdown,
+                "Node stopping".to_string(),
+            )
+            .map_err(|e| ProtocolError::StateError(e.to_string()))?;
         drop(state_machine);
 
         // Save final state if persistence is enabled
         if let Some(persistence) = &self.persistence {
-            let state = self.get_current_state().await
-                .map_err(|e| ProtocolError::Internal(format!("Failed to get state for save: {}", e)))?;
-            persistence.backend.save_state(&state).await
-                .map_err(|e| ProtocolError::Internal(format!("Failed to save final state: {}", e)))?;
+            let state = self.get_current_state().await.map_err(|e| {
+                ProtocolError::Internal(format!("Failed to get state for save: {}", e))
+            })?;
+            persistence.save_state(&state).await.map_err(|e| {
+                ProtocolError::Internal(format!("Failed to save final state: {}", e))
+            })?;
         }
 
         // Stop components
@@ -328,18 +350,22 @@ impl Node {
     pub async fn get_state(&self) -> crate::state::ProtocolState {
         self.state_machine.read().await.current_state().clone()
     }
-    
+
     /// Check if persistence is enabled
     pub fn has_persistence(&self) -> bool {
         self.persistence.is_some()
     }
-    
+
     /// Save current state
     pub async fn save_state(&self) -> Result<(), ProtocolError> {
         if let Some(persistence) = &self.persistence {
-            let state = self.get_current_state().await
+            let state = self
+                .get_current_state()
+                .await
                 .map_err(|e| ProtocolError::Internal(format!("Failed to get state: {}", e)))?;
-            persistence.backend.save_state(&state).await
+            persistence
+                .save_state(&state)
+                .await
                 .map_err(|e| ProtocolError::Internal(format!("Failed to save state: {}", e)))?;
             info!("State saved successfully");
         } else {
@@ -347,27 +373,35 @@ impl Node {
         }
         Ok(())
     }
-    
+
     /// Create backup
     pub async fn create_backup(&self, backup_path: PathBuf) -> Result<(), ProtocolError> {
         if let Some(persistence) = &self.persistence {
-            persistence.backend.create_backup(&backup_path).await
+            persistence
+                .create_backup(&backup_path)
+                .await
                 .map_err(|e| ProtocolError::Internal(format!("Failed to create backup: {}", e)))?;
             info!("Backup created at {:?}", backup_path);
         } else {
-            return Err(ProtocolError::Internal("No persistence backend configured".to_string()));
+            return Err(ProtocolError::Internal(
+                "No persistence backend configured".to_string(),
+            ));
         }
         Ok(())
     }
-    
+
     /// Restore from backup
     pub async fn restore_backup(&self, backup_path: PathBuf) -> Result<(), ProtocolError> {
         if let Some(persistence) = &self.persistence {
-            persistence.backend.restore_backup(&backup_path).await
+            persistence
+                .restore_backup(&backup_path)
+                .await
                 .map_err(|e| ProtocolError::Internal(format!("Failed to restore backup: {}", e)))?;
             info!("Backup restored from {:?}", backup_path);
         } else {
-            return Err(ProtocolError::Internal("No persistence backend configured".to_string()));
+            return Err(ProtocolError::Internal(
+                "No persistence backend configured".to_string(),
+            ));
         }
         Ok(())
     }
@@ -380,18 +414,18 @@ impl Node {
         let current_state = state_machine.current_state().clone();
         let sessions = state_machine.get_sessions().clone();
         let metrics = state_machine.get_metrics();
-        
+
         // TODO: Get actual peer list from network transport
         let peers = vec![];
-        
+
         // TODO: Get actual DAG state from consensus engine
-        let dag_state = crate::persistence::PersistedDagState {
+        let dag_state = crate::persistence::DagState {
             vertices: HashMap::new(),
             tips: std::collections::HashSet::new(),
             voting_records: HashMap::new(),
             last_checkpoint: None,
         };
-        
+
         Ok(PersistedState {
             version: crate::persistence::CURRENT_STATE_VERSION,
             node_id: self.node_id.clone(),
@@ -420,11 +454,19 @@ impl NodeStateProvider {
     }
 }
 
-#[async_trait]
 impl StateProvider for NodeStateProvider {
-    async fn get_current_state(&self) -> Result<PersistedState, PersistenceError> {
-        let node = self.node.read().await;
-        node.get_current_state().await
+    fn get_state_store(&self) -> Arc<dyn crate::persistence::StateStore + Send + Sync> {
+        // Since this is a sync method but we need to access an async RwLock,
+        // we'll use try_read() which is non-blocking
+        if let Ok(node) = self.node.try_read() {
+            if let Some(persistence) = &node.persistence {
+                // Return the actual state store from the persistence manager's backend
+                return persistence.clone();
+            }
+        }
+
+        // Fallback to memory store if no persistence is configured or lock failed
+        Arc::new(crate::persistence::MemoryStateStore::new())
     }
 }
 
@@ -440,39 +482,45 @@ mod tests {
         assert_eq!(node.get_state().await, crate::state::ProtocolState::Initial);
 
         node.start().await.unwrap();
-        assert!(matches!(node.get_state().await, crate::state::ProtocolState::Active(_)));
+        assert!(matches!(
+            node.get_state().await,
+            crate::state::ProtocolState::Active(_)
+        ));
 
         node.stop().await.unwrap();
-        assert_eq!(node.get_state().await, crate::state::ProtocolState::Shutdown);
+        assert_eq!(
+            node.get_state().await,
+            crate::state::ProtocolState::Shutdown
+        );
     }
-    
+
     #[tokio::test]
     async fn test_node_persistence() {
         use tempfile::TempDir;
-        
+
         let temp_dir = TempDir::new().unwrap();
         let config = NodeConfig {
             data_dir: temp_dir.path().to_path_buf(),
             ..Default::default()
         };
-        
+
         // Create node with persistence
         let mut node = Node::with_persistence(config.clone()).await.unwrap();
-        
+
         // Start node
         node.start().await.unwrap();
-        
+
         // Save state
         node.save_state().await.unwrap();
-        
+
         // Create backup
         let backup_path = temp_dir.path().join("backup");
         std::fs::create_dir_all(&backup_path).unwrap();
         node.create_backup(backup_path.clone()).await.unwrap();
-        
+
         // Stop node
         node.stop().await.unwrap();
-        
+
         // Create new node and verify state recovery
         let node2 = Node::with_persistence(config).await.unwrap();
         assert!(node2.persistence.is_some());

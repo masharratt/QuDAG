@@ -5,9 +5,12 @@
 
 pub mod attacks;
 pub mod conditions;
+/// Network performance metrics collection and analysis.
 pub mod metrics;
+/// Network simulation and node management.
 pub mod network;
 pub mod reports;
+/// Test scenario definitions and execution.
 pub mod scenarios;
 pub mod visualization;
 

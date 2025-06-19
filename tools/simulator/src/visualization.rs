@@ -26,9 +26,13 @@ pub struct VisualizationConfig {
 /// Chart theme options
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ChartTheme {
+    /// Light theme with bright background
     Light,
+    /// Dark theme with dark background
     Dark,
+    /// Colorful theme with vibrant colors
     Colorful,
+    /// Monochrome theme with grayscale colors
     Monochrome,
 }
 
@@ -76,20 +80,30 @@ pub struct NetworkConnection {
 /// Node types for visualization
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum NodeType {
+    /// Honest node following protocol correctly
     Honest,
+    /// Malicious node with harmful intent
     Malicious,
+    /// Byzantine node with arbitrary behavior
     Byzantine,
+    /// Sybil node with fake identity
     Sybil,
+    /// Offline node not participating
     Offline,
 }
 
 /// Node status for visualization
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum NodeStatus {
+    /// Node is active and participating
     Active,
+    /// Node is inactive but available
     Inactive,
+    /// Node has been compromised
     Compromised,
+    /// Node is isolated from network
     Isolated,
+    /// Node is recovering from failure
     Recovering,
 }
 

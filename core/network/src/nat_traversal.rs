@@ -9,12 +9,10 @@
 //! - IPv6 support with fallback to IPv4
 //! - Connection upgrade paths from relay to direct connections
 
-use crate::types::{NetworkError, PeerId, ConnectionStatus};
 use crate::connection::ConnectionManager;
+use crate::types::{ConnectionStatus, NetworkError, PeerId};
 use dashmap::DashMap;
-use libp2p::{
-    core::{Multiaddr},
-};
+use libp2p::core::Multiaddr;
 use parking_lot::RwLock;
 use rand::{thread_rng, Rng};
 use serde::{Deserialize, Serialize};
@@ -88,47 +86,47 @@ pub enum NatTraversalError {
     /// STUN operation failed
     #[error("STUN error: {0}")]
     StunError(String),
-    
+
     /// TURN operation failed
     #[error("TURN error: {0}")]
     TurnError(String),
-    
+
     /// UPnP operation failed
     #[error("UPnP error: {0}")]
     UpnpError(String),
-    
+
     /// NAT-PMP operation failed
     #[error("NAT-PMP error: {0}")]
     NatPmpError(String),
-    
+
     /// Hole punching failed
     #[error("Hole punching failed: {0}")]
     HolePunchError(String),
-    
+
     /// Relay error
     #[error("Relay error: {0}")]
     RelayError(String),
-    
+
     /// NAT detection failed
     #[error("NAT detection failed: {0}")]
     DetectionError(String),
-    
+
     /// Connection upgrade failed
     #[error("Connection upgrade failed: {0}")]
     UpgradeError(String),
-    
+
     /// Network error
     #[error("Network error: {0}")]
     NetworkError(#[from] NetworkError),
-    
+
     /// IO error
     #[error("IO error: {0}")]
     IoError(#[from] std::io::Error),
-    
+
     /// Timeout error
     #[error("Operation timed out")]
     Timeout,
-    
+
     /// Connection error
     #[error("Connection error: {0}")]
     ConnectionError(NetworkError),
@@ -429,22 +427,23 @@ impl StunClient {
     /// Detect NAT type and public address
     pub async fn detect_nat(&self) -> Result<NatInfo, NatTraversalError> {
         // Bind local socket
-        let local_addr = if false { // TODO: Add ipv6 feature flag
+        let local_addr = if false {
+            // TODO: Add ipv6 feature flag
             SocketAddr::new(IpAddr::V6(Ipv6Addr::UNSPECIFIED), 0)
         } else {
             SocketAddr::new(IpAddr::V4(Ipv4Addr::UNSPECIFIED), 0)
         };
-        
+
         let socket = UdpSocket::bind(local_addr).await?;
         let local_addr = socket.local_addr()?;
-        
+
         // Store socket
         *self.socket.lock().await = Some(socket);
-        
+
         // Test with multiple STUN servers
         let mut results = Vec::new();
         let servers = self.servers.read().clone();
-        
+
         for server in servers.iter().filter(|s| s.is_active) {
             match self.query_stun_server(&server.address).await {
                 Ok(mapped_addr) => {
@@ -458,13 +457,13 @@ impl StunClient {
                 }
             }
         }
-        
+
         if results.is_empty() {
             return Err(NatTraversalError::DetectionError(
-                "No STUN servers responded".to_string()
+                "No STUN servers responded".to_string(),
             ));
         }
-        
+
         // Analyze results to determine NAT type
         let nat_type = self.analyze_nat_type(&results, local_addr).await?;
         let (public_ip, public_port) = if let Some((_, addr)) = results.first() {
@@ -472,7 +471,7 @@ impl StunClient {
         } else {
             (None, None)
         };
-        
+
         Ok(NatInfo {
             nat_type,
             public_ip,
@@ -486,32 +485,41 @@ impl StunClient {
     }
 
     /// Query a single STUN server
-    async fn query_stun_server(&self, server: &SocketAddr) -> Result<SocketAddr, NatTraversalError> {
+    async fn query_stun_server(
+        &self,
+        server: &SocketAddr,
+    ) -> Result<SocketAddr, NatTraversalError> {
         // Get the socket from the mutex guard
         let socket_guard = self.socket.lock().await;
-        let socket = socket_guard.as_ref()
+        let socket = socket_guard
+            .as_ref()
             .ok_or_else(|| NatTraversalError::StunError("Socket not initialized".to_string()))?;
-        
+
         // Simple STUN-like request - send a UDP packet and expect echo with public address
         let request_data = b"STUN_REQUEST";
-        
+
         // Send request
-        socket.send_to(request_data, server).await
+        socket
+            .send_to(request_data, server)
+            .await
             .map_err(|e| NatTraversalError::StunError(e.to_string()))?;
-        
+
         // Wait for response
         let mut response_buf = vec![0u8; 1024];
-        let (_len, from) = timeout(Duration::from_secs(5), socket.recv_from(&mut response_buf)).await
+        let (_len, from) = timeout(Duration::from_secs(5), socket.recv_from(&mut response_buf))
+            .await
             .map_err(|_| NatTraversalError::Timeout)??;
-        
+
         if from != *server {
-            return Err(NatTraversalError::StunError("Response from wrong server".to_string()));
+            return Err(NatTraversalError::StunError(
+                "Response from wrong server".to_string(),
+            ));
         }
-        
+
         // For simplicity, assume the response contains the public address
         // In a real implementation, this would parse STUN protocol messages
         let local_addr = socket.local_addr()?;
-        
+
         // Mock response - in real implementation this would be parsed from STUN response
         Ok(SocketAddr::new(server.ip(), local_addr.port()))
     }
@@ -528,10 +536,10 @@ impl StunClient {
                 return Ok(NatType::None);
             }
         }
-        
+
         // Check if all results have the same public IP/port
         let all_same = results.windows(2).all(|w| w[0].1 == w[1].1);
-        
+
         if all_same {
             // Could be Full Cone or Restricted Cone
             // Need additional tests to distinguish
@@ -587,9 +595,11 @@ impl TurnClient {
     /// Allocate a relay address
     pub async fn allocate_relay(&self) -> Result<TurnAllocation, NatTraversalError> {
         // Acquire allocation permit
-        let _permit = self.allocation_limit.acquire().await
-            .map_err(|_| NatTraversalError::TurnError("Allocation limit reached".to_string()))?;
-        
+        let _permit =
+            self.allocation_limit.acquire().await.map_err(|_| {
+                NatTraversalError::TurnError("Allocation limit reached".to_string())
+            })?;
+
         // Try each TURN server
         let servers = self.servers.read().clone();
         for server in servers.iter().filter(|s| s.is_active) {
@@ -603,12 +613,17 @@ impl TurnClient {
                 }
             }
         }
-        
-        Err(NatTraversalError::TurnError("No TURN servers available".to_string()))
+
+        Err(NatTraversalError::TurnError(
+            "No TURN servers available".to_string(),
+        ))
     }
 
     /// Allocate from a specific TURN server
-    async fn allocate_from_server(&self, server: &TurnServer) -> Result<TurnAllocation, NatTraversalError> {
+    async fn allocate_from_server(
+        &self,
+        server: &TurnServer,
+    ) -> Result<TurnAllocation, NatTraversalError> {
         // TODO: Implement actual TURN allocation protocol
         // For now, return a mock allocation
         Ok(TurnAllocation {
@@ -672,12 +687,8 @@ impl UpnpManager {
     pub async fn discover_gateway(&self) -> Result<(), NatTraversalError> {
         // Simple UPnP discovery simulation
         // In a real implementation, this would use SSDP multicast discovery
-        let potential_gateways = vec![
-            "192.168.1.1:1900",
-            "192.168.0.1:1900", 
-            "10.0.0.1:1900",
-        ];
-        
+        let potential_gateways = vec!["192.168.1.1:1900", "192.168.0.1:1900", "10.0.0.1:1900"];
+
         for gateway_addr in potential_gateways {
             if let Ok(addr) = gateway_addr.parse::<SocketAddr>() {
                 // Test if gateway responds
@@ -694,8 +705,10 @@ impl UpnpManager {
                 }
             }
         }
-        
-        Err(NatTraversalError::UpnpError("No UPnP gateway found".to_string()))
+
+        Err(NatTraversalError::UpnpError(
+            "No UPnP gateway found".to_string(),
+        ))
     }
 
     /// Create port mapping
@@ -709,9 +722,11 @@ impl UpnpManager {
     ) -> Result<UpnpMapping, NatTraversalError> {
         // Simulate UPnP port mapping
         // In a real implementation, this would send UPnP control messages
-        info!("Creating UPnP port mapping: {}:{} -> {} ({})", 
-              local_port, external_port, protocol as u8, description);
-        
+        info!(
+            "Creating UPnP port mapping: {}:{} -> {} ({})",
+            local_port, external_port, protocol as u8, description
+        );
+
         let mapping = UpnpMapping {
             local_port,
             external_port,
@@ -720,7 +735,7 @@ impl UpnpManager {
             lease_duration,
             created_at: Instant::now(),
         };
-        
+
         self.mappings.insert(local_port, mapping.clone());
         Ok(mapping)
     }
@@ -772,12 +787,8 @@ impl NatPmpClient {
     pub async fn discover_gateway(&self) -> Result<(), NatTraversalError> {
         // TODO: Implement gateway discovery
         // For now, try common gateway addresses
-        let common_gateways = vec![
-            "192.168.1.1",
-            "192.168.0.1",
-            "10.0.0.1",
-        ];
-        
+        let common_gateways = vec!["192.168.1.1", "192.168.0.1", "10.0.0.1"];
+
         for gateway_str in common_gateways {
             if let Ok(gateway) = gateway_str.parse::<IpAddr>() {
                 // Test if gateway responds to NAT-PMP
@@ -788,8 +799,10 @@ impl NatPmpClient {
                 }
             }
         }
-        
-        Err(NatTraversalError::NatPmpError("No NAT-PMP gateway found".to_string()))
+
+        Err(NatTraversalError::NatPmpError(
+            "No NAT-PMP gateway found".to_string(),
+        ))
     }
 
     /// Test if an address responds to NAT-PMP
@@ -808,11 +821,12 @@ impl NatPmpClient {
         lifetime: Duration,
     ) -> Result<NatPmpMapping, NatTraversalError> {
         let gateway = self.gateway.lock().await;
-        let _gateway_addr = gateway.as_ref()
+        let _gateway_addr = gateway
+            .as_ref()
             .ok_or_else(|| NatTraversalError::NatPmpError("No gateway discovered".to_string()))?;
-        
+
         // TODO: Implement actual NAT-PMP mapping protocol
-        
+
         let mapping = NatPmpMapping {
             local_port,
             external_port,
@@ -820,7 +834,7 @@ impl NatPmpClient {
             lifetime,
             created_at: Instant::now(),
         };
-        
+
         self.mappings.insert(local_port, mapping.clone());
         Ok(mapping)
     }
@@ -886,7 +900,7 @@ impl HolePunchCoordinator {
         remote_candidates: Vec<SocketAddr>,
     ) -> Result<SocketAddr, NatTraversalError> {
         info!("Starting hole punch to peer {:?}", peer_id);
-        
+
         let attempt = HolePunchAttempt {
             peer_id,
             local_candidates: local_candidates.clone(),
@@ -895,22 +909,23 @@ impl HolePunchCoordinator {
             phase: HolePunchPhase::Probing,
             succeeded: Arc::new(AtomicBool::new(false)),
         };
-        
+
         self.attempts.insert(peer_id, attempt);
-        
+
         // Create result channel
         let (tx, mut rx) = mpsc::channel(1);
         self.success_handlers.insert(peer_id, tx);
-        
+
         // Start probing all candidate pairs
-        let _probe_tasks: Vec<_> = local_candidates.iter()
+        let _probe_tasks: Vec<_> = local_candidates
+            .iter()
             .flat_map(|local| {
-                remote_candidates.iter().map(move |remote| {
-                    self.probe_candidate_pair(*local, *remote, peer_id)
-                })
+                remote_candidates
+                    .iter()
+                    .map(move |remote| self.probe_candidate_pair(*local, *remote, peer_id))
             })
             .collect();
-        
+
         // Wait for success or timeout
         tokio::select! {
             result = rx.recv() => {
@@ -937,14 +952,14 @@ impl HolePunchCoordinator {
         peer_id: PeerId,
     ) -> Result<(), NatTraversalError> {
         debug!("Probing candidate pair: {} -> {}", local, remote);
-        
+
         let socket = UdpSocket::bind(local).await?;
-        
+
         // Send probe packets
         for i in 0..5 {
             let probe_data = format!("HOLE_PUNCH_PROBE_{}", i).into_bytes();
             socket.send_to(&probe_data, remote).await?;
-            
+
             // Wait for response with short timeout
             let mut buf = vec![0u8; 1024];
             match timeout(Duration::from_millis(200), socket.recv_from(&mut buf)).await {
@@ -959,11 +974,13 @@ impl HolePunchCoordinator {
                 }
                 _ => continue, // Timeout or error, try next probe
             }
-            
+
             sleep(Duration::from_millis(100)).await;
         }
-        
-        Err(NatTraversalError::HolePunchError("No response from remote".to_string()))
+
+        Err(NatTraversalError::HolePunchError(
+            "No response from remote".to_string(),
+        ))
     }
 
     /// Mark hole punch as successful
@@ -1068,12 +1085,14 @@ impl RelayManager {
         target_peer: PeerId,
     ) -> Result<RelayConnection, NatTraversalError> {
         // Acquire connection permit
-        let _permit = self.connection_limit.acquire().await
-            .map_err(|_| NatTraversalError::RelayError("Connection limit reached".to_string()))?;
-        
+        let _permit =
+            self.connection_limit.acquire().await.map_err(|_| {
+                NatTraversalError::RelayError("Connection limit reached".to_string())
+            })?;
+
         // Find best relay server
         let relay_server = self.select_relay_server().await?;
-        
+
         // Create relay connection
         let connection = RelayConnection {
             relay_server: relay_server.id,
@@ -1083,23 +1102,30 @@ impl RelayManager {
             bytes_relayed: Arc::new(AtomicU64::new(0)),
             is_active: Arc::new(AtomicBool::new(true)),
         };
-        
+
         // Update stats
         self.stats.total_connections.fetch_add(1, Ordering::Relaxed);
-        self.stats.active_connections.fetch_add(1, Ordering::Relaxed);
+        self.stats
+            .active_connections
+            .fetch_add(1, Ordering::Relaxed);
         relay_server.load.fetch_add(1, Ordering::Relaxed);
-        
-        self.relay_connections.insert(target_peer, connection.clone());
-        
-        info!("Established relay connection to {:?} via {:?}", target_peer, relay_server.id);
+
+        self.relay_connections
+            .insert(target_peer, connection.clone());
+
+        info!(
+            "Established relay connection to {:?} via {:?}",
+            target_peer, relay_server.id
+        );
         Ok(connection)
     }
 
     /// Select best relay server based on load
     async fn select_relay_server(&self) -> Result<RelayServer, NatTraversalError> {
         let servers = self.relay_servers.read();
-        
-        servers.iter()
+
+        servers
+            .iter()
             .filter(|s| s.is_available)
             .min_by_key(|s| s.load.load(Ordering::Relaxed))
             .cloned()
@@ -1110,8 +1136,10 @@ impl RelayManager {
     pub async fn close_relay(&self, peer_id: &PeerId) {
         if let Some((_, connection)) = self.relay_connections.remove(peer_id) {
             connection.is_active.store(false, Ordering::Relaxed);
-            self.stats.active_connections.fetch_sub(1, Ordering::Relaxed);
-            
+            self.stats
+                .active_connections
+                .fetch_sub(1, Ordering::Relaxed);
+
             // Update relay server load
             let servers = self.relay_servers.read();
             if let Some(server) = servers.iter().find(|s| s.id == connection.relay_server) {
@@ -1181,8 +1209,10 @@ impl ConnectionUpgradeManager {
         if current_type == ConnectionType::Direct {
             return Ok(ConnectionType::Direct); // Already direct
         }
-        
-        let mut attempt = self.upgrade_attempts.entry(peer_id)
+
+        let mut attempt = self
+            .upgrade_attempts
+            .entry(peer_id)
             .or_insert(UpgradeAttempt {
                 peer_id,
                 current_type,
@@ -1190,22 +1220,26 @@ impl ConnectionUpgradeManager {
                 last_attempt: Instant::now(),
                 succeeded: false,
             });
-        
+
         // Check if we should attempt upgrade
         if attempt.last_attempt.elapsed() < self.upgrade_interval {
-            return Err(NatTraversalError::UpgradeError("Too soon to retry".to_string()));
+            return Err(NatTraversalError::UpgradeError(
+                "Too soon to retry".to_string(),
+            ));
         }
-        
+
         attempt.attempt_count += 1;
         attempt.last_attempt = Instant::now();
-        
+
         // Try hole punching if we have NAT manager
         if let Some(nat_manager) = &self.nat_manager {
             match nat_manager.establish_direct_connection(peer_id).await {
                 Ok(_) => {
                     attempt.succeeded = true;
-                    info!("Successfully upgraded connection to {:?} from {:?} to Direct", 
-                          peer_id, current_type);
+                    info!(
+                        "Successfully upgraded connection to {:?} from {:?} to Direct",
+                        peer_id, current_type
+                    );
                     Ok(ConnectionType::Direct)
                 }
                 Err(e) => {
@@ -1214,25 +1248,27 @@ impl ConnectionUpgradeManager {
                 }
             }
         } else {
-            Err(NatTraversalError::UpgradeError("NAT manager not available".to_string()))
+            Err(NatTraversalError::UpgradeError(
+                "NAT manager not available".to_string(),
+            ))
         }
     }
 }
 
 impl NatTraversalManager {
     /// Create a new NAT traversal manager
-    pub fn new(
-        config: NatTraversalConfig,
-        connection_manager: Arc<ConnectionManager>,
-    ) -> Self {
+    pub fn new(config: NatTraversalConfig, connection_manager: Arc<ConnectionManager>) -> Self {
         let stats = Arc::new(NatTraversalStats::default());
-        
+
         Self {
             config: config.clone(),
             nat_info: Arc::new(RwLock::new(None)),
             connection_manager,
             stun_client: Arc::new(StunClient::new(config.stun_servers.clone())),
-            turn_client: Arc::new(TurnClient::new(config.turn_servers.clone(), config.max_relay_connections)),
+            turn_client: Arc::new(TurnClient::new(
+                config.turn_servers.clone(),
+                config.max_relay_connections,
+            )),
             upnp_manager: Arc::new(UpnpManager::new(config.port_mapping_lifetime)),
             nat_pmp_client: Arc::new(NatPmpClient::new()),
             hole_punch_coordinator: Arc::new(HolePunchCoordinator::new(config.hole_punch_timeout)),
@@ -1247,28 +1283,28 @@ impl NatTraversalManager {
     /// Initialize NAT traversal
     pub async fn initialize(&self) -> Result<(), NatTraversalError> {
         info!("Initializing NAT traversal manager");
-        
+
         // Start NAT detection
         if self.config.enable_stun {
             self.start_nat_detection().await?;
         }
-        
+
         // Discover gateways
         if self.config.enable_upnp {
             if let Err(e) = self.upnp_manager.discover_gateway().await {
                 warn!("UPnP gateway discovery failed: {}", e);
             }
         }
-        
+
         if self.config.enable_nat_pmp {
             if let Err(e) = self.nat_pmp_client.discover_gateway().await {
                 warn!("NAT-PMP gateway discovery failed: {}", e);
             }
         }
-        
+
         // Start periodic tasks
         self.start_periodic_tasks().await;
-        
+
         Ok(())
     }
 
@@ -1295,13 +1331,13 @@ impl NatTraversalManager {
         let stun_client = Arc::clone(&self.stun_client);
         let stats = Arc::clone(&self.stats);
         let detection_interval = self.config.detection_interval;
-        
+
         // NAT detection refresh task
         let detection_task = tokio::spawn(async move {
             let mut interval = interval(detection_interval);
             loop {
                 interval.tick().await;
-                
+
                 match stun_client.detect_nat().await {
                     Ok(new_info) => {
                         *nat_info.write() = Some(new_info);
@@ -1314,7 +1350,7 @@ impl NatTraversalManager {
                 }
             }
         });
-        
+
         *self.detection_handle.lock().await = Some(detection_task);
     }
 
@@ -1332,13 +1368,17 @@ impl NatTraversalManager {
     ) -> Result<PortMapping, NatTraversalError> {
         // Try UPnP first
         if self.config.enable_upnp {
-            match self.upnp_manager.create_mapping(
-                local_port,
-                external_port,
-                protocol,
-                "QuDAG P2P",
-                self.config.port_mapping_lifetime,
-            ).await {
+            match self
+                .upnp_manager
+                .create_mapping(
+                    local_port,
+                    external_port,
+                    protocol,
+                    "QuDAG P2P",
+                    self.config.port_mapping_lifetime,
+                )
+                .await
+            {
                 Ok(mapping) => {
                     let port_mapping = PortMapping {
                         local_port,
@@ -1348,9 +1388,11 @@ impl NatTraversalManager {
                         created_at: Instant::now(),
                         expires_at: Instant::now() + mapping.lease_duration,
                     };
-                    
+
                     self.port_mappings.insert(local_port, port_mapping.clone());
-                    self.stats.port_mappings_created.fetch_add(1, Ordering::Relaxed);
+                    self.stats
+                        .port_mappings_created
+                        .fetch_add(1, Ordering::Relaxed);
                     return Ok(port_mapping);
                 }
                 Err(e) => {
@@ -1358,16 +1400,20 @@ impl NatTraversalManager {
                 }
             }
         }
-        
+
         // Try NAT-PMP
         if self.config.enable_nat_pmp {
             let is_tcp = matches!(protocol, PortMappingProtocol::TCP);
-            match self.nat_pmp_client.create_mapping(
-                local_port,
-                external_port,
-                is_tcp,
-                self.config.port_mapping_lifetime,
-            ).await {
+            match self
+                .nat_pmp_client
+                .create_mapping(
+                    local_port,
+                    external_port,
+                    is_tcp,
+                    self.config.port_mapping_lifetime,
+                )
+                .await
+            {
                 Ok(mapping) => {
                     let port_mapping = PortMapping {
                         local_port,
@@ -1377,9 +1423,11 @@ impl NatTraversalManager {
                         created_at: Instant::now(),
                         expires_at: Instant::now() + mapping.lifetime,
                     };
-                    
+
                     self.port_mappings.insert(local_port, port_mapping.clone());
-                    self.stats.port_mappings_created.fetch_add(1, Ordering::Relaxed);
+                    self.stats
+                        .port_mappings_created
+                        .fetch_add(1, Ordering::Relaxed);
                     return Ok(port_mapping);
                 }
                 Err(e) => {
@@ -1387,9 +1435,13 @@ impl NatTraversalManager {
                 }
             }
         }
-        
-        self.stats.port_mappings_failed.fetch_add(1, Ordering::Relaxed);
-        Err(NatTraversalError::UpnpError("All port mapping methods failed".to_string()))
+
+        self.stats
+            .port_mappings_failed
+            .fetch_add(1, Ordering::Relaxed);
+        Err(NatTraversalError::UpnpError(
+            "All port mapping methods failed".to_string(),
+        ))
     }
 
     /// Establish connection to a peer with NAT traversal
@@ -1401,18 +1453,20 @@ impl NatTraversalManager {
                 debug!("Direct connection failed: {}, trying NAT traversal", e);
             }
         }
-        
+
         // Try hole punching if enabled
         if self.config.enable_hole_punching {
             match self.try_hole_punch(peer_id).await {
                 Ok(()) => return Ok(()),
                 Err(e) => {
                     debug!("Hole punching failed: {}", e);
-                    self.stats.hole_punch_failures.fetch_add(1, Ordering::Relaxed);
+                    self.stats
+                        .hole_punch_failures
+                        .fetch_add(1, Ordering::Relaxed);
                 }
             }
         }
-        
+
         // Fall back to relay if enabled
         if self.config.enable_relay {
             match self.establish_relay_connection(peer_id).await {
@@ -1422,59 +1476,62 @@ impl NatTraversalManager {
                 }
             }
         }
-        
-        Err(NatTraversalError::ConnectionError(NetworkError::ConnectionError(
-            "All connection methods failed".to_string()
-        )))
+
+        Err(NatTraversalError::ConnectionError(
+            NetworkError::ConnectionError("All connection methods failed".to_string()),
+        ))
     }
 
     /// Try hole punching to establish direct connection
     async fn try_hole_punch(&self, peer_id: PeerId) -> Result<(), NatTraversalError> {
         // Get local candidates
         let local_candidates = self.gather_local_candidates().await?;
-        
+
         // Exchange candidates with peer (through signaling)
         let remote_candidates = self.exchange_candidates(peer_id, &local_candidates).await?;
-        
+
         // Start hole punching
-        match self.hole_punch_coordinator.start_hole_punch(
-            peer_id,
-            local_candidates,
-            remote_candidates,
-        ).await {
+        match self
+            .hole_punch_coordinator
+            .start_hole_punch(peer_id, local_candidates, remote_candidates)
+            .await
+        {
             Ok(addr) => {
                 info!("Hole punch successful, connected via {}", addr);
-                self.stats.hole_punch_success.fetch_add(1, Ordering::Relaxed);
-                
+                self.stats
+                    .hole_punch_success
+                    .fetch_add(1, Ordering::Relaxed);
+
                 // Update connection in connection manager
-                self.connection_manager.update_status(peer_id, ConnectionStatus::Connected);
+                self.connection_manager
+                    .update_status(peer_id, ConnectionStatus::Connected);
                 Ok(())
             }
-            Err(e) => Err(e)
+            Err(e) => Err(e),
         }
     }
 
     /// Gather local candidate addresses
     async fn gather_local_candidates(&self) -> Result<Vec<SocketAddr>, NatTraversalError> {
         let mut candidates = Vec::new();
-        
+
         // Add public address from NAT info
         if let Some(nat_info) = self.nat_info.read().as_ref() {
             if let (Some(ip), Some(port)) = (nat_info.public_ip, nat_info.public_port) {
                 candidates.push(SocketAddr::new(ip, port));
             }
         }
-        
+
         // Add local addresses
         // TODO: Enumerate local network interfaces
-        
+
         // Add mapped ports
         for mapping in self.port_mappings.iter() {
             if let Some(public_ip) = self.get_public_ip() {
                 candidates.push(SocketAddr::new(public_ip, mapping.external_port));
             }
         }
-        
+
         Ok(candidates)
     }
 
@@ -1504,22 +1561,26 @@ impl NatTraversalManager {
                 }
             }
         }
-        
+
         // Use custom relay
         match self.relay_manager.establish_relay(peer_id).await {
             Ok(connection) => {
-                info!("Relay connection established via {:?}", connection.relay_server);
+                info!(
+                    "Relay connection established via {:?}",
+                    connection.relay_server
+                );
                 self.stats.relay_connections.fetch_add(1, Ordering::Relaxed);
-                
+
                 // Update connection status
-                self.connection_manager.update_status(peer_id, ConnectionStatus::Connected);
-                
+                self.connection_manager
+                    .update_status(peer_id, ConnectionStatus::Connected);
+
                 // Schedule upgrade attempt
                 self.schedule_connection_upgrade(peer_id, ConnectionType::Relay);
-                
+
                 Ok(())
             }
-            Err(e) => Err(e)
+            Err(e) => Err(e),
         }
     }
 
@@ -1527,11 +1588,11 @@ impl NatTraversalManager {
     fn schedule_connection_upgrade(&self, peer_id: PeerId, current_type: ConnectionType) {
         let upgrade_manager = Arc::clone(&self.upgrade_manager);
         let stats = Arc::clone(&self.stats);
-        
+
         tokio::spawn(async move {
             // Wait before attempting upgrade
             sleep(Duration::from_secs(30)).await;
-            
+
             match upgrade_manager.try_upgrade(peer_id, current_type).await {
                 Ok(ConnectionType::Direct) => {
                     stats.upgraded_connections.fetch_add(1, Ordering::Relaxed);
@@ -1560,41 +1621,58 @@ impl NatTraversalManager {
     pub fn get_stats(&self) -> NatTraversalStats {
         NatTraversalStats {
             total_attempts: AtomicU64::new(self.stats.total_attempts.load(Ordering::Relaxed)),
-            successful_traversals: AtomicU64::new(self.stats.successful_traversals.load(Ordering::Relaxed)),
+            successful_traversals: AtomicU64::new(
+                self.stats.successful_traversals.load(Ordering::Relaxed),
+            ),
             failed_traversals: AtomicU64::new(self.stats.failed_traversals.load(Ordering::Relaxed)),
             stun_success: AtomicU64::new(self.stats.stun_success.load(Ordering::Relaxed)),
             stun_failures: AtomicU64::new(self.stats.stun_failures.load(Ordering::Relaxed)),
-            hole_punch_success: AtomicU64::new(self.stats.hole_punch_success.load(Ordering::Relaxed)),
-            hole_punch_failures: AtomicU64::new(self.stats.hole_punch_failures.load(Ordering::Relaxed)),
+            hole_punch_success: AtomicU64::new(
+                self.stats.hole_punch_success.load(Ordering::Relaxed),
+            ),
+            hole_punch_failures: AtomicU64::new(
+                self.stats.hole_punch_failures.load(Ordering::Relaxed),
+            ),
             relay_connections: AtomicU32::new(self.stats.relay_connections.load(Ordering::Relaxed)),
-            upgraded_connections: AtomicU64::new(self.stats.upgraded_connections.load(Ordering::Relaxed)),
-            port_mappings_created: AtomicU64::new(self.stats.port_mappings_created.load(Ordering::Relaxed)),
-            port_mappings_failed: AtomicU64::new(self.stats.port_mappings_failed.load(Ordering::Relaxed)),
-            avg_traversal_time_ms: AtomicU64::new(self.stats.avg_traversal_time_ms.load(Ordering::Relaxed)),
+            upgraded_connections: AtomicU64::new(
+                self.stats.upgraded_connections.load(Ordering::Relaxed),
+            ),
+            port_mappings_created: AtomicU64::new(
+                self.stats.port_mappings_created.load(Ordering::Relaxed),
+            ),
+            port_mappings_failed: AtomicU64::new(
+                self.stats.port_mappings_failed.load(Ordering::Relaxed),
+            ),
+            avg_traversal_time_ms: AtomicU64::new(
+                self.stats.avg_traversal_time_ms.load(Ordering::Relaxed),
+            ),
         }
     }
 
     /// Shutdown NAT traversal manager
     pub async fn shutdown(&self) -> Result<(), NatTraversalError> {
         info!("Shutting down NAT traversal manager");
-        
+
         // Cancel detection task
         if let Some(handle) = self.detection_handle.lock().await.take() {
             handle.abort();
         }
-        
+
         // Close all relay connections
-        let relay_peers: Vec<_> = self.relay_manager.relay_connections.iter()
+        let relay_peers: Vec<_> = self
+            .relay_manager
+            .relay_connections
+            .iter()
             .map(|entry| *entry.key())
             .collect();
-        
+
         for peer_id in relay_peers {
             self.relay_manager.close_relay(&peer_id).await;
         }
-        
+
         // Remove port mappings
         // TODO: Implement port mapping cleanup
-        
+
         Ok(())
     }
 }
@@ -1605,12 +1683,10 @@ mod tests {
 
     #[tokio::test]
     async fn test_nat_detection() {
-        let servers = vec![
-            StunServer::new("8.8.8.8:3478".parse().unwrap(), 1),
-        ];
-        
+        let servers = vec![StunServer::new("8.8.8.8:3478".parse().unwrap(), 1)];
+
         let client = StunClient::new(servers);
-        
+
         // This test will fail without real STUN servers
         // It's here to show the structure
         match client.detect_nat().await {

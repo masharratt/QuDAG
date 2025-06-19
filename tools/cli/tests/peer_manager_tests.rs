@@ -13,7 +13,7 @@ async fn test_peer_manager_initialization() {
         connection_timeout: 30,
         auto_discovery: false,
     };
-    
+
     let manager = PeerManager::new(config).await.unwrap();
     let peers = manager.list_peers().await.unwrap();
     assert_eq!(peers.len(), 0);
@@ -23,7 +23,7 @@ async fn test_peer_manager_initialization() {
 async fn test_peer_persistence() {
     let temp_dir = TempDir::new().unwrap();
     let data_path = temp_dir.path().join("peers.json");
-    
+
     // Create first manager and add a peer
     {
         let config = PeerManagerConfig {
@@ -33,17 +33,19 @@ async fn test_peer_persistence() {
             connection_timeout: 30,
             auto_discovery: false,
         };
-        
+
         let manager = PeerManager::new(config).await.unwrap();
-        
+
         // Note: This will fail in tests because we can't actually connect
         // but it demonstrates the API
-        let _ = manager.add_peer("127.0.0.1:8000".to_string(), Some("test_peer".to_string())).await;
-        
+        let _ = manager
+            .add_peer("127.0.0.1:8000".to_string(), Some("test_peer".to_string()))
+            .await;
+
         // Save peers
         manager.save_peers().await.unwrap();
     }
-    
+
     // Create second manager and verify it loads the saved peers
     {
         let config = PeerManagerConfig {
@@ -53,10 +55,10 @@ async fn test_peer_persistence() {
             connection_timeout: 30,
             auto_discovery: false,
         };
-        
+
         let manager = PeerManager::new(config).await.unwrap();
         let peers = manager.list_peers().await.unwrap();
-        
+
         // Since we couldn't actually connect in the test environment,
         // this should still be 0, but in a real scenario with mocked
         // networking, we'd see the saved peer
@@ -74,9 +76,9 @@ async fn test_peer_import_export() {
         connection_timeout: 30,
         auto_discovery: false,
     };
-    
+
     let manager = PeerManager::new(config).await.unwrap();
-    
+
     // Create a test peer file
     let test_peers = r#"[
         {
@@ -93,19 +95,22 @@ async fn test_peer_import_export() {
             "persistent": true
         }
     ]"#;
-    
+
     let import_path = temp_dir.path().join("import_peers.json");
     std::fs::write(&import_path, test_peers).unwrap();
-    
+
     // Import peers
     let count = manager.import_peers(import_path, false).await.unwrap();
     assert_eq!(count, 1);
-    
+
     // Export peers
     let export_path = temp_dir.path().join("export_peers.json");
-    let exported = manager.export_peers(export_path.clone(), None).await.unwrap();
+    let exported = manager
+        .export_peers(export_path.clone(), None)
+        .await
+        .unwrap();
     assert_eq!(exported, 1);
-    
+
     // Verify exported file exists
     assert!(export_path.exists());
 }
@@ -121,13 +126,19 @@ async fn test_invalid_address_handling() {
         connection_timeout: 30,
         auto_discovery: false,
     };
-    
+
     let manager = PeerManager::new(config).await.unwrap();
-    
+
     // Test invalid addresses
     assert!(manager.add_peer("".to_string(), None).await.is_err());
     assert!(manager.add_peer("invalid".to_string(), None).await.is_err());
     assert!(manager.add_peer(":8000".to_string(), None).await.is_err());
-    assert!(manager.add_peer("127.0.0.1:".to_string(), None).await.is_err());
-    assert!(manager.add_peer("127.0.0.1:0".to_string(), None).await.is_err());
+    assert!(manager
+        .add_peer("127.0.0.1:".to_string(), None)
+        .await
+        .is_err());
+    assert!(manager
+        .add_peer("127.0.0.1:0".to_string(), None)
+        .await
+        .is_err());
 }

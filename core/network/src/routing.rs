@@ -1,11 +1,11 @@
 use crate::discovery::{
-    DiscoveredPeer, LoadBalancer, LoadBalancingAlgorithm, PeerSelector, PeerScoringConfig,
-    GeoPreferences,
+    DiscoveredPeer, GeoPreferences, LoadBalancer, LoadBalancingAlgorithm, PeerScoringConfig,
+    PeerSelector,
 };
 use crate::shadow_address::{ShadowAddress, ShadowAddressError, ShadowAddressResolver};
 use libp2p::PeerId as LibP2PPeerId;
-use rand::thread_rng;
 use rand::seq::SliceRandom;
+use rand::thread_rng;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
@@ -368,7 +368,7 @@ pub enum CircuitBreakerState {
     /// Circuit closed (normal operation)
     Closed,
     /// Circuit open (failures detected)
-    Open { 
+    Open {
         opened_at: Instant,
         failure_count: usize,
     },
@@ -390,7 +390,7 @@ impl Router {
             16 * 1024 * 1024, // 16MB default
         )
     }
-    
+
     /// Creates a new production-ready router instance with custom configuration
     pub fn new_with_config(
         message_tx: mpsc::Sender<Vec<u8>>,
@@ -408,9 +408,7 @@ impl Router {
             load_balancer: Arc::new(Mutex::new(LoadBalancer::new(
                 LoadBalancingAlgorithm::WeightedRoundRobin,
             ))),
-            peer_selector: Arc::new(Mutex::new(PeerSelector::new(
-                GeoPreferences::default(),
-            ))),
+            peer_selector: Arc::new(Mutex::new(PeerSelector::new(GeoPreferences::default()))),
             scoring_config,
             optimization_config,
             dark_addressing_config,
@@ -427,7 +425,10 @@ impl Router {
     }
 
     /// Find paths for a shadow address
-    async fn find_shadow_paths(&self, addr: &ShadowAddress) -> Result<Vec<RoutePath>, RoutingError> {
+    async fn find_shadow_paths(
+        &self,
+        addr: &ShadowAddress,
+    ) -> Result<Vec<RoutePath>, RoutingError> {
         // Resolve shadow address to onetime address
         let _resolved = if let Some(resolver) = &self.shadow_resolver {
             resolver.resolve_address(addr)?
@@ -438,7 +439,7 @@ impl Router {
         // Get available peers
         let peers = self.peers.read().await;
         let mut available_peers: Vec<_> = peers.keys().cloned().collect();
-        
+
         if available_peers.is_empty() {
             return Err(RoutingError::NoRoute);
         }
@@ -448,10 +449,7 @@ impl Router {
         available_peers.shuffle(&mut rng);
 
         let peer_count = 3; // Use 3 intermediate hops
-        let selected_peers: Vec<_> = available_peers
-            .into_iter()
-            .take(peer_count)
-            .collect();
+        let selected_peers: Vec<_> = available_peers.into_iter().take(peer_count).collect();
 
         if selected_peers.len() < peer_count {
             return Err(RoutingError::NoRoute);
@@ -479,7 +477,10 @@ impl Router {
     /// Adds a peer connection to the routing table
     pub fn add_peer_connection(&mut self, from: LibP2PPeerId, to: LibP2PPeerId) {
         let mut connections = self.peer_connections.blocking_write();
-        connections.entry(from).or_insert_with(HashSet::new).insert(to);
+        connections
+            .entry(from)
+            .or_insert_with(HashSet::new)
+            .insert(to);
     }
 
     /// Removes a peer connection from the routing table
@@ -492,7 +493,7 @@ impl Router {
             }
         }
     }
-    
+
     /// Adds a discovered peer with full metrics
     pub async fn add_discovered_peer(&self, peer_id: LibP2PPeerId, peer: DiscoveredPeer) {
         self.peers.write().await.insert(peer_id, peer);
@@ -506,10 +507,8 @@ impl Router {
     /// Updates path metrics for a peer
     pub async fn update_path_metrics(&self, peer_id: LibP2PPeerId, path: RoutePath) {
         let mut cache = self.route_cache.write().await;
-        cache.entry(peer_id)
-            .or_insert_with(Vec::new)
-            .push(path);
-        
+        cache.entry(peer_id).or_insert_with(Vec::new).push(path);
+
         // Keep only the most recent paths
         if let Some(paths) = cache.get_mut(&peer_id) {
             if paths.len() > 10 {
@@ -517,19 +516,23 @@ impl Router {
             }
         }
     }
-    
 
     /// Finds multiple disjoint paths to a destination
-    pub async fn find_paths(&self, destination: LibP2PPeerId, criteria: &RouteSelectionCriteria) -> Result<Vec<RoutePath>, RoutingError> {
+    pub async fn find_paths(
+        &self,
+        destination: LibP2PPeerId,
+        criteria: &RouteSelectionCriteria,
+    ) -> Result<Vec<RoutePath>, RoutingError> {
         // Check cache first
         let cache = self.route_cache.read().await;
         if let Some(cached_paths) = cache.get(&destination) {
-            let valid_paths: Vec<_> = cached_paths.iter()
+            let valid_paths: Vec<_> = cached_paths
+                .iter()
                 .filter(|p| p.created_at.elapsed() < self.optimization_config.cache_ttl)
                 .filter(|p| self.meets_criteria(p, criteria))
                 .cloned()
                 .collect();
-            
+
             if !valid_paths.is_empty() {
                 let mut metrics = self.performance_metrics.lock().unwrap();
                 metrics.cache_hit_rate = (metrics.cache_hit_rate + 1.0) / 2.0;
@@ -540,9 +543,7 @@ impl Router {
 
         // Find new paths
         let peers = self.peers.read().await;
-        let available_peers: Vec<_> = peers.values()
-            .filter(|p| p.is_healthy())
-            .collect();
+        let available_peers: Vec<_> = peers.values().filter(|p| p.is_healthy()).collect();
 
         if available_peers.is_empty() {
             return Err(RoutingError::NoRoute);
@@ -627,7 +628,8 @@ impl Router {
         peers: &HashMap<LibP2PPeerId, DiscoveredPeer>,
         hop_count: usize,
     ) -> Result<Vec<LibP2PPeerId>, RoutingError> {
-        let mut available: Vec<_> = peers.iter()
+        let mut available: Vec<_> = peers
+            .iter()
             .filter(|(id, p)| **id != destination && p.capabilities.can_relay)
             .map(|(id, _)| *id)
             .collect();
@@ -638,10 +640,10 @@ impl Router {
 
         let mut rng = thread_rng();
         available.shuffle(&mut rng);
-        
+
         let mut hops = available.into_iter().take(hop_count).collect::<Vec<_>>();
         hops.push(destination);
-        
+
         Ok(hops)
     }
 
@@ -679,9 +681,13 @@ impl Router {
     }
 
     /// Calculate latency for a path
-    fn calculate_path_latency(&self, hops: &[LibP2PPeerId], peers: &HashMap<LibP2PPeerId, DiscoveredPeer>) -> Duration {
+    fn calculate_path_latency(
+        &self,
+        hops: &[LibP2PPeerId],
+        peers: &HashMap<LibP2PPeerId, DiscoveredPeer>,
+    ) -> Duration {
         let mut total_latency = Duration::ZERO;
-        
+
         for hop in hops {
             if let Some(peer) = peers.get(hop) {
                 total_latency += peer.performance_metrics.avg_response_time;
@@ -689,14 +695,18 @@ impl Router {
                 total_latency += Duration::from_millis(50); // Default estimate
             }
         }
-        
+
         total_latency
     }
 
     /// Calculate reliability for a path
-    fn calculate_path_reliability(&self, hops: &[LibP2PPeerId], peers: &HashMap<LibP2PPeerId, DiscoveredPeer>) -> f64 {
+    fn calculate_path_reliability(
+        &self,
+        hops: &[LibP2PPeerId],
+        peers: &HashMap<LibP2PPeerId, DiscoveredPeer>,
+    ) -> f64 {
         let mut reliability = 1.0;
-        
+
         for hop in hops {
             if let Some(peer) = peers.get(hop) {
                 reliability *= peer.connection_quality.reliability_score;
@@ -704,14 +714,18 @@ impl Router {
                 reliability *= 0.9; // Default estimate
             }
         }
-        
+
         reliability
     }
 
     /// Calculate bandwidth for a path
-    fn calculate_path_bandwidth(&self, hops: &[LibP2PPeerId], peers: &HashMap<LibP2PPeerId, DiscoveredPeer>) -> Option<u64> {
+    fn calculate_path_bandwidth(
+        &self,
+        hops: &[LibP2PPeerId],
+        peers: &HashMap<LibP2PPeerId, DiscoveredPeer>,
+    ) -> Option<u64> {
         let mut min_bandwidth = u64::MAX;
-        
+
         for hop in hops {
             if let Some(peer) = peers.get(hop) {
                 if let Some(bw) = peer.capabilities.bandwidth_capacity {
@@ -723,7 +737,7 @@ impl Router {
                 return None;
             }
         }
-        
+
         if min_bandwidth == u64::MAX {
             None
         } else {
@@ -732,9 +746,13 @@ impl Router {
     }
 
     /// Calculate load factor for a path
-    fn calculate_path_load(&self, hops: &[LibP2PPeerId], peers: &HashMap<LibP2PPeerId, DiscoveredPeer>) -> f64 {
+    fn calculate_path_load(
+        &self,
+        hops: &[LibP2PPeerId],
+        peers: &HashMap<LibP2PPeerId, DiscoveredPeer>,
+    ) -> f64 {
         let mut total_load = 0.0;
-        
+
         for hop in hops {
             if let Some(peer) = peers.get(hop) {
                 total_load += peer.load_metrics.load_score / 100.0;
@@ -742,21 +760,21 @@ impl Router {
                 total_load += 0.5; // Default estimate
             }
         }
-        
+
         total_load / hops.len() as f64
     }
 
     /// Calculate path cost
     fn calculate_path_cost(&self, latency: Duration, reliability: f64, load_factor: f64) -> f64 {
         let weights = &self.optimization_config.weight_factors;
-        
+
         let latency_cost = latency.as_millis() as f64 / 1000.0; // Convert to seconds
         let reliability_cost = 1.0 - reliability;
         let load_cost = load_factor;
-        
-        latency_cost * weights.latency_weight +
-        reliability_cost * weights.reliability_weight +
-        load_cost * weights.load_weight
+
+        latency_cost * weights.latency_weight
+            + reliability_cost * weights.reliability_weight
+            + load_cost * weights.load_weight
     }
 
     /// Routes a message through multiple paths using either PeerId or ShadowAddress
@@ -804,7 +822,7 @@ impl Router {
                     }
                 }
                 drop(breakers);
-                
+
                 self.find_paths(peer_id, &criteria).await?
             }
             Destination::Shadow(shadow_addr) => {
@@ -829,13 +847,15 @@ impl Router {
             &paths[0]
         } else {
             // Get peer IDs from paths
-            let peer_ids: Vec<_> = paths.iter()
+            let peer_ids: Vec<_> = paths
+                .iter()
                 .filter_map(|p| p.hops.first())
                 .copied()
                 .collect();
-            
+
             if let Some(selected_peer) = load_balancer.select_peer(&peer_ids) {
-                paths.iter()
+                paths
+                    .iter()
                     .find(|p| p.hops.first() == Some(&selected_peer))
                     .unwrap_or(&paths[0])
             } else {
@@ -853,18 +873,18 @@ impl Router {
 
         // Build routing header
         let mut routed_message = Vec::new();
-        
+
         // Header format:
         // - Path length (4 bytes)
         // - Path hops (variable)
         // - Message data
-        
+
         routed_message.extend_from_slice(&(selected_path.hops.len() as u32).to_le_bytes());
-        
+
         for hop in &selected_path.hops {
             routed_message.extend_from_slice(hop.to_bytes().as_slice());
         }
-        
+
         routed_message.extend_from_slice(&message);
 
         // Send through channel
@@ -953,9 +973,21 @@ mod tests {
         let peer3 = LibP2PPeerId::random();
 
         // Set up peers
-        let discovered_peer1 = DiscoveredPeer::new(peer1, "127.0.0.1:8001".parse().unwrap(), DiscoveryMethod::Static);
-        let discovered_peer2 = DiscoveredPeer::new(peer2, "127.0.0.1:8002".parse().unwrap(), DiscoveryMethod::Static);
-        let discovered_peer3 = DiscoveredPeer::new(peer3, "127.0.0.1:8003".parse().unwrap(), DiscoveryMethod::Static);
+        let discovered_peer1 = DiscoveredPeer::new(
+            peer1,
+            "127.0.0.1:8001".parse().unwrap(),
+            DiscoveryMethod::Static,
+        );
+        let discovered_peer2 = DiscoveredPeer::new(
+            peer2,
+            "127.0.0.1:8002".parse().unwrap(),
+            DiscoveryMethod::Static,
+        );
+        let discovered_peer3 = DiscoveredPeer::new(
+            peer3,
+            "127.0.0.1:8003".parse().unwrap(),
+            DiscoveryMethod::Static,
+        );
 
         router.add_peer_connection(peer1, discovered_peer1).await;
         router.add_peer_connection(peer2, discovered_peer2).await;
@@ -977,9 +1009,21 @@ mod tests {
         let peer3 = LibP2PPeerId::random();
 
         // Set up peers
-        let discovered_peer1 = DiscoveredPeer::new(peer1, "127.0.0.1:8001".parse().unwrap(), DiscoveryMethod::Static);
-        let discovered_peer2 = DiscoveredPeer::new(peer2, "127.0.0.1:8002".parse().unwrap(), DiscoveryMethod::Static);
-        let discovered_peer3 = DiscoveredPeer::new(peer3, "127.0.0.1:8003".parse().unwrap(), DiscoveryMethod::Static);
+        let discovered_peer1 = DiscoveredPeer::new(
+            peer1,
+            "127.0.0.1:8001".parse().unwrap(),
+            DiscoveryMethod::Static,
+        );
+        let discovered_peer2 = DiscoveredPeer::new(
+            peer2,
+            "127.0.0.1:8002".parse().unwrap(),
+            DiscoveryMethod::Static,
+        );
+        let discovered_peer3 = DiscoveredPeer::new(
+            peer3,
+            "127.0.0.1:8003".parse().unwrap(),
+            DiscoveryMethod::Static,
+        );
 
         router.add_peer_connection(peer1, discovered_peer1).await;
         router.add_peer_connection(peer2, discovered_peer2).await;
@@ -1013,9 +1057,21 @@ mod tests {
         let peer3 = LibP2PPeerId::random();
 
         // Set up some peers
-        let discovered_peer1 = DiscoveredPeer::new(peer1, "127.0.0.1:8001".parse().unwrap(), DiscoveryMethod::Static);
-        let discovered_peer2 = DiscoveredPeer::new(peer2, "127.0.0.1:8002".parse().unwrap(), DiscoveryMethod::Static);
-        let discovered_peer3 = DiscoveredPeer::new(peer3, "127.0.0.1:8003".parse().unwrap(), DiscoveryMethod::Static);
+        let discovered_peer1 = DiscoveredPeer::new(
+            peer1,
+            "127.0.0.1:8001".parse().unwrap(),
+            DiscoveryMethod::Static,
+        );
+        let discovered_peer2 = DiscoveredPeer::new(
+            peer2,
+            "127.0.0.1:8002".parse().unwrap(),
+            DiscoveryMethod::Static,
+        );
+        let discovered_peer3 = DiscoveredPeer::new(
+            peer3,
+            "127.0.0.1:8003".parse().unwrap(),
+            DiscoveryMethod::Static,
+        );
 
         router.add_peer_connection(peer1, discovered_peer1).await;
         router.add_peer_connection(peer2, discovered_peer2).await;

@@ -44,9 +44,10 @@ pub enum StateError {
 }
 
 /// Protocol state enumeration with detailed substates
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Default)]
 pub enum ProtocolState {
     /// Initial state - node starting up
+    #[default]
     Initial,
 
     /// Handshake states
@@ -782,12 +783,6 @@ impl ProtocolStateMachine {
             total_bytes_received,
             total_errors,
         }
-    }
-}
-
-impl Default for ProtocolState {
-    fn default() -> Self {
-        ProtocolState::Initial
     }
 }
 

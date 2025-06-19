@@ -55,13 +55,19 @@
 #![allow(clippy::type_complexity)]
 
 use pqcrypto_dilithium::dilithium3::*;
-use pqcrypto_traits::sign::{PublicKey as PqPublicKeyTrait, SecretKey as PqSecretKeyTrait, SignedMessage as PqSignedMessageTrait};
+use pqcrypto_traits::sign::{
+    PublicKey as PqPublicKeyTrait, SecretKey as PqSecretKeyTrait,
+    SignedMessage as PqSignedMessageTrait,
+};
+use rand::Rng;
 use rand_core::{CryptoRng, RngCore};
-use sha3::{Shake128, Shake256, digest::{Update, ExtendableOutput, XofReader}};
+use sha3::{
+    digest::{ExtendableOutput, Update, XofReader},
+    Shake128, Shake256,
+};
 use subtle::ConstantTimeEq;
 use thiserror::Error;
 use zeroize::Zeroize;
-use rand::Rng;
 
 /// Helper for secure memory cleanup
 #[allow(dead_code)]
@@ -92,16 +98,16 @@ fn poly_ct_eq(a: &[i32; ML_DSA_N], b: &[i32; ML_DSA_N]) -> bool {
 #[allow(dead_code)]
 mod side_channel_resistant {
     use super::*;
-    
+
     /// Timing-attack resistant verification
     pub fn verify_with_timing_protection(
         message: &[u8],
-        signature: &[u8], 
-        public_key: &[u8]
+        signature: &[u8],
+        public_key: &[u8],
     ) -> Result<(), MlDsaError> {
         // Add random delay to prevent timing attacks
         let _dummy_operations = rand::thread_rng().gen::<u8>() % 16;
-        
+
         // Perform verification
         verify_ml_dsa_signature(message, signature, public_key)
     }
@@ -238,21 +244,20 @@ impl MlDsaPublicKey {
         let mut signed_message_bytes = Vec::with_capacity(signature.len() + message.len());
         signed_message_bytes.extend_from_slice(signature);
         signed_message_bytes.extend_from_slice(message);
-        
+
         let signed_msg = <SignedMessage as PqSignedMessageTrait>::from_bytes(&signed_message_bytes)
             .map_err(|_| MlDsaError::VerificationFailed)?;
-        
+
         match open(&signed_msg, &self.internal_key) {
             Ok(verified_msg) => {
                 // Use constant-time comparison for message verification
-                if verified_msg.len() == message.len() && 
-                   bool::from(verified_msg.ct_eq(message)) {
+                if verified_msg.len() == message.len() && bool::from(verified_msg.ct_eq(message)) {
                     Ok(())
                 } else {
                     Err(MlDsaError::VerificationFailed)
                 }
             }
-            Err(_) => Err(MlDsaError::VerificationFailed)
+            Err(_) => Err(MlDsaError::VerificationFailed),
         }
     }
 
@@ -265,13 +270,13 @@ impl MlDsaPublicKey {
 
     /// Batch verification of multiple signatures
     pub fn batch_verify(
-        messages: &[&[u8]], 
-        signatures: &[&[u8]], 
-        public_keys: &[&MlDsaPublicKey]
+        messages: &[&[u8]],
+        signatures: &[&[u8]],
+        public_keys: &[&MlDsaPublicKey],
     ) -> Result<(), MlDsaError> {
         if messages.len() != signatures.len() || messages.len() != public_keys.len() {
             return Err(MlDsaError::InternalError(
-                "Mismatched batch verification input lengths".to_string()
+                "Mismatched batch verification input lengths".to_string(),
             ));
         }
 
@@ -320,24 +325,28 @@ impl MlDsaKeyPair {
     }
 
     /// Generate a new ML-DSA key pair using the provided RNG
-    pub fn generate<R: CryptoRng + RngCore>(#[allow(unused_variables)] rng: &mut R) -> Result<Self, MlDsaError> {
+    pub fn generate<R: CryptoRng + RngCore>(
+        #[allow(unused_variables)] rng: &mut R,
+    ) -> Result<Self, MlDsaError> {
         // Generate key pair using pqcrypto
         let (internal_public, internal_secret) = keypair();
-        
+
         let public_key = <PublicKey as PqPublicKeyTrait>::as_bytes(&internal_public).to_vec();
         let secret_key = <SecretKey as PqSecretKeyTrait>::as_bytes(&internal_secret).to_vec();
-        
+
         // Validate key sizes
         if public_key.len() != ML_DSA_PUBLIC_KEY_SIZE {
-            return Err(MlDsaError::KeyGenerationFailed(
-                format!("Invalid public key size: {}", public_key.len())
-            ));
+            return Err(MlDsaError::KeyGenerationFailed(format!(
+                "Invalid public key size: {}",
+                public_key.len()
+            )));
         }
-        
+
         if secret_key.len() != ML_DSA_SECRET_KEY_SIZE {
-            return Err(MlDsaError::KeyGenerationFailed(
-                format!("Invalid secret key size: {}", secret_key.len())
-            ));
+            return Err(MlDsaError::KeyGenerationFailed(format!(
+                "Invalid secret key size: {}",
+                secret_key.len()
+            )));
         }
 
         Ok(Self {
@@ -367,13 +376,15 @@ impl MlDsaKeyPair {
         // Use pqcrypto-dilithium's signing which includes rejection sampling
         let signed_msg = sign(message, &self.internal_secret);
         let signed_bytes = <SignedMessage as PqSignedMessageTrait>::as_bytes(&signed_msg);
-        
+
         // Extract signature portion (everything except the message at the end)
         if signed_bytes.len() >= message.len() {
             let sig_len = signed_bytes.len() - message.len();
             Ok(signed_bytes[..sig_len].to_vec())
         } else {
-            Err(MlDsaError::SigningFailed("Invalid signed message format".to_string()))
+            Err(MlDsaError::SigningFailed(
+                "Invalid signed message format".to_string(),
+            ))
         }
     }
 
@@ -389,7 +400,9 @@ impl MlDsaKeyPair {
 
 /// Generate the matrix A from seed rho using SHAKE128
 #[allow(dead_code)]
-fn generate_matrix_a(rho: &[u8; 32]) -> Result<[[[i32; ML_DSA_N]; ML_DSA_L]; ML_DSA_K], MlDsaError> {
+fn generate_matrix_a(
+    rho: &[u8; 32],
+) -> Result<[[[i32; ML_DSA_N]; ML_DSA_L]; ML_DSA_K], MlDsaError> {
     let mut a = [[[0i32; ML_DSA_N]; ML_DSA_L]; ML_DSA_K];
 
     for i in 0..ML_DSA_K {
@@ -398,7 +411,7 @@ fn generate_matrix_a(rho: &[u8; 32]) -> Result<[[[i32; ML_DSA_N]; ML_DSA_L]; ML_
             let mut shake = Shake128::default();
             shake.update(rho);
             shake.update(&[j as u8, i as u8]);
-            
+
             let mut reader = shake.finalize_xof();
             let mut poly = [0i32; ML_DSA_N];
             generate_uniform_poly(&mut reader, &mut poly)?;
@@ -440,17 +453,18 @@ fn generate_secret_vectors(
 
 /// Generate uniform polynomial using rejection sampling
 #[allow(dead_code)]
-fn generate_uniform_poly(reader: &mut dyn XofReader, poly: &mut [i32; ML_DSA_N]) -> Result<(), MlDsaError> {
+fn generate_uniform_poly(
+    reader: &mut dyn XofReader,
+    poly: &mut [i32; ML_DSA_N],
+) -> Result<(), MlDsaError> {
     let mut buffer = [0u8; 3];
     let mut pos = 0;
 
     while pos < ML_DSA_N {
         reader.read(&mut buffer);
-        
+
         // Extract 23-bit value using rejection sampling
-        let t = (buffer[0] as u32) | 
-               ((buffer[1] as u32) << 8) | 
-               ((buffer[2] as u32) << 16);
+        let t = (buffer[0] as u32) | ((buffer[1] as u32) << 8) | ((buffer[2] as u32) << 16);
         let t = t & 0x7FFFFF; // 23 bits
 
         if t < ML_DSA_Q as u32 {
@@ -464,17 +478,20 @@ fn generate_uniform_poly(reader: &mut dyn XofReader, poly: &mut [i32; ML_DSA_N])
 
 /// Generate polynomial with coefficients in [-eta, eta] using rejection sampling
 #[allow(dead_code)]
-fn generate_eta_poly(reader: &mut dyn XofReader, poly: &mut [i32; ML_DSA_N]) -> Result<(), MlDsaError> {
+fn generate_eta_poly(
+    reader: &mut dyn XofReader,
+    poly: &mut [i32; ML_DSA_N],
+) -> Result<(), MlDsaError> {
     let mut pos = 0;
     let mut buffer = [0u8; 1];
 
     while pos < ML_DSA_N {
         reader.read(&mut buffer);
         let byte = buffer[0];
-        
+
         let z0 = byte & 0x0F;
         let z1 = byte >> 4;
-        
+
         // Use rejection sampling to generate coefficients in [-eta, eta]
         if z0 < 15 {
             if z0 < 9 {
@@ -483,7 +500,7 @@ fn generate_eta_poly(reader: &mut dyn XofReader, poly: &mut [i32; ML_DSA_N]) -> 
                 poly[pos] = ML_DSA_ETA - ((z0 - 9) as i32);
             }
             pos += 1;
-            
+
             if pos < ML_DSA_N {
                 if z1 < 9 {
                     poly[pos] = (z1 as i32) - ML_DSA_ETA;
@@ -521,18 +538,18 @@ fn matrix_vector_multiply(
         for j in 0..ML_DSA_L {
             let mut a_ntt = a[i][j];
             ntt(&mut a_ntt);
-            
+
             let mut product = [0i32; ML_DSA_N];
             for k in 0..ML_DSA_N {
                 product[k] = montgomery_reduce(a_ntt[k] as i64 * s1_ntt[j][k] as i64);
             }
-            
+
             // Add to result
             for k in 0..ML_DSA_N {
                 t[i][k] = (t[i][k].wrapping_add(product[k])).rem_euclid(ML_DSA_Q);
             }
         }
-        
+
         // Convert back from NTT domain
         invntt(&mut t[i]);
 
@@ -550,19 +567,19 @@ fn matrix_vector_multiply(
 fn ntt(poly: &mut [i32; ML_DSA_N]) {
     let mut k = 1;
     let mut len = 128;
-    
+
     while len >= 2 {
         let mut start = 0;
         while start < ML_DSA_N {
             let zeta = ntt_zetas()[k];
             k += 1;
-            
+
             for j in start..start + len {
                 let t = montgomery_reduce(zeta as i64 * poly[j + len] as i64);
                 poly[j + len] = poly[j].wrapping_sub(t);
                 poly[j] = poly[j].wrapping_add(t);
             }
-            
+
             start += len << 1;
         }
         len >>= 1;
@@ -574,25 +591,25 @@ fn ntt(poly: &mut [i32; ML_DSA_N]) {
 fn invntt(poly: &mut [i32; ML_DSA_N]) {
     let mut k = 127;
     let mut len = 2;
-    
+
     while len <= 128 {
         let mut start = 0;
         while start < ML_DSA_N {
             let zeta = ntt_zetas()[k];
             k -= 1;
-            
+
             for j in start..start + len {
                 let t = poly[j];
                 poly[j] = barrett_reduce(t.wrapping_add(poly[j + len]));
                 poly[j + len] = poly[j + len].wrapping_sub(t);
                 poly[j + len] = montgomery_reduce(zeta as i64 * poly[j + len] as i64);
             }
-            
+
             start += len << 1;
         }
         len <<= 1;
     }
-    
+
     // Multiply by n^(-1) = 8347681 in Montgomery domain
     for i in 0..ML_DSA_N {
         poly[i] = montgomery_reduce(8347681i64 * poly[i] as i64);
@@ -633,7 +650,7 @@ fn decompose(a: i32) -> (i32, i32) {
     let a = a.rem_euclid(ML_DSA_Q);
     let a1 = (a + 127) >> 7;
     let a0 = a - a1 * 128;
-    
+
     if a0 > 43 {
         (a1, a0 - 128)
     } else {
@@ -649,38 +666,31 @@ fn check_norm_bound(poly: &[i32; ML_DSA_N], bound: i32) -> bool {
 
 /// Make hint for signature verification
 #[allow(dead_code)]
-fn make_hint(
-    z: &[i32; ML_DSA_N],
-    r: &[i32; ML_DSA_N],
-) -> ([u8; ML_DSA_OMEGA + ML_DSA_K], usize) {
+fn make_hint(z: &[i32; ML_DSA_N], r: &[i32; ML_DSA_N]) -> ([u8; ML_DSA_OMEGA + ML_DSA_K], usize) {
     let mut h = [0u8; ML_DSA_OMEGA + ML_DSA_K];
     let mut cnt = 0;
-    
+
     for i in 0..ML_DSA_N {
         let (r1, _) = decompose(r[i]);
         let (z1, _) = decompose(z[i]);
-        
+
         if r1 != z1 && cnt < ML_DSA_OMEGA {
             h[cnt] = i as u8;
             cnt += 1;
         }
     }
-    
+
     (h, cnt)
 }
 
 /// Use hint during verification
 #[allow(dead_code)]
-fn use_hint(
-    hint: &[u8],
-    hint_len: usize,
-    r: &[i32; ML_DSA_N],
-) -> [i32; ML_DSA_N] {
+fn use_hint(hint: &[u8], hint_len: usize, r: &[i32; ML_DSA_N]) -> [i32; ML_DSA_N] {
     let mut result = [0i32; ML_DSA_N];
-    
+
     for i in 0..ML_DSA_N {
         let (r1, r0) = decompose(r[i]);
-        
+
         if hint[..hint_len].contains(&(i as u8)) {
             if r0 > 0 {
                 result[i] = r1 + 1;
@@ -691,7 +701,7 @@ fn use_hint(
             result[i] = r1;
         }
     }
-    
+
     result
 }
 
@@ -699,24 +709,22 @@ fn use_hint(
 #[allow(dead_code)]
 fn expand_mat(rho: &[u8; 32]) -> [[[i32; ML_DSA_N]; ML_DSA_L]; ML_DSA_K] {
     let mut a = [[[0i32; ML_DSA_N]; ML_DSA_L]; ML_DSA_K];
-    
+
     for i in 0..ML_DSA_K {
         for j in 0..ML_DSA_L {
             let mut shake = Shake128::default();
             shake.update(rho);
             shake.update(&[j as u8, i as u8]);
             let mut reader = shake.finalize_xof();
-            
+
             let mut pos = 0;
             while pos < ML_DSA_N {
                 let mut buf = [0u8; 3];
                 reader.read(&mut buf);
-                
-                let t = (buf[0] as u32) | 
-                       ((buf[1] as u32) << 8) | 
-                       ((buf[2] as u32) << 16);
+
+                let t = (buf[0] as u32) | ((buf[1] as u32) << 8) | ((buf[2] as u32) << 16);
                 let t = t & 0x7FFFFF;
-                
+
                 if t < ML_DSA_Q as u32 {
                     a[i][j][pos] = t as i32;
                     pos += 1;
@@ -724,7 +732,7 @@ fn expand_mat(rho: &[u8; 32]) -> [[[i32; ML_DSA_N]; ML_DSA_L]; ML_DSA_K] {
             }
         }
     }
-    
+
     a
 }
 
@@ -737,10 +745,10 @@ fn verify_ml_dsa_signature(
     // Parse public key
     if public_key.len() != ML_DSA_PUBLIC_KEY_SIZE {
         return Err(MlDsaError::InvalidPublicKey(
-            "Invalid public key size".to_string()
+            "Invalid public key size".to_string(),
         ));
     }
-    
+
     // Parse signature
     if signature.len() != ML_DSA_SIGNATURE_SIZE {
         return Err(MlDsaError::InvalidSignatureLength {
@@ -748,14 +756,14 @@ fn verify_ml_dsa_signature(
             found: signature.len(),
         });
     }
-    
+
     // Extract rho from public key
     let mut rho = [0u8; 32];
     rho.copy_from_slice(&public_key[0..32]);
-    
+
     // Expand matrix A
     let _a = expand_mat(&rho);
-    
+
     // For now, delegate to pqcrypto implementation
     // In a full implementation, this would include:
     // 1. Parse signature components (c, z, h)
@@ -763,7 +771,7 @@ fn verify_ml_dsa_signature(
     // 3. Compute w = Az - c*2^d*t1
     // 4. Use hints to compute w1
     // 5. Recompute challenge and verify
-    
+
     verify_signature_internal(message, public_key, signature)
 }
 
@@ -772,7 +780,7 @@ fn verify_ml_dsa_signature(
 fn montgomery_reduce(a: i64) -> i32 {
     const QINV: i64 = 58728449; // q^(-1) mod 2^32
     const Q: i64 = ML_DSA_Q as i64;
-    
+
     let t = a.wrapping_mul(QINV) & ((1i64 << 32) - 1);
     ((a - t.wrapping_mul(Q)) >> 32) as i32
 }
@@ -791,22 +799,20 @@ fn ntt_zetas() -> &'static [i32] {
     // Precomputed NTT constants for Dilithium
     // This is a simplified version - full implementation would have all 256 values
     &[
-        0, 25847, -2608894, -518909, 237124, -777960, -876248, 466468,
-        1826347, 2353451, -359251, -2091905, 3119733, -2884855, 3111497, 2680103,
-        2725464, 1024112, -1079900, 3585928, -549488, -1119584, 2619752, -2108549,
-        -2118186, -3859737, -1399561, -3277672, 1757237, -19422, 4010497, 280005,
-        2706023, 95776, 3077325, 3530437, -1661693, -3592148, -2537516, 3915439,
-        -3861115, -3043716, 3574422, -2867647, 3539968, -300467, 2348700, -539299,
-        -1699267, -1643818, 3505694, -3821735, 3507263, -2140649, -1600420, 3699596,
-        811944, 531354, 954230, 3881043, 3900724, 2556880, 2071892, -2797779,
-        -3930395, -1528703, -3677745, -3041255, -1452451, 3475950, 2176455, -1585221,
-        -1257611, 1939314, -4083598, -1000202, -3190144, -3157330, -3632928, 126922,
-        3412210, -983419, 2147896, 2715295, -2967645, -3693493, -411027, -2477047,
-        -671102, -1228525, -22981, -1308169, -381987, 1349076, 1852771, -1430430,
-        -3343383, 264944, 508951, 3097992, 44288, -1100098, 904516, 3958618,
-        -3724342, -8578, 1653064, -3249728, 2389356, -210977, 759969, -1316856,
-        189548, -3553272, 3159746, -1851402, -2409325, -177440, 1315589, 1341330,
-        1285669, -1584928, -812732, -1439742, -3019102, -3881060, -3628969, 3839961,
+        0, 25847, -2608894, -518909, 237124, -777960, -876248, 466468, 1826347, 2353451, -359251,
+        -2091905, 3119733, -2884855, 3111497, 2680103, 2725464, 1024112, -1079900, 3585928,
+        -549488, -1119584, 2619752, -2108549, -2118186, -3859737, -1399561, -3277672, 1757237,
+        -19422, 4010497, 280005, 2706023, 95776, 3077325, 3530437, -1661693, -3592148, -2537516,
+        3915439, -3861115, -3043716, 3574422, -2867647, 3539968, -300467, 2348700, -539299,
+        -1699267, -1643818, 3505694, -3821735, 3507263, -2140649, -1600420, 3699596, 811944,
+        531354, 954230, 3881043, 3900724, 2556880, 2071892, -2797779, -3930395, -1528703, -3677745,
+        -3041255, -1452451, 3475950, 2176455, -1585221, -1257611, 1939314, -4083598, -1000202,
+        -3190144, -3157330, -3632928, 126922, 3412210, -983419, 2147896, 2715295, -2967645,
+        -3693493, -411027, -2477047, -671102, -1228525, -22981, -1308169, -381987, 1349076,
+        1852771, -1430430, -3343383, 264944, 508951, 3097992, 44288, -1100098, 904516, 3958618,
+        -3724342, -8578, 1653064, -3249728, 2389356, -210977, 759969, -1316856, 189548, -3553272,
+        3159746, -1851402, -2409325, -177440, 1315589, 1341330, 1285669, -1584928, -812732,
+        -1439742, -3019102, -3881060, -3628969, 3839961,
     ]
 }
 
@@ -817,27 +823,31 @@ fn sample_in_ball(seed: &[u8]) -> [i32; ML_DSA_N] {
     let mut shake = Shake256::default();
     shake.update(seed);
     let mut reader = shake.finalize_xof();
-    
+
     let mut signs = [0u8; 8];
     reader.read(&mut signs);
     let mut pos = 0;
-    
+
     for i in (0..ML_DSA_N).rev() {
         let mut buf = [0u8; 1];
         reader.read(&mut buf);
         let j = buf[0] as usize;
-        
+
         if j <= i {
             poly[i] = poly[j];
-            poly[j] = if (signs[pos / 8] >> (pos % 8)) & 1 == 1 { 1 } else { -1 };
+            poly[j] = if (signs[pos / 8] >> (pos % 8)) & 1 == 1 {
+                1
+            } else {
+                -1
+            };
             pos += 1;
         }
-        
+
         if pos == ML_DSA_TAU {
             break;
         }
     }
-    
+
     poly
 }
 
@@ -852,15 +862,15 @@ fn verify_signature_internal(
     // Parse public key
     let public_key = <PublicKey as PqPublicKeyTrait>::from_bytes(public_key_bytes)
         .map_err(|_| MlDsaError::InvalidPublicKey("Failed to parse public key".to_string()))?;
-    
+
     // Create signed message format for verification
     let mut signed_message = Vec::with_capacity(message.len() + signature.len());
     signed_message.extend_from_slice(signature);
     signed_message.extend_from_slice(message);
-    
+
     let signed_msg = <SignedMessage as PqSignedMessageTrait>::from_bytes(&signed_message)
         .map_err(|_| MlDsaError::VerificationFailed)?;
-    
+
     match open(&signed_msg, &public_key) {
         Ok(verified_msg) => {
             if verified_msg == message {
@@ -878,7 +888,9 @@ pub struct MlDsa;
 
 impl MlDsa {
     /// Generate a new ML-DSA key pair
-    pub fn keygen<R: CryptoRng + RngCore>(#[allow(unused_variables)] rng: &mut R) -> Result<MlDsaKeyPair, MlDsaError> {
+    pub fn keygen<R: CryptoRng + RngCore>(
+        #[allow(unused_variables)] rng: &mut R,
+    ) -> Result<MlDsaKeyPair, MlDsaError> {
         MlDsaKeyPair::generate(rng)
     }
 
@@ -899,26 +911,26 @@ impl MlDsa {
     ) -> Result<(), MlDsaError> {
         public_key.verify(message, signature)
     }
-    
+
     /// Batch verify multiple ML-DSA signatures
     pub fn batch_verify(
-        messages: &[&[u8]], 
-        signatures: &[&[u8]], 
-        public_keys: &[&MlDsaPublicKey]
+        messages: &[&[u8]],
+        signatures: &[&[u8]],
+        public_keys: &[&MlDsaPublicKey],
     ) -> Result<(), MlDsaError> {
         MlDsaPublicKey::batch_verify(messages, signatures, public_keys)
     }
-    
+
     /// Check if signature is valid format without verification
     pub fn validate_signature_format(signature: &[u8]) -> bool {
         signature.len() == ML_DSA_SIGNATURE_SIZE
     }
-    
+
     /// Check if public key is valid format
     pub fn validate_public_key_format(public_key: &[u8]) -> bool {
         public_key.len() == ML_DSA_PUBLIC_KEY_SIZE
     }
-    
+
     /// Get parameter information
     pub fn parameters() -> MlDsaParameters {
         MlDsaParameters {
@@ -971,56 +983,56 @@ mod tests {
 
         assert!(public_key.verify(message, &signature).is_ok());
     }
-    
+
     #[test]
     fn test_key_sizes() {
         let mut rng = thread_rng();
         let keypair = MlDsaKeyPair::generate(&mut rng).unwrap();
-        
+
         assert_eq!(keypair.public_key().len(), ML_DSA_PUBLIC_KEY_SIZE);
         assert_eq!(keypair.secret_key().len(), ML_DSA_SECRET_KEY_SIZE);
     }
-    
+
     #[test]
     fn test_signature_size() {
         let mut rng = thread_rng();
         let keypair = MlDsaKeyPair::generate(&mut rng).unwrap();
         let message = b"test message for signature size";
-        
+
         let signature = keypair.sign(message, &mut rng).unwrap();
         assert_eq!(signature.len(), ML_DSA_SIGNATURE_SIZE);
     }
-    
+
     #[test]
     fn test_batch_verification() {
         let mut rng = thread_rng();
         let keypair1 = MlDsaKeyPair::generate(&mut rng).unwrap();
         let keypair2 = MlDsaKeyPair::generate(&mut rng).unwrap();
-        
+
         let message1 = b"first message";
         let message2 = b"second message";
-        
+
         let sig1 = keypair1.sign(message1, &mut rng).unwrap();
         let sig2 = keypair2.sign(message2, &mut rng).unwrap();
-        
+
         let pk1 = MlDsaPublicKey::from_bytes(keypair1.public_key()).unwrap();
         let pk2 = MlDsaPublicKey::from_bytes(keypair2.public_key()).unwrap();
-        
+
         let messages = vec![message1.as_slice(), message2.as_slice()];
         let signatures = vec![sig1.as_slice(), sig2.as_slice()];
         let public_keys = vec![&pk1, &pk2];
-        
+
         assert!(MlDsaPublicKey::batch_verify(&messages, &signatures, &public_keys).is_ok());
     }
-    
+
     #[test]
     fn test_ntt_operations() {
         let mut poly = [1i32; ML_DSA_N];
         let original = poly;
-        
+
         ntt(&mut poly);
         invntt(&mut poly);
-        
+
         // After NTT and INTT, should be close to original (modulo rounding)
         for i in 0..ML_DSA_N {
             assert!((poly[i] - original[i]).abs() < 100);

@@ -24,7 +24,7 @@ pub mod signature;
 pub use error::CryptoError;
 pub use fingerprint::{Fingerprint, FingerprintError};
 pub use hash::HashFunction;
-pub use hqc::{HqcError, SecurityParameter, Hqc, Hqc128, Hqc192, Hqc256};
+pub use hqc::{Hqc, Hqc128, Hqc192, Hqc256, HqcError, SecurityParameter};
 pub use kem::{
     Ciphertext, KEMError, KeyEncapsulation, KeyPair, PublicKey, SecretKey, SharedSecret,
 };

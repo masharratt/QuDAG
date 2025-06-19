@@ -86,14 +86,14 @@ impl QueueMetrics {
         self.total_messages += 1;
         self.depth = self.depth.saturating_add(1);
         self.peak_depth = self.peak_depth.max(self.depth);
-        
+
         let elapsed = self.last_update.elapsed();
         if elapsed >= Duration::from_secs(1) {
             self.messages_per_second = self.total_messages as f64 / elapsed.as_secs_f64();
             self.last_update = Instant::now();
         }
     }
-    
+
     /// Record message completion
     pub fn record_completion(&mut self) {
         self.depth = self.depth.saturating_sub(1);
@@ -108,33 +108,34 @@ impl LatencyMetrics {
             latency
         } else {
             Duration::from_nanos(
-                ((self.avg_latency.as_nanos() as f64 * self.latency_samples.len() as f64) +
-                 latency.as_nanos() as f64) as u64 / (self.latency_samples.len() + 1) as f64 as u64
+                ((self.avg_latency.as_nanos() as f64 * self.latency_samples.len() as f64)
+                    + latency.as_nanos() as f64) as u64
+                    / (self.latency_samples.len() + 1) as f64 as u64,
             )
         };
-        
+
         // Update peak latency
         self.peak_latency = self.peak_latency.max(latency);
-        
+
         // Add to samples
         if self.latency_samples.len() >= 100 {
             self.latency_samples.remove(0);
         }
         self.latency_samples.push(latency);
     }
-    
+
     /// Get latency percentile
     pub fn get_percentile(&self, percentile: f64) -> Duration {
         if self.latency_samples.is_empty() {
             return Duration::default();
         }
-        
+
         let mut samples = self.latency_samples.clone();
         samples.sort();
-        
-        let index = ((samples.len() as f64 * percentile / 100.0).round() as usize)
-            .min(samples.len() - 1);
-            
+
+        let index =
+            ((samples.len() as f64 * percentile / 100.0).round() as usize).min(samples.len() - 1);
+
         samples[index]
     }
 }
@@ -143,17 +144,17 @@ impl ThroughputMetrics {
     /// Record message throughput
     pub fn record_throughput(&mut self, bytes: u64) {
         self.total_bytes += bytes;
-        
+
         let elapsed = self.last_update.elapsed();
         if elapsed >= Duration::from_secs(1) {
             let seconds = elapsed.as_secs_f64();
-            
+
             self.messages_per_second = self.total_bytes as f64 / seconds;
             self.bytes_per_second = self.total_bytes as f64 / seconds;
-            
-            self.peak_messages_per_second = self.peak_messages_per_second
-                .max(self.messages_per_second);
-                
+
+            self.peak_messages_per_second =
+                self.peak_messages_per_second.max(self.messages_per_second);
+
             self.last_update = Instant::now();
         }
     }
@@ -168,14 +169,14 @@ impl NetworkMetrics {
             self.connection_failures += 1;
         }
     }
-    
+
     /// Record cache hit
     pub fn record_cache_hit(&mut self) {
         self.route_cache_hits += 1;
-        self.cache_hit_ratio = self.route_cache_hits as f64 /
-            (self.route_cache_hits + self.connection_failures) as f64;
+        self.cache_hit_ratio = self.route_cache_hits as f64
+            / (self.route_cache_hits + self.connection_failures) as f64;
     }
-    
+
     /// Record latency
     pub fn record_latency(&mut self, latency: Duration) {
         self.avg_latency = if self.avg_latency.is_zero() {
@@ -184,7 +185,7 @@ impl NetworkMetrics {
             (self.avg_latency + latency) / 2
         };
     }
-    
+
     /// Get metrics summary
     pub fn get_summary(&self) -> NetworkMetricsSummary {
         NetworkMetricsSummary {

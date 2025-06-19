@@ -33,22 +33,23 @@ pub use discovery::{
     KademliaPeerDiscovery,
 };
 pub use dns::{CloudflareClient, CloudflareConfig, DnsError, DnsManager, DnsRecord, RecordType};
-pub use kademlia::{
-    BootstrapConfig, ContentRoutingConfig, KademliaDHT, PeerReputation,
-};
+pub use kademlia::{BootstrapConfig, ContentRoutingConfig, KademliaDHT, PeerReputation};
 pub use message::MessageEnvelope;
 pub use nat_traversal::{
-    ConnectionType, ConnectionUpgradeManager, HolePunchCoordinator, HolePunchPhase,
-    NatInfo, NatPmpClient, NatTraversalConfig, NatTraversalError, NatTraversalManager,
-    NatTraversalStats, NatType, PortMapping, PortMappingMethod, PortMappingProtocol,
-    RelayConnection, RelayManager, RelayServer, StunClient, StunServer, TurnClient,
-    TurnServer, UpgradeAttempt,
+    ConnectionType, ConnectionUpgradeManager, HolePunchCoordinator, HolePunchPhase, NatInfo,
+    NatPmpClient, NatTraversalConfig, NatTraversalError, NatTraversalManager, NatTraversalStats,
+    NatType, PortMapping, PortMappingMethod, PortMappingProtocol, RelayConnection, RelayManager,
+    RelayServer, StunClient, StunServer, TurnClient, TurnServer, UpgradeAttempt,
 };
 pub use onion::{
+    Circuit, CircuitManager, CircuitState, CircuitStats, DirectoryClient, HopMetadata, LayerFlags,
     MLKEMOnionRouter, MetadataConfig, MetadataProtector, MixConfig, MixMessage, MixMessageType,
-    MixNode, MixNodeStats, OnionError, OnionLayer, OnionRouter, ProtectedMetadata,
-    TrafficAnalysisConfig, TrafficAnalysisResistance, CircuitManager, Circuit, CircuitState,
-    CircuitStats, DirectoryClient, NodeInfo, NodeFlags, HopMetadata, LayerFlags,
+    MixNode, MixNodeStats, NodeFlags, NodeInfo, OnionError, OnionLayer, OnionRouter,
+    ProtectedMetadata, TrafficAnalysisConfig, TrafficAnalysisResistance,
+};
+pub use p2p::{
+    NetworkConfig as P2PNetworkConfig, P2PCommand, P2PEvent, P2PHandle, P2PNode, QuDagRequest,
+    QuDagResponse,
 };
 pub use quantum_crypto::{
     MlKemCiphertext, MlKemPublicKey, MlKemSecretKey, MlKemSecurityLevel, QuantumKeyExchange,
@@ -56,9 +57,9 @@ pub use quantum_crypto::{
 };
 pub use router::{HopInfo, Router};
 pub use shadow_address::{
-    DefaultShadowAddressHandler, NetworkType, ShadowAddress, ShadowAddressError,
-    ShadowAddressGenerator, ShadowAddressResolver, ShadowMetadata, ShadowFeatures,
-    ShadowAddressManager, ShadowAddressPool, RotationPolicies, ShadowAddressMixer,
+    DefaultShadowAddressHandler, NetworkType, RotationPolicies, ShadowAddress, ShadowAddressError,
+    ShadowAddressGenerator, ShadowAddressManager, ShadowAddressMixer, ShadowAddressPool,
+    ShadowAddressResolver, ShadowFeatures, ShadowMetadata,
 };
 pub use traffic_obfuscation::{
     ObfuscationPattern, ObfuscationStats, TrafficObfuscationConfig, TrafficObfuscator,
@@ -212,7 +213,10 @@ impl ReputationManager {
         // Auto-blacklist peers with very low reputation
         if new_score < -50.0 {
             self.blacklist.insert(peer_id, std::time::Instant::now());
-            warn!("Auto-blacklisted peer {:?} due to low reputation: {}", peer_id, new_score);
+            warn!(
+                "Auto-blacklisted peer {:?} due to low reputation: {}",
+                peer_id, new_score
+            );
         }
     }
 
@@ -237,10 +241,9 @@ impl ReputationManager {
     pub fn cleanup_expired(&mut self) {
         let now = std::time::Instant::now();
         let expire_time = std::time::Duration::from_secs(24 * 60 * 60);
-        
-        self.blacklist.retain(|_, timestamp| {
-            now.duration_since(*timestamp) < expire_time
-        });
+
+        self.blacklist
+            .retain(|_, timestamp| now.duration_since(*timestamp) < expire_time);
     }
 }
 
@@ -274,46 +277,46 @@ impl NetworkManager {
     pub async fn initialize(&mut self) -> Result<(), NetworkError> {
         // Generate or load peer identity
         self.local_peer_id = Some(LibP2PPeerId::random());
-        
+
         // Set up message channel
         let (tx, mut rx) = mpsc::channel(1024);
         self.message_tx = Some(tx);
 
         // Initialize connection manager
-        let connection_manager = Arc::new(
-            ConnectionManager::new(self.config.max_connections)
-        );
+        let connection_manager = Arc::new(ConnectionManager::new(self.config.max_connections));
         self.connection_manager = Some(connection_manager.clone());
 
         // Initialize NAT traversal if enabled
         if self.config.enable_nat_traversal {
-            let nat_config = self.config.nat_traversal_config.clone()
-                .unwrap_or_default();
+            let nat_config = self.config.nat_traversal_config.clone().unwrap_or_default();
             let nat_manager = Arc::new(NatTraversalManager::new(
                 nat_config,
                 connection_manager.clone(),
             ));
-            
+
             if let Err(e) = nat_manager.initialize().await {
                 warn!("NAT traversal initialization failed: {}", e);
             } else {
                 info!("NAT traversal initialized successfully");
             }
-            
+
             self.nat_traversal_manager = Some(nat_manager);
         }
 
         // Start background event processing
         let connected_peers = Arc::clone(&self.connected_peers);
         let reputation_manager = Arc::clone(&self.reputation_manager);
-        
+
         tokio::spawn(async move {
             while let Some(event) = rx.recv().await {
                 Self::handle_network_event(event, &connected_peers, &reputation_manager).await;
             }
         });
 
-        info!("NetworkManager initialized with peer ID: {:?}", self.local_peer_id);
+        info!(
+            "NetworkManager initialized with peer ID: {:?}",
+            self.local_peer_id
+        );
         Ok(())
     }
 
@@ -345,7 +348,10 @@ impl NetworkManager {
                 if let Some(metadata) = connected_peers.write().await.get_mut(&from) {
                     metadata.last_activity = std::time::Instant::now();
                 }
-                reputation_manager.write().await.update_reputation(from, 0.1);
+                reputation_manager
+                    .write()
+                    .await
+                    .update_reputation(from, 0.1);
             }
             NetworkEvent::NetworkError(error) => {
                 error!("Network error: {}", error);
@@ -361,9 +367,14 @@ impl NetworkManager {
         let peer_id = LibP2PPeerId::random(); // In real implementation, derive from address
 
         // Check if peer is blacklisted
-        if self.reputation_manager.read().await.is_blacklisted(&peer_id) {
+        if self
+            .reputation_manager
+            .read()
+            .await
+            .is_blacklisted(&peer_id)
+        {
             return Err(NetworkError::ConnectionError(
-                "Peer is blacklisted".to_string()
+                "Peer is blacklisted".to_string(),
             ));
         }
 
@@ -424,17 +435,21 @@ impl NetworkManager {
     }
 
     /// Send message to a peer
-    pub async fn send_message(&self, peer_id: &LibP2PPeerId, data: Vec<u8>) -> Result<(), NetworkError> {
+    pub async fn send_message(
+        &self,
+        peer_id: &LibP2PPeerId,
+        data: Vec<u8>,
+    ) -> Result<(), NetworkError> {
         // Check if peer is connected
         if !self.connected_peers.read().await.contains_key(peer_id) {
             return Err(NetworkError::ConnectionError(
-                "Peer not connected".to_string()
+                "Peer not connected".to_string(),
             ));
         }
 
         // In real implementation, this would use the actual transport layer
         debug!("Sending {} bytes to peer {:?}", data.len(), peer_id);
-        
+
         // Update peer activity
         if let Some(metadata) = self.connected_peers.write().await.get_mut(peer_id) {
             metadata.last_activity = std::time::Instant::now();
@@ -460,7 +475,7 @@ impl NetworkManager {
             let rep_mgr = self.reputation_manager.read().await;
             rep_mgr.scores.values().cloned().collect()
         };
-        
+
         let avg_reputation = if reputation_scores.is_empty() {
             0.0
         } else {
@@ -483,11 +498,14 @@ impl NetworkManager {
 
     /// Blacklist a peer
     pub async fn blacklist_peer(&self, peer_id: LibP2PPeerId) {
-        self.reputation_manager.write().await.update_reputation(peer_id, -100.0);
-        
+        self.reputation_manager
+            .write()
+            .await
+            .update_reputation(peer_id, -100.0);
+
         // Disconnect if currently connected
         let _ = self.disconnect_peer(&peer_id).await;
-        
+
         warn!("Blacklisted peer: {:?}", peer_id);
     }
 
@@ -501,7 +519,7 @@ impl NetworkManager {
     /// Stop the network manager
     pub async fn shutdown(&mut self) -> Result<(), NetworkError> {
         info!("Shutting down NetworkManager");
-        
+
         // Disconnect all peers
         let peers: Vec<_> = self.get_connected_peers().await;
         for peer_id in peers {
@@ -532,11 +550,11 @@ impl NetworkManager {
     pub async fn maintenance(&self) {
         // Cleanup expired blacklist entries
         self.reputation_manager.write().await.cleanup_expired();
-        
+
         // Remove inactive peers (older than 5 minutes with no activity)
         let now = std::time::Instant::now();
         let timeout = std::time::Duration::from_secs(300);
-        
+
         let mut to_disconnect = Vec::new();
         {
             let peers = self.connected_peers.read().await;
@@ -566,11 +584,14 @@ impl NetworkManager {
         protocol: crate::nat_traversal::PortMappingProtocol,
     ) -> Result<PortMapping, NetworkError> {
         if let Some(nat_manager) = &self.nat_traversal_manager {
-            nat_manager.create_port_mapping(local_port, external_port, protocol)
+            nat_manager
+                .create_port_mapping(local_port, external_port, protocol)
                 .await
                 .map_err(|e| NetworkError::ConnectionError(e.to_string()))
         } else {
-            Err(NetworkError::ConnectionError("NAT traversal not enabled".to_string()))
+            Err(NetworkError::ConnectionError(
+                "NAT traversal not enabled".to_string(),
+            ))
         }
     }
 
@@ -594,6 +615,6 @@ pub struct NetworkStats {
 }
 pub use circuit_breaker::{CircuitBreaker, CircuitState as CircuitBreakerState};
 pub use connection::{
-    ConnectionInfo, ConnectionManager, HealthStatistics, 
-    SecureConfig, SecureConnection, TransportKeys, UnhealthyConnectionInfo,
+    ConnectionInfo, ConnectionManager, HealthStatistics, SecureConfig, SecureConnection,
+    TransportKeys, UnhealthyConnectionInfo,
 };

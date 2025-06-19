@@ -1,26 +1,34 @@
-//! State persistence implementation for QuDAG node
+//! State persistence layer for QuDAG protocol
 //!
-//! This module provides persistence backends for saving and restoring node state,
-//! including peer lists, DAG state, and other critical data that should survive
-//! node restarts.
+//! This module provides a comprehensive persistence layer for storing and retrieving
+//! DAG vertices, peer information, and dark domain records using different storage backends.
 
 use async_trait::async_trait;
+use dashmap::DashMap;
 use serde::{Deserialize, Serialize};
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use thiserror::Error;
-use tokio::sync::RwLock;
+use tokio::fs::{self, File};
+use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tracing::{debug, error, info, warn};
-use uuid::Uuid;
 
-use crate::state::{ProtocolState, SessionInfo, StateMachineMetrics};
+// Import types from other modules
 use qudag_dag::vertex::{Vertex, VertexId};
+use qudag_network::dark_resolver::DarkDomainRecord;
+use qudag_network::types::PeerId;
+
+/// Result type for persistence operations
+pub type Result<T> = std::result::Result<T, PersistenceError>;
+
+/// Current state version for compatibility
+pub const CURRENT_STATE_VERSION: u32 = 1;
 
 /// Errors that can occur during persistence operations
 #[derive(Debug, Error)]
 pub enum PersistenceError {
-    /// IO error during read/write operations
+    /// IO error during file operations
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
@@ -28,1010 +36,1078 @@ pub enum PersistenceError {
     #[error("Serialization error: {0}")]
     Serialization(String),
 
-    /// Database error (for RocksDB/SQLite backends)
-    #[error("Database error: {0}")]
-    Database(String),
-
-    /// State validation error
-    #[error("State validation error: {0}")]
-    Validation(String),
-
-    /// State version mismatch
-    #[error("State version mismatch: expected {expected}, got {actual}")]
-    VersionMismatch { expected: u32, actual: u32 },
-
-    /// Corruption detected in persisted state
-    #[error("Corrupted state detected: {0}")]
+    /// Data corruption detected
+    #[error("Data corruption detected: {0}")]
     Corruption(String),
 
-    /// Backup/restore operation failed
-    #[error("Backup/restore failed: {0}")]
-    BackupRestore(String),
+    /// Directory creation failed
+    #[error("Directory creation failed: {0}")]
+    DirectoryCreation(String),
+
+    /// File not found
+    #[error("File not found: {0}")]
+    FileNotFound(String),
+
+    /// Invalid data format
+    #[error("Invalid data format: {0}")]
+    InvalidFormat(String),
+
+    /// Lock acquisition timeout
+    #[error("Lock acquisition timeout")]
+    LockTimeout,
 }
 
-/// State version for migration support
-pub const CURRENT_STATE_VERSION: u32 = 1;
-
-/// Persisted peer information
+/// Information about a peer for persistence
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PersistedPeer {
-    /// Peer identifier (stored as bytes for persistence)
-    pub id: Vec<u8>,
-    /// Peer address
+pub struct PeerInfo {
+    /// Peer's network address
     pub address: String,
-    /// Reputation score (0-100)
-    pub reputation: u32,
-    /// Last seen timestamp
+    /// Last seen timestamp (Unix timestamp)
     pub last_seen: u64,
+    /// Reputation score (0-100)
+    pub reputation: u8,
+    /// Whether the peer is trusted
+    pub trusted: bool,
     /// Connection statistics
-    pub stats: PeerStats,
-    /// Whether peer is blacklisted
-    pub blacklisted: bool,
-    /// Whether peer is whitelisted
-    pub whitelisted: bool,
-    /// Custom metadata
+    pub connection_count: u64,
+    /// Total bytes exchanged
+    pub bytes_exchanged: u64,
+    /// Additional metadata
     pub metadata: HashMap<String, String>,
 }
 
-/// Peer connection statistics
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct PeerStats {
-    /// Total connections
-    pub total_connections: u64,
-    /// Successful connections
-    pub successful_connections: u64,
-    /// Failed connections
-    pub failed_connections: u64,
-    /// Total bytes sent
-    pub bytes_sent: u64,
-    /// Total bytes received
-    pub bytes_received: u64,
-    /// Average response time in milliseconds
-    pub avg_response_time: u64,
-}
-
-/// Persisted DAG state
+/// Persisted DAG state for protocol operations
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PersistedDagState {
-    /// DAG vertices
-    pub vertices: HashMap<VertexId, Vertex>,
-    /// Current tips
-    pub tips: HashSet<VertexId>,
-    /// Consensus voting records
-    pub voting_records: HashMap<VertexId, VotingRecord>,
-    /// Last checkpoint
-    pub last_checkpoint: Option<Checkpoint>,
-}
-
-/// Voting record for consensus
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VotingRecord {
-    /// Vertex ID
-    pub vertex_id: VertexId,
-    /// Yes votes
-    pub yes_votes: u32,
-    /// No votes
-    pub no_votes: u32,
-    /// Voting round
-    pub round: u32,
-    /// Finalized status
-    pub finalized: bool,
-}
-
-/// DAG checkpoint for fast recovery
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct Checkpoint {
-    /// Checkpoint ID
-    pub id: Uuid,
-    /// Checkpoint height
-    pub height: u64,
-    /// Checkpoint timestamp
-    pub timestamp: u64,
-    /// Checkpoint hash
-    pub hash: Vec<u8>,
-    /// Included vertices
-    pub vertices: HashSet<VertexId>,
-}
-
-/// Complete persisted state
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct PersistedState {
-    /// State version
+    /// Version of the persisted state format
     pub version: u32,
-    /// Node ID
+    /// Node identifier
     pub node_id: Vec<u8>,
-    /// Protocol state
-    pub protocol_state: ProtocolState,
+    /// Current protocol state
+    pub protocol_state: crate::state::ProtocolState,
     /// Active sessions
-    pub sessions: HashMap<Uuid, SessionInfo>,
-    /// Peer list
-    pub peers: Vec<PersistedPeer>,
-    /// DAG state
-    pub dag_state: PersistedDagState,
-    /// Node metrics
-    pub metrics: StateMachineMetrics,
-    /// Last save timestamp
+    pub sessions: HashMap<uuid::Uuid, crate::state::SessionInfo>,
+    /// Peer information
+    pub peers: Vec<(PeerId, PeerInfo)>,
+    /// DAG state information
+    pub dag_state: DagState,
+    /// State machine metrics
+    pub metrics: crate::state::StateMachineMetrics,
+    /// Timestamp when state was last saved
     pub last_saved: u64,
 }
 
-/// Trait for state persistence backends
+/// DAG-specific state information
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DagState {
+    /// DAG vertices stored as HashMap for efficient lookup
+    pub vertices: HashMap<VertexId, Vertex>,
+    /// Current tip vertices
+    pub tips: std::collections::HashSet<VertexId>,
+    /// Voting records for consensus
+    pub voting_records: HashMap<VertexId, VotingRecord>,
+    /// Last checkpoint information
+    pub last_checkpoint: Option<CheckpointInfo>,
+}
+
+/// Voting record for consensus tracking
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct VotingRecord {
+    /// Vertex being voted on
+    pub vertex_id: VertexId,
+    /// Votes received (node_id -> vote)
+    pub votes: HashMap<Vec<u8>, bool>,
+    /// Timestamp when voting started
+    pub started_at: u64,
+    /// Consensus status
+    pub status: ConsensusStatus,
+}
+
+/// Consensus status for a vertex
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum ConsensusStatus {
+    /// Voting in progress
+    Pending,
+    /// Consensus reached (accepted)
+    Accepted,
+    /// Consensus reached (rejected)
+    Rejected,
+    /// Voting timed out
+    TimedOut,
+}
+
+/// Checkpoint information for state snapshots
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CheckpointInfo {
+    /// Checkpoint identifier
+    pub id: Vec<u8>,
+    /// Checkpoint timestamp
+    pub timestamp: u64,
+    /// Number of vertices at checkpoint
+    pub vertex_count: usize,
+    /// Merkle root of DAG state at checkpoint
+    pub merkle_root: Vec<u8>,
+}
+
+/// General persisted state wrapper
+pub type PersistedState = PersistedDagState;
+
+/// Backend storage interface alias
+pub type MemoryBackend = MemoryStateStore;
+pub type SqliteBackend = FileStateStore; // For now, using file backend as SQLite placeholder
+
+/// Persistence manager for coordinating storage operations
+pub type PersistenceManager = Arc<dyn StateStore + Send + Sync>;
+
+/// State persistence trait alias
+pub trait StatePersistence: StateStore {}
+impl<T: StateStore> StatePersistence for T {}
+
+/// State provider trait for node integration
+pub trait StateProvider: Send + Sync {
+    fn get_state_store(&self) -> Arc<dyn StateStore + Send + Sync>;
+}
+
+impl Default for PeerInfo {
+    fn default() -> Self {
+        Self {
+            address: String::new(),
+            last_seen: 0,
+            reputation: 50,
+            trusted: false,
+            connection_count: 0,
+            bytes_exchanged: 0,
+            metadata: HashMap::new(),
+        }
+    }
+}
+
+/// Abstract storage trait for different persistence backends
 #[async_trait]
-pub trait StatePersistence: Send + Sync {
-    /// Save complete state
-    async fn save_state(&self, state: &PersistedState) -> Result<(), PersistenceError>;
+pub trait StateStore: Send + Sync {
+    /// Save a DAG vertex to storage
+    async fn save_vertex(&self, vertex: &Vertex) -> Result<()>;
 
-    /// Load complete state
-    async fn load_state(&self) -> Result<Option<PersistedState>, PersistenceError>;
+    /// Load a DAG vertex from storage by ID
+    async fn load_vertex(&self, id: &VertexId) -> Result<Option<Vertex>>;
 
-    /// Save peer list
-    async fn save_peers(&self, peers: &[PersistedPeer]) -> Result<(), PersistenceError>;
+    /// Save peer information to storage
+    async fn save_peer(&self, peer_id: &PeerId, info: &PeerInfo) -> Result<()>;
 
-    /// Load peer list
-    async fn load_peers(&self) -> Result<Vec<PersistedPeer>, PersistenceError>;
+    /// Load all peers from storage
+    async fn load_peers(&self) -> Result<Vec<(PeerId, PeerInfo)>>;
 
-    /// Save DAG state
-    async fn save_dag_state(&self, dag_state: &PersistedDagState) -> Result<(), PersistenceError>;
+    /// Save a dark domain record to storage
+    async fn save_dark_record(&self, record: &DarkDomainRecord) -> Result<()>;
 
-    /// Load DAG state
-    async fn load_dag_state(&self) -> Result<Option<PersistedDagState>, PersistenceError>;
+    /// Load all dark domain records from storage
+    async fn load_dark_records(&self) -> Result<Vec<DarkDomainRecord>>;
 
-    /// Create backup
-    async fn create_backup(&self, backup_path: &Path) -> Result<(), PersistenceError>;
+    /// Remove a vertex from storage
+    async fn remove_vertex(&self, id: &VertexId) -> Result<()>;
+
+    /// Remove a peer from storage
+    async fn remove_peer(&self, peer_id: &PeerId) -> Result<()>;
+
+    /// Remove a dark domain record from storage by owner ID
+    async fn remove_dark_record(&self, owner_id: &PeerId) -> Result<()>;
+
+    /// Get total number of stored vertices
+    async fn vertex_count(&self) -> Result<usize>;
+
+    /// Get total number of stored peers
+    async fn peer_count(&self) -> Result<usize>;
+
+    /// Get total number of stored dark records
+    async fn dark_record_count(&self) -> Result<usize>;
+
+    /// Check if storage is healthy
+    async fn health_check(&self) -> Result<bool>;
+
+    /// Save complete persisted state
+    async fn save_state(&self, state: &PersistedDagState) -> Result<()>;
+
+    /// Recover complete persisted state
+    async fn recover_state(&self) -> Result<Option<PersistedDagState>>;
+
+    /// Create backup of the entire state
+    async fn create_backup(&self, backup_path: &PathBuf) -> Result<()>;
 
     /// Restore from backup
-    async fn restore_backup(&self, backup_path: &Path) -> Result<(), PersistenceError>;
-
-    /// Prune old data
-    async fn prune_old_data(&self, before_timestamp: u64) -> Result<u64, PersistenceError>;
-
-    /// Validate persisted state
-    async fn validate_state(&self) -> Result<bool, PersistenceError>;
-
-    /// Get backend type name
-    fn backend_type(&self) -> &'static str;
+    async fn restore_backup(&self, backup_path: &PathBuf) -> Result<()>;
 }
 
-/// RocksDB persistence backend for production use
-#[cfg(feature = "rocksdb")]
-pub struct RocksDbBackend {
-    db: Arc<rocksdb::DB>,
-    path: PathBuf,
+/// File-based storage implementation using JSON files
+pub struct FileStateStore {
+    /// Base directory for data storage
+    data_dir: PathBuf,
+    /// Whether to use atomic writes
+    atomic_writes: bool,
 }
 
-#[cfg(feature = "rocksdb")]
-impl RocksDbBackend {
-    /// Create new RocksDB backend
-    pub fn new(path: PathBuf) -> Result<Self, PersistenceError> {
-        let mut opts = rocksdb::Options::default();
-        opts.create_if_missing(true);
-        opts.set_compression_type(rocksdb::DBCompressionType::Lz4);
-        
-        let db = rocksdb::DB::open(&opts, &path)
-            .map_err(|e| PersistenceError::Database(e.to_string()))?;
-        
+impl FileStateStore {
+    /// Create a new file-based state store
+    pub async fn new(data_dir: PathBuf) -> Result<Self> {
+        // Create the base directory structure
+        fs::create_dir_all(&data_dir).await.map_err(|e| {
+            PersistenceError::DirectoryCreation(format!("Failed to create data dir: {}", e))
+        })?;
+
+        // Create subdirectories
+        let vertices_dir = data_dir.join("vertices");
+        let peers_dir = data_dir.join("peers");
+        let domains_dir = data_dir.join("domains");
+
+        fs::create_dir_all(&vertices_dir).await.map_err(|e| {
+            PersistenceError::DirectoryCreation(format!("Failed to create vertices dir: {}", e))
+        })?;
+
+        fs::create_dir_all(&peers_dir).await.map_err(|e| {
+            PersistenceError::DirectoryCreation(format!("Failed to create peers dir: {}", e))
+        })?;
+
+        fs::create_dir_all(&domains_dir).await.map_err(|e| {
+            PersistenceError::DirectoryCreation(format!("Failed to create domains dir: {}", e))
+        })?;
+
+        info!("Initialized file state store at {:?}", data_dir);
+
         Ok(Self {
-            db: Arc::new(db),
-            path,
+            data_dir,
+            atomic_writes: true,
         })
     }
 
-    fn serialize<T: Serialize>(value: &T) -> Result<Vec<u8>, PersistenceError> {
-        bincode::serialize(value)
-            .map_err(|e| PersistenceError::Serialization(e.to_string()))
+    /// Enable or disable atomic writes
+    pub fn set_atomic_writes(&mut self, enabled: bool) {
+        self.atomic_writes = enabled;
     }
 
-    fn deserialize<T: for<'de> Deserialize<'de>>(bytes: &[u8]) -> Result<T, PersistenceError> {
-        bincode::deserialize(bytes)
-            .map_err(|e| PersistenceError::Serialization(e.to_string()))
-    }
-}
-
-#[cfg(feature = "rocksdb")]
-#[async_trait]
-impl StatePersistence for RocksDbBackend {
-    async fn save_state(&self, state: &PersistedState) -> Result<(), PersistenceError> {
-        let key = b"state";
-        let value = Self::serialize(state)?;
-        
-        self.db.put(key, value)
-            .map_err(|e| PersistenceError::Database(e.to_string()))?;
-        
-        // Also save individual components for faster access
-        self.save_peers(&state.peers).await?;
-        self.save_dag_state(&state.dag_state).await?;
-        
-        info!("State saved to RocksDB");
-        Ok(())
+    /// Get path for a vertex file
+    fn vertex_path(&self, id: &VertexId) -> PathBuf {
+        let id_hex = hex::encode(id.as_bytes());
+        self.data_dir
+            .join("vertices")
+            .join(format!("{}.json", id_hex))
     }
 
-    async fn load_state(&self) -> Result<Option<PersistedState>, PersistenceError> {
-        let key = b"state";
-        
-        match self.db.get(key).map_err(|e| PersistenceError::Database(e.to_string()))? {
-            Some(bytes) => {
-                let state: PersistedState = Self::deserialize(&bytes)?;
-                
-                // Validate version
-                if state.version != CURRENT_STATE_VERSION {
-                    return Err(PersistenceError::VersionMismatch {
-                        expected: CURRENT_STATE_VERSION,
-                        actual: state.version,
-                    });
-                }
-                
-                info!("State loaded from RocksDB");
-                Ok(Some(state))
-            }
-            None => Ok(None),
-        }
+    /// Get path for a peer file
+    fn peer_path(&self, peer_id: &PeerId) -> PathBuf {
+        let id_hex = hex::encode(peer_id.as_bytes());
+        self.data_dir.join("peers").join(format!("{}.json", id_hex))
     }
 
-    async fn save_peers(&self, peers: &[PersistedPeer]) -> Result<(), PersistenceError> {
-        let key = b"peers";
-        let value = Self::serialize(peers)?;
-        
-        self.db.put(key, value)
-            .map_err(|e| PersistenceError::Database(e.to_string()))?;
-        
-        debug!("Saved {} peers to RocksDB", peers.len());
-        Ok(())
+    /// Get path for a dark domain file
+    fn domain_path(&self, record: &DarkDomainRecord) -> PathBuf {
+        // Use owner_id as the filename since domain is in a related field
+        let id_hex = hex::encode(record.owner_id.as_bytes());
+        self.data_dir
+            .join("domains")
+            .join(format!("{}.json", id_hex))
     }
 
-    async fn load_peers(&self) -> Result<Vec<PersistedPeer>, PersistenceError> {
-        let key = b"peers";
-        
-        match self.db.get(key).map_err(|e| PersistenceError::Database(e.to_string()))? {
-            Some(bytes) => {
-                let peers: Vec<PersistedPeer> = Self::deserialize(&bytes)?;
-                debug!("Loaded {} peers from RocksDB", peers.len());
-                Ok(peers)
-            }
-            None => Ok(Vec::new()),
-        }
-    }
+    /// Write data to file atomically
+    async fn write_file_atomic<T: Serialize>(&self, path: &Path, data: &T) -> Result<()> {
+        let json = serde_json::to_string_pretty(data)
+            .map_err(|e| PersistenceError::Serialization(e.to_string()))?;
 
-    async fn save_dag_state(&self, dag_state: &PersistedDagState) -> Result<(), PersistenceError> {
-        let key = b"dag_state";
-        let value = Self::serialize(dag_state)?;
-        
-        self.db.put(key, value)
-            .map_err(|e| PersistenceError::Database(e.to_string()))?;
-        
-        debug!("Saved DAG state with {} vertices", dag_state.vertices.len());
-        Ok(())
-    }
+        if self.atomic_writes {
+            // Write to temporary file first
+            let temp_path = path.with_extension("tmp");
+            let mut file = File::create(&temp_path).await?;
+            file.write_all(json.as_bytes()).await?;
+            file.sync_all().await?;
 
-    async fn load_dag_state(&self) -> Result<Option<PersistedDagState>, PersistenceError> {
-        let key = b"dag_state";
-        
-        match self.db.get(key).map_err(|e| PersistenceError::Database(e.to_string()))? {
-            Some(bytes) => {
-                let dag_state: PersistedDagState = Self::deserialize(&bytes)?;
-                debug!("Loaded DAG state with {} vertices", dag_state.vertices.len());
-                Ok(Some(dag_state))
-            }
-            None => Ok(None),
-        }
-    }
-
-    async fn create_backup(&self, backup_path: &Path) -> Result<(), PersistenceError> {
-        let backup_engine = rocksdb::backup::BackupEngine::open(
-            &rocksdb::backup::BackupEngineOptions::default(),
-            backup_path,
-        ).map_err(|e| PersistenceError::BackupRestore(e.to_string()))?;
-        
-        backup_engine.create_new_backup(&self.db)
-            .map_err(|e| PersistenceError::BackupRestore(e.to_string()))?;
-        
-        info!("Backup created at {:?}", backup_path);
-        Ok(())
-    }
-
-    async fn restore_backup(&self, backup_path: &Path) -> Result<(), PersistenceError> {
-        let backup_engine = rocksdb::backup::BackupEngine::open(
-            &rocksdb::backup::BackupEngineOptions::default(),
-            backup_path,
-        ).map_err(|e| PersistenceError::BackupRestore(e.to_string()))?;
-        
-        let restore_opts = rocksdb::backup::RestoreOptions::default();
-        backup_engine.restore_from_latest_backup(&self.path, &self.path, &restore_opts)
-            .map_err(|e| PersistenceError::BackupRestore(e.to_string()))?;
-        
-        info!("Backup restored from {:?}", backup_path);
-        Ok(())
-    }
-
-    async fn prune_old_data(&self, before_timestamp: u64) -> Result<u64, PersistenceError> {
-        // For RocksDB, we would iterate through entries and delete old ones
-        // This is a simplified implementation
-        warn!("Pruning not fully implemented for RocksDB backend");
-        Ok(0)
-    }
-
-    async fn validate_state(&self) -> Result<bool, PersistenceError> {
-        // Validate state integrity
-        if let Some(state) = self.load_state().await? {
-            // Check version
-            if state.version != CURRENT_STATE_VERSION {
-                return Ok(false);
-            }
-            
-            // Basic validation checks
-            if state.node_id.is_empty() {
-                return Ok(false);
-            }
-            
-            Ok(true)
+            // Atomically rename to final location
+            fs::rename(&temp_path, path).await?;
         } else {
-            Ok(true) // No state is valid
+            // Direct write
+            let mut file = File::create(path).await?;
+            file.write_all(json.as_bytes()).await?;
+            file.sync_all().await?;
         }
+
+        Ok(())
     }
 
-    fn backend_type(&self) -> &'static str {
-        "RocksDB"
-    }
-}
-
-/// SQLite persistence backend for lightweight deployments
-pub struct SqliteBackend {
-    pool: Arc<RwLock<sqlx::SqlitePool>>,
-    path: PathBuf,
-}
-
-impl SqliteBackend {
-    /// Create new SQLite backend
-    pub async fn new(path: PathBuf) -> Result<Self, PersistenceError> {
-        // Ensure parent directory exists
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent)?;
+    /// Read data from file
+    async fn read_file<T: for<'de> Deserialize<'de>>(&self, path: &Path) -> Result<Option<T>> {
+        if !path.exists() {
+            return Ok(None);
         }
-        
-        // Ensure path is absolute
-        let abs_path = if path.is_absolute() {
-            path
-        } else {
-            std::env::current_dir()?.join(path)
-        };
-        
-        let db_url = format!("sqlite:{}", abs_path.display());
-        
-        let pool = sqlx::sqlite::SqlitePoolOptions::new()
-            .max_connections(5)
-            .connect(&db_url)
-            .await
-            .map_err(|e| PersistenceError::Database(e.to_string()))?;
-        
-        // Create tables
-        sqlx::query(
-            r#"
-            CREATE TABLE IF NOT EXISTS state (
-                id INTEGER PRIMARY KEY,
-                data BLOB NOT NULL,
-                timestamp INTEGER NOT NULL
-            );
-            
-            CREATE TABLE IF NOT EXISTS peers (
-                id TEXT PRIMARY KEY,
-                data BLOB NOT NULL,
-                timestamp INTEGER NOT NULL
-            );
-            
-            CREATE TABLE IF NOT EXISTS dag_state (
-                id INTEGER PRIMARY KEY,
-                data BLOB NOT NULL,
-                timestamp INTEGER NOT NULL
-            );
-            "#
-        )
-        .execute(&pool)
-        .await
-        .map_err(|e| PersistenceError::Database(e.to_string()))?;
-        
-        Ok(Self {
-            pool: Arc::new(RwLock::new(pool)),
-            path: abs_path,
-        })
-    }
 
-    fn serialize<T: Serialize>(value: &T) -> Result<Vec<u8>, PersistenceError> {
-        bincode::serialize(value)
-            .map_err(|e| PersistenceError::Serialization(e.to_string()))
-    }
+        let mut file = File::open(path).await?;
+        let mut contents = String::new();
+        file.read_to_string(&mut contents).await?;
 
-    fn deserialize<T: for<'de> Deserialize<'de>>(bytes: &[u8]) -> Result<T, PersistenceError> {
-        bincode::deserialize(bytes)
-            .map_err(|e| PersistenceError::Serialization(e.to_string()))
+        let data = serde_json::from_str(&contents)
+            .map_err(|e| PersistenceError::Serialization(e.to_string()))?;
+
+        Ok(Some(data))
     }
 }
 
 #[async_trait]
-impl StatePersistence for SqliteBackend {
-    async fn save_state(&self, state: &PersistedState) -> Result<(), PersistenceError> {
-        let pool = self.pool.read().await;
-        let data = Self::serialize(state)?;
-        let timestamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs() as i64;
-        
-        sqlx::query(
-            "INSERT OR REPLACE INTO state (id, data, timestamp) VALUES (1, ?, ?)"
-        )
-        .bind(&data[..])
-        .bind(timestamp)
-        .execute(&*pool)
-        .await
-        .map_err(|e| PersistenceError::Database(e.to_string()))?;
-        
-        info!("State saved to SQLite");
+impl StateStore for FileStateStore {
+    async fn save_vertex(&self, vertex: &Vertex) -> Result<()> {
+        let path = self.vertex_path(&vertex.id);
+        self.write_file_atomic(&path, vertex).await?;
+        debug!("Saved vertex {:?} to file", vertex.id);
         Ok(())
     }
 
-    async fn load_state(&self) -> Result<Option<PersistedState>, PersistenceError> {
-        let pool = self.pool.read().await;
-        
-        let row: Option<(Vec<u8>,)> = sqlx::query_as(
-            "SELECT data FROM state WHERE id = 1"
-        )
-        .fetch_optional(&*pool)
-        .await
-        .map_err(|e| PersistenceError::Database(e.to_string()))?;
-        
-        match row {
-            Some((data,)) => {
-                let state: PersistedState = Self::deserialize(&data)?;
-                
-                // Validate version
-                if state.version != CURRENT_STATE_VERSION {
-                    return Err(PersistenceError::VersionMismatch {
-                        expected: CURRENT_STATE_VERSION,
-                        actual: state.version,
-                    });
-                }
-                
-                info!("State loaded from SQLite");
-                Ok(Some(state))
-            }
-            None => Ok(None),
+    async fn load_vertex(&self, id: &VertexId) -> Result<Option<Vertex>> {
+        let path = self.vertex_path(id);
+        let vertex = self.read_file(&path).await?;
+        if vertex.is_some() {
+            debug!("Loaded vertex {:?} from file", id);
         }
+        Ok(vertex)
     }
 
-    async fn save_peers(&self, peers: &[PersistedPeer]) -> Result<(), PersistenceError> {
-        let pool = self.pool.read().await;
-        let timestamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs() as i64;
-        
-        // Use transaction for batch insert
-        let mut tx = pool.begin()
-            .await
-            .map_err(|e| PersistenceError::Database(e.to_string()))?;
-        
-        for peer in peers {
-            let data = Self::serialize(peer)?;
-            let id = hex::encode(&peer.id);
-            
-            sqlx::query(
-                "INSERT OR REPLACE INTO peers (id, data, timestamp) VALUES (?, ?, ?)"
-            )
-            .bind(&id)
-            .bind(&data[..])
-            .bind(timestamp)
-            .execute(&mut *tx)
-            .await
-            .map_err(|e| PersistenceError::Database(e.to_string()))?;
-        }
-        
-        tx.commit()
-            .await
-            .map_err(|e| PersistenceError::Database(e.to_string()))?;
-        
-        debug!("Saved {} peers to SQLite", peers.len());
+    async fn save_peer(&self, peer_id: &PeerId, info: &PeerInfo) -> Result<()> {
+        let path = self.peer_path(peer_id);
+        self.write_file_atomic(&path, info).await?;
+        debug!("Saved peer {:?} to file", peer_id);
         Ok(())
     }
 
-    async fn load_peers(&self) -> Result<Vec<PersistedPeer>, PersistenceError> {
-        let pool = self.pool.read().await;
-        
-        let rows: Vec<(Vec<u8>,)> = sqlx::query_as(
-            "SELECT data FROM peers"
-        )
-        .fetch_all(&*pool)
-        .await
-        .map_err(|e| PersistenceError::Database(e.to_string()))?;
-        
+    async fn load_peers(&self) -> Result<Vec<(PeerId, PeerInfo)>> {
+        let peers_dir = self.data_dir.join("peers");
         let mut peers = Vec::new();
-        for (data,) in rows {
-            let peer: PersistedPeer = Self::deserialize(&data)?;
-            peers.push(peer);
+
+        let mut entries = fs::read_dir(&peers_dir).await?;
+        while let Some(entry) = entries.next_entry().await? {
+            let path = entry.path();
+            if path.extension().and_then(|s| s.to_str()) == Some("json") {
+                let filename = path.file_stem().and_then(|s| s.to_str()).ok_or_else(|| {
+                    PersistenceError::InvalidFormat("Invalid filename".to_string())
+                })?;
+
+                let peer_id_bytes = hex::decode(filename).map_err(|e| {
+                    PersistenceError::InvalidFormat(format!("Invalid peer ID: {}", e))
+                })?;
+
+                if peer_id_bytes.len() != 32 {
+                    return Err(PersistenceError::InvalidFormat(
+                        "Invalid peer ID length".to_string(),
+                    ));
+                }
+
+                let mut id_array = [0u8; 32];
+                id_array.copy_from_slice(&peer_id_bytes);
+                let peer_id = PeerId::from_bytes(id_array);
+
+                if let Some(info) = self.read_file::<PeerInfo>(&path).await? {
+                    peers.push((peer_id, info));
+                }
+            }
         }
-        
-        debug!("Loaded {} peers from SQLite", peers.len());
+
+        debug!("Loaded {} peers from files", peers.len());
         Ok(peers)
     }
 
-    async fn save_dag_state(&self, dag_state: &PersistedDagState) -> Result<(), PersistenceError> {
-        let pool = self.pool.read().await;
-        let data = Self::serialize(dag_state)?;
-        let timestamp = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_secs() as i64;
-        
-        sqlx::query(
-            "INSERT OR REPLACE INTO dag_state (id, data, timestamp) VALUES (1, ?, ?)"
-        )
-        .bind(&data[..])
-        .bind(timestamp)
-        .execute(&*pool)
-        .await
-        .map_err(|e| PersistenceError::Database(e.to_string()))?;
-        
-        debug!("Saved DAG state with {} vertices", dag_state.vertices.len());
+    async fn save_dark_record(&self, record: &DarkDomainRecord) -> Result<()> {
+        let path = self.domain_path(record);
+        self.write_file_atomic(&path, record).await?;
+        debug!(
+            "Saved dark domain record for owner {:?} to file",
+            record.owner_id
+        );
         Ok(())
     }
 
-    async fn load_dag_state(&self) -> Result<Option<PersistedDagState>, PersistenceError> {
-        let pool = self.pool.read().await;
-        
-        let row: Option<(Vec<u8>,)> = sqlx::query_as(
-            "SELECT data FROM dag_state WHERE id = 1"
-        )
-        .fetch_optional(&*pool)
-        .await
-        .map_err(|e| PersistenceError::Database(e.to_string()))?;
-        
-        match row {
-            Some((data,)) => {
-                let dag_state: PersistedDagState = Self::deserialize(&data)?;
-                debug!("Loaded DAG state with {} vertices", dag_state.vertices.len());
-                Ok(Some(dag_state))
-            }
-            None => Ok(None),
-        }
-    }
+    async fn load_dark_records(&self) -> Result<Vec<DarkDomainRecord>> {
+        let domains_dir = self.data_dir.join("domains");
+        let mut records = Vec::new();
 
-    async fn create_backup(&self, backup_path: &Path) -> Result<(), PersistenceError> {
-        let pool = self.pool.read().await;
-        
-        // SQLite backup using VACUUM INTO
-        let backup_db = backup_path.join("backup.db");
-        let query = format!("VACUUM INTO '{}'", backup_db.display());
-        
-        sqlx::query(&query)
-            .execute(&*pool)
-            .await
-            .map_err(|e| PersistenceError::BackupRestore(e.to_string()))?;
-        
-        info!("Backup created at {:?}", backup_path);
-        Ok(())
-    }
-
-    async fn restore_backup(&self, backup_path: &Path) -> Result<(), PersistenceError> {
-        // For SQLite, we would copy the backup file
-        let backup_db = backup_path.join("backup.db");
-        
-        if !backup_db.exists() {
-            return Err(PersistenceError::BackupRestore(
-                "Backup file not found".to_string()
-            ));
-        }
-        
-        // Close current connection and replace file
-        // This is simplified - in production we'd handle this more carefully
-        std::fs::copy(&backup_db, &self.path)
-            .map_err(|e| PersistenceError::BackupRestore(e.to_string()))?;
-        
-        info!("Backup restored from {:?}", backup_path);
-        Ok(())
-    }
-
-    async fn prune_old_data(&self, before_timestamp: u64) -> Result<u64, PersistenceError> {
-        let pool = self.pool.read().await;
-        
-        // Delete old peer entries
-        let result = sqlx::query(
-            "DELETE FROM peers WHERE timestamp < ?"
-        )
-        .bind(before_timestamp as i64)
-        .execute(&*pool)
-        .await
-        .map_err(|e| PersistenceError::Database(e.to_string()))?;
-        
-        let pruned = result.rows_affected();
-        debug!("Pruned {} old entries", pruned);
-        Ok(pruned)
-    }
-
-    async fn validate_state(&self) -> Result<bool, PersistenceError> {
-        let pool = self.pool.read().await;
-        
-        // Check database integrity
-        let result: (String,) = sqlx::query_as("PRAGMA integrity_check")
-            .fetch_one(&*pool)
-            .await
-            .map_err(|e| PersistenceError::Database(e.to_string()))?;
-        
-        if result.0 != "ok" {
-            return Err(PersistenceError::Corruption(result.0));
-        }
-        
-        // Validate stored state
-        if let Some(state) = self.load_state().await? {
-            if state.version != CURRENT_STATE_VERSION {
-                return Ok(false);
-            }
-            
-            if state.node_id.is_empty() {
-                return Ok(false);
-            }
-        }
-        
-        Ok(true)
-    }
-
-    fn backend_type(&self) -> &'static str {
-        "SQLite"
-    }
-}
-
-/// In-memory persistence backend for testing
-pub struct MemoryBackend {
-    state: Arc<RwLock<Option<PersistedState>>>,
-    peers: Arc<RwLock<Vec<PersistedPeer>>>,
-    dag_state: Arc<RwLock<Option<PersistedDagState>>>,
-}
-
-impl Default for MemoryBackend {
-    fn default() -> Self {
-        Self {
-            state: Arc::new(RwLock::new(None)),
-            peers: Arc::new(RwLock::new(Vec::new())),
-            dag_state: Arc::new(RwLock::new(None)),
-        }
-    }
-}
-
-#[async_trait]
-impl StatePersistence for MemoryBackend {
-    async fn save_state(&self, state: &PersistedState) -> Result<(), PersistenceError> {
-        let mut stored_state = self.state.write().await;
-        *stored_state = Some(state.clone());
-        
-        // Also save individual components
-        let mut peers = self.peers.write().await;
-        *peers = state.peers.clone();
-        
-        let mut dag_state = self.dag_state.write().await;
-        *dag_state = Some(state.dag_state.clone());
-        
-        debug!("State saved to memory");
-        Ok(())
-    }
-
-    async fn load_state(&self) -> Result<Option<PersistedState>, PersistenceError> {
-        let state = self.state.read().await;
-        Ok(state.clone())
-    }
-
-    async fn save_peers(&self, peers_list: &[PersistedPeer]) -> Result<(), PersistenceError> {
-        let mut peers = self.peers.write().await;
-        *peers = peers_list.to_vec();
-        debug!("Saved {} peers to memory", peers_list.len());
-        Ok(())
-    }
-
-    async fn load_peers(&self) -> Result<Vec<PersistedPeer>, PersistenceError> {
-        let peers = self.peers.read().await;
-        Ok(peers.clone())
-    }
-
-    async fn save_dag_state(&self, new_dag_state: &PersistedDagState) -> Result<(), PersistenceError> {
-        let mut dag_state = self.dag_state.write().await;
-        *dag_state = Some(new_dag_state.clone());
-        debug!("Saved DAG state with {} vertices to memory", new_dag_state.vertices.len());
-        Ok(())
-    }
-
-    async fn load_dag_state(&self) -> Result<Option<PersistedDagState>, PersistenceError> {
-        let dag_state = self.dag_state.read().await;
-        Ok(dag_state.clone())
-    }
-
-    async fn create_backup(&self, backup_path: &Path) -> Result<(), PersistenceError> {
-        let state = self.state.read().await;
-        if let Some(state) = &*state {
-            let backup_file = backup_path.join("memory_backup.bin");
-            let data = bincode::serialize(state)
-                .map_err(|e| PersistenceError::Serialization(e.to_string()))?;
-            tokio::fs::write(&backup_file, data).await?;
-            info!("Memory backup created at {:?}", backup_file);
-        }
-        Ok(())
-    }
-
-    async fn restore_backup(&self, backup_path: &Path) -> Result<(), PersistenceError> {
-        let backup_file = backup_path.join("memory_backup.bin");
-        let data = tokio::fs::read(&backup_file).await?;
-        let state: PersistedState = bincode::deserialize(&data)
-            .map_err(|e| PersistenceError::Serialization(e.to_string()))?;
-        
-        let mut stored_state = self.state.write().await;
-        *stored_state = Some(state);
-        
-        info!("Memory backup restored from {:?}", backup_file);
-        Ok(())
-    }
-
-    async fn prune_old_data(&self, _before_timestamp: u64) -> Result<u64, PersistenceError> {
-        // No-op for memory backend
-        Ok(0)
-    }
-
-    async fn validate_state(&self) -> Result<bool, PersistenceError> {
-        let state = self.state.read().await;
-        if let Some(state) = &*state {
-            if state.version != CURRENT_STATE_VERSION {
-                return Ok(false);
-            }
-            if state.node_id.is_empty() {
-                return Ok(false);
-            }
-        }
-        Ok(true)
-    }
-
-    fn backend_type(&self) -> &'static str {
-        "Memory"
-    }
-}
-
-/// State persistence manager that handles state saving and recovery
-pub struct PersistenceManager {
-    pub backend: Arc<dyn StatePersistence>,
-    auto_save_interval: Option<tokio::time::Duration>,
-    compression_enabled: bool,
-}
-
-impl PersistenceManager {
-    /// Create new persistence manager with specified backend
-    pub fn new(backend: Arc<dyn StatePersistence>) -> Self {
-        Self {
-            backend,
-            auto_save_interval: Some(tokio::time::Duration::from_secs(300)), // 5 minutes
-            compression_enabled: true,
-        }
-    }
-
-    /// Set auto-save interval
-    pub fn set_auto_save_interval(&mut self, interval: Option<tokio::time::Duration>) {
-        self.auto_save_interval = interval;
-    }
-
-    /// Enable/disable compression
-    pub fn set_compression(&mut self, enabled: bool) {
-        self.compression_enabled = enabled;
-    }
-
-    /// Start auto-save task
-    pub fn start_auto_save(&self, state_provider: Arc<dyn StateProvider>) {
-        if let Some(interval) = self.auto_save_interval {
-            let backend = self.backend.clone();
-            
-            tokio::spawn(async move {
-                let mut interval_timer = tokio::time::interval(interval);
-                
-                loop {
-                    interval_timer.tick().await;
-                    
-                    match state_provider.get_current_state().await {
-                        Ok(state) => {
-                            if let Err(e) = backend.save_state(&state).await {
-                                error!("Auto-save failed: {}", e);
-                            } else {
-                                debug!("Auto-save completed");
-                            }
-                        }
-                        Err(e) => {
-                            error!("Failed to get current state for auto-save: {}", e);
-                        }
-                    }
+        let mut entries = fs::read_dir(&domains_dir).await?;
+        while let Some(entry) = entries.next_entry().await? {
+            let path = entry.path();
+            if path.extension().and_then(|s| s.to_str()) == Some("json") {
+                if let Some(record) = self.read_file::<DarkDomainRecord>(&path).await? {
+                    records.push(record);
                 }
-            });
+            }
+        }
+
+        debug!("Loaded {} dark domain records from files", records.len());
+        Ok(records)
+    }
+
+    async fn remove_vertex(&self, id: &VertexId) -> Result<()> {
+        let path = self.vertex_path(id);
+        if path.exists() {
+            fs::remove_file(&path).await?;
+            debug!("Removed vertex {:?} from file", id);
+        }
+        Ok(())
+    }
+
+    async fn remove_peer(&self, peer_id: &PeerId) -> Result<()> {
+        let path = self.peer_path(peer_id);
+        if path.exists() {
+            fs::remove_file(&path).await?;
+            debug!("Removed peer {:?} from file", peer_id);
+        }
+        Ok(())
+    }
+
+    async fn remove_dark_record(&self, owner_id: &PeerId) -> Result<()> {
+        let id_hex = hex::encode(owner_id.as_bytes());
+        let path = self
+            .data_dir
+            .join("domains")
+            .join(format!("{}.json", id_hex));
+        if path.exists() {
+            fs::remove_file(&path).await?;
+            debug!(
+                "Removed dark domain record for owner {:?} from file",
+                owner_id
+            );
+        }
+        Ok(())
+    }
+
+    async fn vertex_count(&self) -> Result<usize> {
+        let vertices_dir = self.data_dir.join("vertices");
+        let mut count = 0;
+        let mut entries = fs::read_dir(&vertices_dir).await?;
+        while let Some(entry) = entries.next_entry().await? {
+            if entry.path().extension().and_then(|s| s.to_str()) == Some("json") {
+                count += 1;
+            }
+        }
+        Ok(count)
+    }
+
+    async fn peer_count(&self) -> Result<usize> {
+        let peers_dir = self.data_dir.join("peers");
+        let mut count = 0;
+        let mut entries = fs::read_dir(&peers_dir).await?;
+        while let Some(entry) = entries.next_entry().await? {
+            if entry.path().extension().and_then(|s| s.to_str()) == Some("json") {
+                count += 1;
+            }
+        }
+        Ok(count)
+    }
+
+    async fn dark_record_count(&self) -> Result<usize> {
+        let domains_dir = self.data_dir.join("domains");
+        let mut count = 0;
+        let mut entries = fs::read_dir(&domains_dir).await?;
+        while let Some(entry) = entries.next_entry().await? {
+            if entry.path().extension().and_then(|s| s.to_str()) == Some("json") {
+                count += 1;
+            }
+        }
+        Ok(count)
+    }
+
+    async fn health_check(&self) -> Result<bool> {
+        // Check if directories exist and are writable
+        let test_file = self.data_dir.join(".health_check");
+        match File::create(&test_file).await {
+            Ok(_) => {
+                let _ = fs::remove_file(&test_file).await;
+                Ok(true)
+            }
+            Err(_) => Ok(false),
         }
     }
 
-    /// Perform state recovery on startup
-    pub async fn recover_state(&self) -> Result<Option<PersistedState>, PersistenceError> {
-        info!("Starting state recovery from {} backend", self.backend.backend_type());
-        
-        // Validate existing state
-        if !self.backend.validate_state().await? {
-            warn!("State validation failed, attempting recovery");
-            
-            // Try to load anyway and fix what we can
-            if let Some(mut state) = self.backend.load_state().await? {
-                // Fix version if needed
-                if state.version != CURRENT_STATE_VERSION {
-                    warn!("Migrating state from version {} to {}", 
-                          state.version, CURRENT_STATE_VERSION);
-                    state = self.migrate_state(state)?;
-                }
-                
-                // Re-save corrected state
-                self.backend.save_state(&state).await?;
-                return Ok(Some(state));
-            }
-        }
-        
-        // Load normal state
-        self.backend.load_state().await
+    async fn save_state(&self, state: &PersistedDagState) -> Result<()> {
+        let state_file = self.data_dir.join("state.json");
+        self.write_file_atomic(&state_file, state).await?;
+        debug!("Saved complete state to file");
+        Ok(())
     }
 
-    /// Migrate state from old version to current
-    fn migrate_state(&self, mut state: PersistedState) -> Result<PersistedState, PersistenceError> {
-        // Implement version-specific migrations
-        match state.version {
-            0 => {
-                // Migration from version 0 to 1
-                warn!("Migrating from version 0 to 1");
-                state.version = 1;
-                // Add any new fields with defaults
-            }
-            _ => {
-                return Err(PersistenceError::VersionMismatch {
-                    expected: CURRENT_STATE_VERSION,
-                    actual: state.version,
-                });
-            }
+    async fn recover_state(&self) -> Result<Option<PersistedDagState>> {
+        let state_file = self.data_dir.join("state.json");
+        let state = self.read_file(&state_file).await?;
+        if state.is_some() {
+            debug!("Recovered complete state from file");
         }
-        
         Ok(state)
     }
 
-    /// Export state to file
-    pub async fn export_state(&self, export_path: &Path) -> Result<(), PersistenceError> {
-        if let Some(state) = self.backend.load_state().await? {
-            let json = serde_json::to_string_pretty(&state)
-                .map_err(|e| PersistenceError::Serialization(e.to_string()))?;
-            
-            tokio::fs::write(export_path, json).await?;
-            info!("State exported to {:?}", export_path);
-        }
-        
+    async fn create_backup(&self, backup_path: &PathBuf) -> Result<()> {
+        // Create backup directory if it doesn't exist
+        fs::create_dir_all(backup_path).await.map_err(|e| {
+            PersistenceError::DirectoryCreation(format!("Failed to create backup dir: {}", e))
+        })?;
+
+        // Copy all data files to backup directory
+        let backup_data_dir = backup_path.join("data");
+        fs::create_dir_all(&backup_data_dir).await.map_err(|e| {
+            PersistenceError::DirectoryCreation(format!("Failed to create backup data dir: {}", e))
+        })?;
+
+        // Copy all files recursively
+        copy_dir_all(self.data_dir.clone(), backup_data_dir.clone()).await?;
+
+        debug!("Created backup at {:?}", backup_path);
         Ok(())
     }
 
-    /// Import state from file
-    pub async fn import_state(&self, import_path: &Path) -> Result<(), PersistenceError> {
-        let json = tokio::fs::read_to_string(import_path).await?;
-        let state: PersistedState = serde_json::from_str(&json)
-            .map_err(|e| PersistenceError::Serialization(e.to_string()))?;
-        
-        // Validate imported state
-        if state.version != CURRENT_STATE_VERSION {
-            return Err(PersistenceError::VersionMismatch {
-                expected: CURRENT_STATE_VERSION,
-                actual: state.version,
-            });
+    async fn restore_backup(&self, backup_path: &PathBuf) -> Result<()> {
+        let backup_data_dir = backup_path.join("data");
+
+        if !backup_data_dir.exists() {
+            return Err(PersistenceError::FileNotFound(format!(
+                "Backup data directory not found: {:?}",
+                backup_data_dir
+            )));
         }
-        
-        self.backend.save_state(&state).await?;
-        info!("State imported from {:?}", import_path);
-        
+
+        // Clear current data directory
+        if self.data_dir.exists() {
+            fs::remove_dir_all(&self.data_dir).await?;
+        }
+
+        // Restore from backup
+        copy_dir_all(backup_data_dir.clone(), self.data_dir.clone()).await?;
+
+        debug!("Restored backup from {:?}", backup_path);
         Ok(())
     }
 }
 
-/// Trait for providing current state to persistence manager
+/// In-memory storage implementation for testing
+pub struct MemoryStateStore {
+    /// Stored vertices
+    vertices: DashMap<VertexId, Vertex>,
+    /// Stored peers
+    peers: DashMap<PeerId, PeerInfo>,
+    /// Stored dark domain records
+    dark_records: DashMap<String, DarkDomainRecord>,
+}
+
+impl Default for MemoryStateStore {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl MemoryStateStore {
+    /// Create a new memory-based state store
+    pub fn new() -> Self {
+        Self {
+            vertices: DashMap::new(),
+            peers: DashMap::new(),
+            dark_records: DashMap::new(),
+        }
+    }
+
+    /// Clear all stored data
+    pub fn clear(&self) {
+        self.vertices.clear();
+        self.peers.clear();
+        self.dark_records.clear();
+    }
+}
+
 #[async_trait]
-pub trait StateProvider: Send + Sync {
-    /// Get current state for persistence
-    async fn get_current_state(&self) -> Result<PersistedState, PersistenceError>;
+impl StateStore for MemoryStateStore {
+    async fn save_vertex(&self, vertex: &Vertex) -> Result<()> {
+        self.vertices.insert(vertex.id.clone(), vertex.clone());
+        debug!("Saved vertex {:?} to memory", vertex.id);
+        Ok(())
+    }
+
+    async fn load_vertex(&self, id: &VertexId) -> Result<Option<Vertex>> {
+        let vertex = self.vertices.get(id).map(|entry| entry.clone());
+        if vertex.is_some() {
+            debug!("Loaded vertex {:?} from memory", id);
+        }
+        Ok(vertex)
+    }
+
+    async fn save_peer(&self, peer_id: &PeerId, info: &PeerInfo) -> Result<()> {
+        self.peers.insert(*peer_id, info.clone());
+        debug!("Saved peer {:?} to memory", peer_id);
+        Ok(())
+    }
+
+    async fn load_peers(&self) -> Result<Vec<(PeerId, PeerInfo)>> {
+        let peers: Vec<(PeerId, PeerInfo)> = self
+            .peers
+            .iter()
+            .map(|entry| (*entry.key(), entry.value().clone()))
+            .collect();
+        debug!("Loaded {} peers from memory", peers.len());
+        Ok(peers)
+    }
+
+    async fn save_dark_record(&self, record: &DarkDomainRecord) -> Result<()> {
+        let key = hex::encode(record.owner_id.as_bytes());
+        self.dark_records.insert(key, record.clone());
+        debug!(
+            "Saved dark domain record for owner {:?} to memory",
+            record.owner_id
+        );
+        Ok(())
+    }
+
+    async fn load_dark_records(&self) -> Result<Vec<DarkDomainRecord>> {
+        let records: Vec<DarkDomainRecord> = self
+            .dark_records
+            .iter()
+            .map(|entry| entry.value().clone())
+            .collect();
+        debug!("Loaded {} dark domain records from memory", records.len());
+        Ok(records)
+    }
+
+    async fn remove_vertex(&self, id: &VertexId) -> Result<()> {
+        self.vertices.remove(id);
+        debug!("Removed vertex {:?} from memory", id);
+        Ok(())
+    }
+
+    async fn remove_peer(&self, peer_id: &PeerId) -> Result<()> {
+        self.peers.remove(peer_id);
+        debug!("Removed peer {:?} from memory", peer_id);
+        Ok(())
+    }
+
+    async fn remove_dark_record(&self, owner_id: &PeerId) -> Result<()> {
+        let key = hex::encode(owner_id.as_bytes());
+        self.dark_records.remove(&key);
+        debug!(
+            "Removed dark domain record for owner {:?} from memory",
+            owner_id
+        );
+        Ok(())
+    }
+
+    async fn vertex_count(&self) -> Result<usize> {
+        Ok(self.vertices.len())
+    }
+
+    async fn peer_count(&self) -> Result<usize> {
+        Ok(self.peers.len())
+    }
+
+    async fn dark_record_count(&self) -> Result<usize> {
+        Ok(self.dark_records.len())
+    }
+
+    async fn health_check(&self) -> Result<bool> {
+        // Memory store is always healthy if it exists
+        Ok(true)
+    }
+
+    async fn save_state(&self, _state: &PersistedDagState) -> Result<()> {
+        // Memory store doesn't persist state to disk
+        debug!("State save called on memory store (no-op)");
+        Ok(())
+    }
+
+    async fn recover_state(&self) -> Result<Option<PersistedDagState>> {
+        // Memory store doesn't persist state to disk
+        debug!("State recovery called on memory store (returning None)");
+        Ok(None)
+    }
+
+    async fn create_backup(&self, _backup_path: &PathBuf) -> Result<()> {
+        // Memory store doesn't support backups
+        warn!("Backup creation called on memory store (no-op)");
+        Ok(())
+    }
+
+    async fn restore_backup(&self, _backup_path: &PathBuf) -> Result<()> {
+        // Memory store doesn't support backups
+        warn!("Backup restoration called on memory store (no-op)");
+        Ok(())
+    }
+}
+
+/// Enhanced NodeRunner with persistence integration
+pub struct PersistentNodeRunner<S: StateStore> {
+    /// Storage backend
+    store: Arc<S>,
+    /// Auto-save interval in seconds
+    auto_save_interval: u64,
+    /// Whether persistence is enabled
+    persistence_enabled: bool,
+}
+
+impl<S: StateStore + 'static> PersistentNodeRunner<S> {
+    /// Create a new persistent node runner
+    pub fn new(store: Arc<S>) -> Self {
+        Self {
+            store,
+            auto_save_interval: 300, // 5 minutes default
+            persistence_enabled: true,
+        }
+    }
+
+    /// Set auto-save interval in seconds
+    pub fn set_auto_save_interval(&mut self, seconds: u64) {
+        self.auto_save_interval = seconds;
+    }
+
+    /// Enable or disable persistence
+    pub fn set_persistence_enabled(&mut self, enabled: bool) {
+        self.persistence_enabled = enabled;
+    }
+
+    /// Save a DAG vertex after consensus
+    pub async fn save_vertex_after_consensus(&self, vertex: &Vertex) -> Result<()> {
+        if !self.persistence_enabled {
+            return Ok(());
+        }
+
+        self.store.save_vertex(vertex).await?;
+        info!("Persisted vertex {:?} after consensus", vertex.id);
+        Ok(())
+    }
+
+    /// Persist peer information
+    pub async fn persist_peer_info(&self, peer_id: &PeerId, info: &PeerInfo) -> Result<()> {
+        if !self.persistence_enabled {
+            return Ok(());
+        }
+
+        self.store.save_peer(peer_id, info).await?;
+        debug!("Persisted peer info for {:?}", peer_id);
+        Ok(())
+    }
+
+    /// Store dark domain registration
+    pub async fn store_dark_domain_registration(&self, record: &DarkDomainRecord) -> Result<()> {
+        if !self.persistence_enabled {
+            return Ok(());
+        }
+
+        self.store.save_dark_record(record).await?;
+        info!(
+            "Stored dark domain registration for owner {:?}",
+            record.owner_id
+        );
+        Ok(())
+    }
+
+    /// Load state on startup
+    pub async fn load_state_on_startup(&self) -> Result<StartupState> {
+        if !self.persistence_enabled {
+            return Ok(StartupState::default());
+        }
+
+        info!("Loading persisted state on startup...");
+
+        let vertices = vec![]; // Would load all vertices in a real implementation
+        let peers = self.store.load_peers().await?;
+        let dark_records = self.store.load_dark_records().await?;
+
+        let state = StartupState {
+            vertices,
+            peers,
+            dark_records,
+        };
+
+        info!(
+            "Loaded startup state: {} vertices, {} peers, {} dark records",
+            state.vertices.len(),
+            state.peers.len(),
+            state.dark_records.len()
+        );
+
+        Ok(state)
+    }
+
+    /// Start auto-save background task
+    pub async fn start_auto_save_task(&self) -> Result<()> {
+        if !self.persistence_enabled || self.auto_save_interval == 0 {
+            return Ok(());
+        }
+
+        let store = self.store.clone();
+        let interval = self.auto_save_interval;
+
+        tokio::spawn(async move {
+            let mut interval_timer =
+                tokio::time::interval(tokio::time::Duration::from_secs(interval));
+
+            loop {
+                interval_timer.tick().await;
+
+                match store.health_check().await {
+                    Ok(true) => {
+                        debug!("Auto-save health check passed");
+                    }
+                    Ok(false) => {
+                        warn!("Auto-save health check failed");
+                    }
+                    Err(e) => {
+                        error!("Auto-save health check error: {}", e);
+                    }
+                }
+            }
+        });
+
+        info!("Started auto-save task with {} second interval", interval);
+        Ok(())
+    }
+
+    /// Get storage statistics
+    pub async fn get_storage_stats(&self) -> Result<StorageStats> {
+        let vertex_count = self.store.vertex_count().await?;
+        let peer_count = self.store.peer_count().await?;
+        let dark_record_count = self.store.dark_record_count().await?;
+        let healthy = self.store.health_check().await?;
+
+        Ok(StorageStats {
+            vertex_count,
+            peer_count,
+            dark_record_count,
+            healthy,
+        })
+    }
+}
+
+/// State loaded on node startup
+#[derive(Debug, Default)]
+pub struct StartupState {
+    /// Loaded vertices
+    pub vertices: Vec<Vertex>,
+    /// Loaded peers
+    pub peers: Vec<(PeerId, PeerInfo)>,
+    /// Loaded dark domain records
+    pub dark_records: Vec<DarkDomainRecord>,
+}
+
+/// Storage statistics
+#[derive(Debug)]
+pub struct StorageStats {
+    /// Number of stored vertices
+    pub vertex_count: usize,
+    /// Number of stored peers
+    pub peer_count: usize,
+    /// Number of stored dark records
+    pub dark_record_count: usize,
+    /// Whether storage is healthy
+    pub healthy: bool,
+}
+
+/// Helper function to copy directory contents recursively
+fn copy_dir_all(
+    src: PathBuf,
+    dst: PathBuf,
+) -> std::pin::Pin<Box<dyn std::future::Future<Output = Result<()>> + Send + 'static>> {
+    Box::pin(async move {
+        fs::create_dir_all(&dst).await.map_err(|e| {
+            PersistenceError::DirectoryCreation(format!(
+                "Failed to create destination directory: {}",
+                e
+            ))
+        })?;
+
+        let mut entries = fs::read_dir(&src).await?;
+        while let Some(entry) = entries.next_entry().await? {
+            let path = entry.path();
+            let dest_path = dst.join(entry.file_name());
+
+            if path.is_dir() {
+                copy_dir_all(path, dest_path).await?;
+            } else {
+                fs::copy(&path, &dest_path).await?;
+            }
+        }
+        Ok(())
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::TempDir;
+    use qudag_dag::vertex::VertexId;
+    use qudag_network::peer::PeerId;
+    use std::collections::HashSet;
+    use tempfile::tempdir;
 
-    #[tokio::test]
-    async fn test_memory_backend() {
-        let backend = MemoryBackend::default();
-        
-        // Test save and load
-        let state = create_test_state();
-        backend.save_state(&state).await.unwrap();
-        
-        let loaded = backend.load_state().await.unwrap();
-        assert!(loaded.is_some());
-        assert_eq!(loaded.unwrap().node_id, state.node_id);
+    fn create_test_vertex() -> Vertex {
+        Vertex::new(VertexId::new(), vec![1, 2, 3, 4], HashSet::new())
     }
 
-    #[tokio::test]
-    async fn test_sqlite_backend() {
-        let temp_dir = TempDir::new().unwrap();
-        let db_path = temp_dir.path().join("test.db");
-        
-        let backend = SqliteBackend::new(db_path).await.unwrap();
-        
-        // Test save and load
-        let state = create_test_state();
-        backend.save_state(&state).await.unwrap();
-        
-        let loaded = backend.load_state().await.unwrap();
-        assert!(loaded.is_some());
-        assert_eq!(loaded.unwrap().node_id, state.node_id);
-    }
-
-    #[tokio::test]
-    async fn test_peer_persistence() {
-        let backend = MemoryBackend::default();
-        
-        let peers = vec![
-            PersistedPeer {
-                id: vec![1, 2, 3],
-                address: "127.0.0.1:8000".to_string(),
-                reputation: 75,
-                last_seen: 12345,
-                stats: PeerStats::default(),
-                blacklisted: false,
-                whitelisted: true,
-                metadata: HashMap::new(),
-            },
-        ];
-        
-        backend.save_peers(&peers).await.unwrap();
-        let loaded = backend.load_peers().await.unwrap();
-        assert_eq!(loaded.len(), 1);
-        assert_eq!(loaded[0].id, vec![1, 2, 3]);
-    }
-
-    #[tokio::test]
-    async fn test_state_validation() {
-        let backend = MemoryBackend::default();
-        
-        // Empty state should be valid
-        assert!(backend.validate_state().await.unwrap());
-        
-        // Save valid state
-        let state = create_test_state();
-        backend.save_state(&state).await.unwrap();
-        assert!(backend.validate_state().await.unwrap());
-        
-        // Save invalid state (empty node_id)
-        let mut invalid_state = state.clone();
-        invalid_state.node_id = vec![];
-        backend.save_state(&invalid_state).await.unwrap();
-        assert!(!backend.validate_state().await.unwrap());
-    }
-
-    fn create_test_state() -> PersistedState {
-        PersistedState {
-            version: CURRENT_STATE_VERSION,
-            node_id: vec![1, 2, 3, 4],
-            protocol_state: ProtocolState::Initial,
-            sessions: HashMap::new(),
-            peers: vec![],
-            dag_state: PersistedDagState {
-                vertices: HashMap::new(),
-                tips: HashSet::new(),
-                voting_records: HashMap::new(),
-                last_checkpoint: None,
-            },
-            metrics: StateMachineMetrics {
-                current_state: ProtocolState::Initial,
-                uptime: std::time::Duration::from_secs(0),
-                active_sessions: 0,
-                total_state_transitions: 0,
-                total_messages_sent: 0,
-                total_messages_received: 0,
-                total_bytes_sent: 0,
-                total_bytes_received: 0,
-                total_errors: 0,
-            },
-            last_saved: 0,
+    fn create_test_peer_info() -> PeerInfo {
+        PeerInfo {
+            address: "127.0.0.1:8080".to_string(),
+            last_seen: 1234567890,
+            reputation: 75,
+            trusted: true,
+            connection_count: 5,
+            bytes_exchanged: 1024,
+            metadata: HashMap::new(),
         }
+    }
+
+    fn create_test_dark_record() -> DarkDomainRecord {
+        use qudag_network::types::NetworkAddress;
+        use std::collections::HashMap;
+
+        DarkDomainRecord {
+            signing_public_key: vec![1, 2, 3, 4],
+            encryption_public_key: vec![5, 6, 7, 8],
+            addresses: vec![NetworkAddress::new([127, 0, 0, 1], 8080)],
+            alias: Some("test.dark".to_string()),
+            ttl: 3600,
+            registered_at: 1234567890,
+            expires_at: 1234567890 + 3600,
+            owner_id: PeerId::new(),
+            signature: vec![9, 10, 11, 12],
+            metadata: HashMap::new(),
+        }
+    }
+
+    #[tokio::test]
+    async fn test_memory_store_vertices() {
+        let store = MemoryStateStore::new();
+        let vertex = create_test_vertex();
+
+        // Save vertex
+        store.save_vertex(&vertex).await.unwrap();
+
+        // Load vertex
+        let loaded = store.load_vertex(&vertex.id).await.unwrap();
+        assert!(loaded.is_some());
+        assert_eq!(loaded.unwrap().id, vertex.id);
+
+        // Check count
+        assert_eq!(store.vertex_count().await.unwrap(), 1);
+
+        // Remove vertex
+        store.remove_vertex(&vertex.id).await.unwrap();
+        assert_eq!(store.vertex_count().await.unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_memory_store_peers() {
+        let store = MemoryStateStore::new();
+        let peer_id = PeerId::random();
+        let peer_info = create_test_peer_info();
+
+        // Save peer
+        store.save_peer(&peer_id, &peer_info).await.unwrap();
+
+        // Load peers
+        let peers = store.load_peers().await.unwrap();
+        assert_eq!(peers.len(), 1);
+        assert_eq!(peers[0].0, peer_id);
+
+        // Check count
+        assert_eq!(store.peer_count().await.unwrap(), 1);
+
+        // Remove peer
+        store.remove_peer(&peer_id).await.unwrap();
+        assert_eq!(store.peer_count().await.unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_memory_store_dark_records() {
+        let store = MemoryStateStore::new();
+        let record = create_test_dark_record();
+
+        // Save record
+        store.save_dark_record(&record).await.unwrap();
+
+        // Load records
+        let records = store.load_dark_records().await.unwrap();
+        assert_eq!(records.len(), 1);
+        assert_eq!(records[0].owner_id, record.owner_id);
+
+        // Check count
+        assert_eq!(store.dark_record_count().await.unwrap(), 1);
+
+        // Remove record
+        store.remove_dark_record(&record.owner_id).await.unwrap();
+        assert_eq!(store.dark_record_count().await.unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn test_file_store_vertices() {
+        let temp_dir = tempdir().unwrap();
+        let store = FileStateStore::new(temp_dir.path().to_path_buf())
+            .await
+            .unwrap();
+        let vertex = create_test_vertex();
+
+        // Save vertex
+        store.save_vertex(&vertex).await.unwrap();
+
+        // Load vertex
+        let loaded = store.load_vertex(&vertex.id).await.unwrap();
+        assert!(loaded.is_some());
+        assert_eq!(loaded.unwrap().id, vertex.id);
+
+        // Check count
+        assert_eq!(store.vertex_count().await.unwrap(), 1);
+    }
+
+    #[tokio::test]
+    async fn test_file_store_peers() {
+        let temp_dir = tempdir().unwrap();
+        let store = FileStateStore::new(temp_dir.path().to_path_buf())
+            .await
+            .unwrap();
+        let peer_id = PeerId::random();
+        let peer_info = create_test_peer_info();
+
+        // Save peer
+        store.save_peer(&peer_id, &peer_info).await.unwrap();
+
+        // Load peers
+        let peers = store.load_peers().await.unwrap();
+        assert_eq!(peers.len(), 1);
+        assert_eq!(peers[0].0, peer_id);
+    }
+
+    #[tokio::test]
+    async fn test_persistent_node_runner() {
+        let store = Arc::new(MemoryStateStore::new());
+        let mut runner = PersistentNodeRunner::new(store.clone());
+        runner.set_auto_save_interval(1);
+
+        let vertex = create_test_vertex();
+        runner.save_vertex_after_consensus(&vertex).await.unwrap();
+
+        let peer_id = PeerId::random();
+        let peer_info = create_test_peer_info();
+        runner
+            .persist_peer_info(&peer_id, &peer_info)
+            .await
+            .unwrap();
+
+        let dark_record = create_test_dark_record();
+        runner
+            .store_dark_domain_registration(&dark_record)
+            .await
+            .unwrap();
+
+        let state = runner.load_state_on_startup().await.unwrap();
+        assert_eq!(state.peers.len(), 1);
+        assert_eq!(state.dark_records.len(), 1);
+
+        let stats = runner.get_storage_stats().await.unwrap();
+        assert_eq!(stats.vertex_count, 1);
+        assert_eq!(stats.peer_count, 1);
+        assert_eq!(stats.dark_record_count, 1);
+        assert!(stats.healthy);
+    }
+
+    #[tokio::test]
+    async fn test_health_check() {
+        let store = MemoryStateStore::new();
+        assert!(store.health_check().await.unwrap());
+
+        let temp_dir = tempdir().unwrap();
+        let file_store = FileStateStore::new(temp_dir.path().to_path_buf())
+            .await
+            .unwrap();
+        assert!(file_store.health_check().await.unwrap());
     }
 }

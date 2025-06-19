@@ -2,27 +2,24 @@
 //! with bootstrap node functionality, content routing, and peer reputation scoring.
 
 use crate::discovery::{
-    DiscoveredPeer, DiscoveryEvent, DiscoveryMethod, DHTConfig, PeerScoringConfig,
-    GeographicInfo,
+    DHTConfig, DiscoveredPeer, DiscoveryEvent, DiscoveryMethod, GeographicInfo, PeerScoringConfig,
 };
 use crate::shadow_address::{ShadowAddress, ShadowAddressResolver};
 use crate::types::NetworkError;
 use libp2p::{
     kad::{
-        Record, RecordKey,
-        Event as KademliaEvent, QueryResult,
-        GetProvidersOk, PutRecordOk, GetRecordOk,
-        BootstrapOk, GetClosestPeersOk, QueryId,
+        BootstrapOk, Event as KademliaEvent, GetClosestPeersOk, GetProvidersOk, GetRecordOk,
+        PutRecordOk, QueryId, QueryResult, Record, RecordKey,
     },
     PeerId as LibP2PPeerId,
 };
+use sha2::{Digest, Sha256};
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::net::SocketAddr;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 use tokio::sync::{mpsc, RwLock};
 use tracing::{debug, info, warn};
-use sha2::{Sha256, Digest};
 
 /// Maximum record size for DHT storage (1MB)
 const MAX_RECORD_SIZE: usize = 1024 * 1024;
@@ -155,25 +152,30 @@ impl PeerReputation {
     }
 
     /// Record an interaction with this peer
-    pub fn record_interaction(&mut self, success: bool, response_time: Option<Duration>, config: &PeerScoringConfig) {
+    pub fn record_interaction(
+        &mut self,
+        success: bool,
+        response_time: Option<Duration>,
+        config: &PeerScoringConfig,
+    ) {
         self.total_interactions += 1;
         self.last_interaction = Some(Instant::now());
 
         if success {
             self.successful_interactions += 1;
             self.score += config.connection_success_bonus;
-            
+
             // Update response time metrics
             if let Some(rt) = response_time {
                 self.response_times.push_back(rt);
                 if self.response_times.len() > 100 {
                     self.response_times.pop_front();
                 }
-                
+
                 // Calculate new average
                 let sum: Duration = self.response_times.iter().sum();
                 self.avg_response_time = sum / self.response_times.len() as u32;
-                
+
                 // Apply latency penalty if response is slow
                 let latency_penalty = rt.as_millis() as f64 * config.latency_penalty_factor;
                 self.score -= latency_penalty.min(5.0); // Cap penalty at 5 points
@@ -185,7 +187,8 @@ impl PeerReputation {
 
         // Update content success rate
         if self.total_interactions > 0 {
-            self.content_success_rate = self.successful_interactions as f64 / self.total_interactions as f64;
+            self.content_success_rate =
+                self.successful_interactions as f64 / self.total_interactions as f64;
         }
 
         // Clamp score to valid range
@@ -205,7 +208,7 @@ impl PeerReputation {
         let total_time = self.uptime_start.elapsed();
         let downtime = Duration::from_secs(self.downtime_incidents as u64 * 300); // Assume 5 min per incident
         let uptime = total_time.saturating_sub(downtime);
-        
+
         if total_time.as_secs() > 0 {
             (uptime.as_secs() as f64 / total_time.as_secs() as f64) * 100.0
         } else {
@@ -404,13 +407,13 @@ impl KademliaDHT {
         // kad_config.set_publication_interval(Some(config.refresh_interval));
         // kad_config.set_provider_record_ttl(Some(content_config.provider_ttl));
         // kad_config.set_record_ttl(Some(DEFAULT_RECORD_TTL));
-        
+
         // Create memory store
         // let store = MemoryStore::new(local_peer_id);
-        
+
         // Create Kademlia instance
         // let kademlia = Kademlia::with_config(local_peer_id, store, kad_config);
-        
+
         Self {
             // kademlia,
             config,
@@ -457,8 +460,11 @@ impl KademliaDHT {
             _ => {}
         }
 
-        info!("Starting DHT bootstrap with {} nodes", self.bootstrap_config.nodes.len());
-        
+        info!(
+            "Starting DHT bootstrap with {} nodes",
+            self.bootstrap_config.nodes.len()
+        );
+
         self.bootstrap_state = BootstrapState::InProgress {
             start_time: Instant::now(),
             connected_nodes: 0,
@@ -472,13 +478,13 @@ impl KademliaDHT {
         // Add bootstrap nodes
         let mut connected = 0;
         let mut attempted = 0;
-        
+
         for (peer_id, addr) in &self.bootstrap_config.nodes {
             attempted += 1;
-            
+
             // Add address to Kademlia (TODO: re-enable when libp2p kad API is updated)
             // self.kademlia.add_address(peer_id, addr.clone().into());
-            
+
             // Mark as bootstrap node in reputation system
             let mut reputations = self.peer_reputations.write().await;
             let reputation = reputations.entry(*peer_id).or_insert_with(|| {
@@ -489,18 +495,18 @@ impl KademliaDHT {
             });
             reputation.is_bootstrap = true;
             drop(reputations);
-            
+
             // Initiate connection (TODO: re-enable when libp2p kad API is updated)
             // self.kademlia.bootstrap();
             connected += 1;
-            
+
             debug!("Added bootstrap peer: {} at {}", peer_id, addr);
         }
 
         // Wait for bootstrap to complete or timeout
         let start = Instant::now();
         let timeout = self.bootstrap_config.timeout;
-        
+
         while start.elapsed() < timeout {
             if connected >= self.bootstrap_config.min_connections {
                 // Bootstrap successful
@@ -510,47 +516,53 @@ impl KademliaDHT {
                     connected_nodes: connected,
                     duration,
                 };
-                
+
                 let mut metrics = self.metrics.lock().unwrap();
                 metrics.successful_bootstraps += 1;
                 drop(metrics);
-                
+
                 if let Some(tx) = &self.event_tx {
-                    let _ = tx.send(DiscoveryEvent::BootstrapCompleted {
-                        peers_discovered: connected,
-                        duration,
-                        success_rate: connected as f64 / attempted as f64,
-                    }).await;
+                    let _ = tx
+                        .send(DiscoveryEvent::BootstrapCompleted {
+                            peers_discovered: connected,
+                            duration,
+                            success_rate: connected as f64 / attempted as f64,
+                        })
+                        .await;
                 }
-                
-                info!("DHT bootstrap completed: {} nodes connected in {:?}", connected, duration);
+
+                info!(
+                    "DHT bootstrap completed: {} nodes connected in {:?}",
+                    connected, duration
+                );
                 return Ok(());
             }
-            
+
             tokio::time::sleep(Duration::from_millis(100)).await;
         }
 
         // Bootstrap failed
         let reason = format!(
-            "Only {} of {} required nodes connected", 
-            connected, 
-            self.bootstrap_config.min_connections
+            "Only {} of {} required nodes connected",
+            connected, self.bootstrap_config.min_connections
         );
-        
+
         self.bootstrap_state = BootstrapState::Failed {
             failure_time: Instant::now(),
             reason: reason.clone(),
             attempted_nodes: attempted,
         };
-        
+
         if let Some(tx) = &self.event_tx {
-            let _ = tx.send(DiscoveryEvent::BootstrapFailed {
-                reason,
-                attempted_nodes: attempted,
-                successful_connections: connected,
-            }).await;
+            let _ = tx
+                .send(DiscoveryEvent::BootstrapFailed {
+                    reason,
+                    attempted_nodes: attempted,
+                    successful_connections: connected,
+                })
+                .await;
         }
-        
+
         Err(NetworkError::BootstrapFailed)
     }
 
@@ -564,12 +576,14 @@ impl KademliaDHT {
     /// Handle new peer discovered
     async fn handle_new_peer(&mut self, peer: LibP2PPeerId) {
         debug!("New peer discovered via Kademlia: {}", peer);
-        
+
         // Create or update peer reputation
         let mut reputations = self.peer_reputations.write().await;
-        reputations.entry(peer).or_insert_with(|| PeerReputation::new(peer));
+        reputations
+            .entry(peer)
+            .or_insert_with(|| PeerReputation::new(peer));
         drop(reputations);
-        
+
         // Update metrics (TODO: re-enable when libp2p kad API is updated)
         let mut metrics = self.metrics.lock().unwrap();
         // metrics.routing_table_size = self.kademlia.kbuckets()
@@ -577,7 +591,7 @@ impl KademliaDHT {
         //     .sum();
         metrics.routing_table_size = 0; // Placeholder
         drop(metrics);
-        
+
         // Send discovery event
         if let Some(tx) = &self.event_tx {
             let discovered_peer = DiscoveredPeer::new(
@@ -585,15 +599,17 @@ impl KademliaDHT {
                 SocketAddr::from(([0, 0, 0, 0], 0)), // Address will be updated later
                 DiscoveryMethod::Kademlia,
             );
-            
-            let _ = tx.send(DiscoveryEvent::PeerDiscovered(discovered_peer)).await;
+
+            let _ = tx
+                .send(DiscoveryEvent::PeerDiscovered(discovered_peer))
+                .await;
         }
     }
 
     /// Handle unroutable peer
     async fn handle_unroutable_peer(&mut self, peer: LibP2PPeerId) {
         warn!("Peer became unroutable: {}", peer);
-        
+
         // Update reputation
         let mut reputations = self.peer_reputations.write().await;
         if let Some(reputation) = reputations.get_mut(&peer) {
@@ -605,7 +621,7 @@ impl KademliaDHT {
     /// Handle routable peer
     async fn handle_routable_peer(&mut self, peer: LibP2PPeerId) {
         debug!("Peer became routable: {}", peer);
-        
+
         // Update reputation positively
         let mut reputations = self.peer_reputations.write().await;
         if let Some(reputation) = reputations.get_mut(&peer) {
@@ -619,10 +635,10 @@ impl KademliaDHT {
             let mut queries = self.pending_queries.lock().unwrap();
             queries.remove(&id)
         };
-        
+
         if let Some(info) = query_info {
             let duration = info.start_time.elapsed();
-            
+
             match result {
                 QueryResult::GetProviders(Ok(result)) => {
                     // GetProvidersOk is an enum variant, extract providers from it
@@ -667,16 +683,20 @@ impl KademliaDHT {
     }
 
     /// Handle providers found
-    async fn handle_providers_found(&mut self, providers: HashSet<LibP2PPeerId>, duration: Duration) {
+    async fn handle_providers_found(
+        &mut self,
+        providers: HashSet<LibP2PPeerId>,
+        duration: Duration,
+    ) {
         debug!("Found {} providers in {:?}", providers.len(), duration);
-        
+
         let mut metrics = self.metrics.lock().unwrap();
         metrics.successful_queries += 1;
         metrics.avg_query_time = Duration::from_secs_f64(
-            (metrics.avg_query_time.as_secs_f64() + duration.as_secs_f64()) / 2.0
+            (metrics.avg_query_time.as_secs_f64() + duration.as_secs_f64()) / 2.0,
         );
         drop(metrics);
-        
+
         // Update peer reputations
         let mut reputations = self.peer_reputations.write().await;
         for provider in providers {
@@ -690,23 +710,23 @@ impl KademliaDHT {
     /// Handle record stored
     async fn handle_record_stored(&mut self, duration: Duration) {
         debug!("Record stored in {:?}", duration);
-        
+
         let mut metrics = self.metrics.lock().unwrap();
         metrics.successful_queries += 1;
         metrics.records_stored += 1;
         metrics.avg_query_time = Duration::from_secs_f64(
-            (metrics.avg_query_time.as_secs_f64() + duration.as_secs_f64()) / 2.0
+            (metrics.avg_query_time.as_secs_f64() + duration.as_secs_f64()) / 2.0,
         );
     }
 
     /// Handle record found
     async fn handle_record_found(&mut self, _record: Record, duration: Duration) {
         debug!("Record found in {:?}", duration);
-        
+
         let mut metrics = self.metrics.lock().unwrap();
         metrics.successful_queries += 1;
         metrics.avg_query_time = Duration::from_secs_f64(
-            (metrics.avg_query_time.as_secs_f64() + duration.as_secs_f64()) / 2.0
+            (metrics.avg_query_time.as_secs_f64() + duration.as_secs_f64()) / 2.0,
         );
     }
 
@@ -714,9 +734,14 @@ impl KademliaDHT {
     async fn handle_bootstrap_result(&mut self, result: BootstrapOk, duration: Duration) {
         let peer = result.peer;
         debug!("Bootstrap query to {} completed in {:?}", peer, duration);
-        
+
         // Update bootstrap state if still in progress
-        if let BootstrapState::InProgress { start_time, mut connected_nodes, attempted_nodes } = self.bootstrap_state {
+        if let BootstrapState::InProgress {
+            start_time,
+            mut connected_nodes,
+            attempted_nodes,
+        } = self.bootstrap_state
+        {
             connected_nodes += 1;
             self.bootstrap_state = BootstrapState::InProgress {
                 start_time,
@@ -730,13 +755,13 @@ impl KademliaDHT {
     async fn handle_closest_peers(&mut self, result: GetClosestPeersOk, duration: Duration) {
         let peers = result.peers;
         debug!("Found {} closest peers in {:?}", peers.len(), duration);
-        
+
         // Update network size estimate
         {
             let mut metrics = self.metrics.lock().unwrap();
             metrics.network_size_estimate = self.estimate_network_size(&peers);
         }
-        
+
         // Check for network partitions
         self.check_network_partition(&peers).await;
     }
@@ -747,9 +772,10 @@ impl KademliaDHT {
         if closest_peers.is_empty() {
             return 1;
         }
-        
+
         // Calculate average distance to closest peers
-        let distances: Vec<u32> = closest_peers.iter()
+        let distances: Vec<u32> = closest_peers
+            .iter()
             .map(|peer| {
                 // Calculate XOR distance manually
                 let distance = self.calculate_xor_distance(&self.local_peer_id, peer);
@@ -757,9 +783,9 @@ impl KademliaDHT {
                 distance
             })
             .collect();
-        
+
         let avg_distance = distances.iter().sum::<u32>() / distances.len() as u32;
-        
+
         // Estimate: 2^(avg_distance) nodes in network
         2_usize.pow(avg_distance.min(31)) // Cap at 31 to avoid overflow
     }
@@ -767,28 +793,34 @@ impl KademliaDHT {
     /// Check for network partitions
     async fn check_network_partition(&mut self, peers: &[LibP2PPeerId]) {
         let mut detector = self.partition_detector.lock().unwrap();
-        
+
         // Update successful query times for buckets
         for peer in peers {
             let bucket_index = self.get_bucket_index(peer);
-            detector.last_successful_queries.insert(bucket_index, Instant::now());
+            detector
+                .last_successful_queries
+                .insert(bucket_index, Instant::now());
         }
-        
+
         // Check for potential partitions
         let now = Instant::now();
         let mut potentially_partitioned_buckets = Vec::new();
-        
-        for bucket_idx in 0..160 { // Assuming 160-bit keys
+
+        for bucket_idx in 0..160 {
+            // Assuming 160-bit keys
             if let Some(last_success) = detector.last_successful_queries.get(&bucket_idx) {
                 if now.duration_since(*last_success) > detector.detection_threshold {
                     potentially_partitioned_buckets.push(bucket_idx);
                 }
             }
         }
-        
+
         if !potentially_partitioned_buckets.is_empty() {
-            warn!("Potential network partition detected in buckets: {:?}", potentially_partitioned_buckets);
-            
+            warn!(
+                "Potential network partition detected in buckets: {:?}",
+                potentially_partitioned_buckets
+            );
+
             detector.detected_partitions.push(PartitionInfo {
                 detected_at: now,
                 affected_buckets: potentially_partitioned_buckets,
@@ -804,12 +836,12 @@ impl KademliaDHT {
         // Find the position of the most significant bit
         (159 - distance) as u8 // For 160-bit keys
     }
-    
+
     /// Calculate XOR distance between two peer IDs (returns leading zeros count)
     fn calculate_xor_distance(&self, peer1: &LibP2PPeerId, peer2: &LibP2PPeerId) -> u32 {
         let bytes1 = peer1.to_bytes();
         let bytes2 = peer2.to_bytes();
-        
+
         // XOR the bytes and count leading zeros
         let mut leading_zeros = 0u32;
         for i in 0..bytes1.len().min(bytes2.len()) {
@@ -821,7 +853,7 @@ impl KademliaDHT {
                 break;
             }
         }
-        
+
         leading_zeros
     }
 
@@ -830,7 +862,7 @@ impl KademliaDHT {
         if value.len() > self.content_config.max_content_size {
             return Err(NetworkError::ContentTooLarge);
         }
-        
+
         let record_key = RecordKey::new(&key);
         let _record = Record {
             key: record_key.clone(),
@@ -838,7 +870,7 @@ impl KademliaDHT {
             publisher: Some(self.local_peer_id),
             expires: Some(Instant::now() + DEFAULT_RECORD_TTL),
         };
-        
+
         // Track query (TODO: re-enable when libp2p kad API is updated)
         // let query_id = self.kademlia.put_record(record, Quorum::Majority)?;
         // let mut queries = self.pending_queries.lock().unwrap();
@@ -848,17 +880,19 @@ impl KademliaDHT {
         //     target: QueryTarget::RecordKey(record_key),
         //     requestor: None,
         // });
-        // 
+        //
         // let mut metrics = self.metrics.lock().unwrap();
         // metrics.total_queries += 1;
-        
-        Err(NetworkError::Internal("Kademlia functionality not implemented for libp2p 0.53".to_string()))
+
+        Err(NetworkError::Internal(
+            "Kademlia functionality not implemented for libp2p 0.53".to_string(),
+        ))
     }
 
     /// Get content from the DHT
     pub async fn get_record(&mut self, key: Vec<u8>) -> Result<(), NetworkError> {
         let _record_key = RecordKey::new(&key);
-        
+
         // Track query (TODO: re-enable when libp2p kad API is updated)
         // let query_id = self.kademlia.get_record(&record_key, Quorum::Majority);
         // let mut queries = self.pending_queries.lock().unwrap();
@@ -868,17 +902,19 @@ impl KademliaDHT {
         //     target: QueryTarget::RecordKey(record_key),
         //     requestor: None,
         // });
-        // 
+        //
         // let mut metrics = self.metrics.lock().unwrap();
         // metrics.total_queries += 1;
-        
-        Err(NetworkError::Internal("Kademlia functionality not implemented for libp2p 0.53".to_string()))
+
+        Err(NetworkError::Internal(
+            "Kademlia functionality not implemented for libp2p 0.53".to_string(),
+        ))
     }
 
     /// Announce as provider for content
     pub async fn provide(&mut self, key: Vec<u8>) -> Result<(), NetworkError> {
         let _record_key = RecordKey::new(&key);
-        
+
         // Track query (TODO: re-enable when libp2p kad API is updated)
         // let query_id = self.kademlia.start_providing(record_key.clone())?;
         // let mut queries = self.pending_queries.lock().unwrap();
@@ -888,18 +924,20 @@ impl KademliaDHT {
         //     target: QueryTarget::RecordKey(record_key),
         //     requestor: None,
         // });
-        // 
+        //
         // let mut metrics = self.metrics.lock().unwrap();
         // metrics.total_queries += 1;
         // metrics.providers_announced += 1;
-        
-        Err(NetworkError::Internal("Kademlia functionality not implemented for libp2p 0.53".to_string()))
+
+        Err(NetworkError::Internal(
+            "Kademlia functionality not implemented for libp2p 0.53".to_string(),
+        ))
     }
 
     /// Find providers for content
     pub async fn find_providers(&mut self, key: Vec<u8>) -> Result<(), NetworkError> {
         let _record_key = RecordKey::new(&key);
-        
+
         // Track query (TODO: re-enable when libp2p kad API is updated)
         // let query_id = self.kademlia.get_providers(&record_key);
         // let mut queries = self.pending_queries.lock().unwrap();
@@ -909,16 +947,18 @@ impl KademliaDHT {
         //     target: QueryTarget::RecordKey(record_key),
         //     requestor: None,
         // });
-        // 
+        //
         // let mut metrics = self.metrics.lock().unwrap();
         // metrics.total_queries += 1;
-        
-        Err(NetworkError::Internal("Kademlia functionality not implemented for libp2p 0.53".to_string()))
+
+        Err(NetworkError::Internal(
+            "Kademlia functionality not implemented for libp2p 0.53".to_string(),
+        ))
     }
 
     /// Store dark address mapping in DHT
     pub async fn store_dark_address(
-        &mut self, 
+        &mut self,
         shadow_address: &ShadowAddress,
         peer_id: LibP2PPeerId,
     ) -> Result<(), NetworkError> {
@@ -927,21 +967,24 @@ impl KademliaDHT {
         hasher.update(&shadow_address.view_key);
         hasher.update(&shadow_address.spend_key);
         let key = hasher.finalize().to_vec();
-        
+
         // Serialize peer ID as value
         let value = peer_id.to_bytes();
-        
+
         self.store_record(key, value).await
     }
 
     /// Find peer for dark address
-    pub async fn find_dark_address(&mut self, shadow_address: &ShadowAddress) -> Result<(), NetworkError> {
+    pub async fn find_dark_address(
+        &mut self,
+        shadow_address: &ShadowAddress,
+    ) -> Result<(), NetworkError> {
         // Generate same deterministic key
         let mut hasher = Sha256::new();
         hasher.update(&shadow_address.view_key);
         hasher.update(&shadow_address.spend_key);
         let key = hasher.finalize().to_vec();
-        
+
         self.get_record(key).await
     }
 
@@ -952,8 +995,18 @@ impl KademliaDHT {
 
     /// Get all peer reputations sorted by score
     pub async fn get_top_peers(&self, limit: usize) -> Vec<PeerReputation> {
-        let mut peers: Vec<_> = self.peer_reputations.read().await.values().cloned().collect();
-        peers.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        let mut peers: Vec<_> = self
+            .peer_reputations
+            .read()
+            .await
+            .values()
+            .cloned()
+            .collect();
+        peers.sort_by(|a, b| {
+            b.score
+                .partial_cmp(&a.score)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         peers.truncate(limit);
         peers
     }
@@ -989,19 +1042,24 @@ impl KademliaDHT {
     pub async fn perform_maintenance(&mut self) {
         // Apply reputation decay
         self.apply_reputation_decay().await;
-        
+
         // Clean up old partition detection data
         let mut detector = self.partition_detector.lock().unwrap();
         let cutoff = Instant::now() - Duration::from_secs(3600); // 1 hour
-        detector.detected_partitions.retain(|p| p.detected_at > cutoff || !p.recovered);
-        
+        detector
+            .detected_partitions
+            .retain(|p| p.detected_at > cutoff || !p.recovered);
+
         // Update metrics
         let mut metrics = self.metrics.lock().unwrap();
         metrics.routing_table_size = self.routing_table_size();
-        
+
         // Periodic bootstrap if configured
         if self.bootstrap_config.periodic_bootstrap {
-            if let BootstrapState::Completed { completion_time, .. } = self.bootstrap_state {
+            if let BootstrapState::Completed {
+                completion_time, ..
+            } = self.bootstrap_state
+            {
                 if completion_time.elapsed() > self.bootstrap_config.bootstrap_interval {
                     info!("Performing periodic bootstrap");
                     // TODO: re-enable when libp2p kad API is updated
@@ -1015,45 +1073,48 @@ impl KademliaDHT {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_peer_reputation() {
         let peer_id = LibP2PPeerId::random();
         let mut reputation = PeerReputation::new(peer_id);
         let config = PeerScoringConfig::default();
-        
+
         // Test successful interaction
         reputation.record_interaction(true, Some(Duration::from_millis(50)), &config);
         assert!(reputation.score > 50.0);
         assert_eq!(reputation.successful_interactions, 1);
-        
+
         // Test failed interaction
         reputation.record_interaction(false, None, &config);
         assert!(reputation.score < 50.0);
         assert_eq!(reputation.failed_interactions, 1);
-        
+
         // Test misbehavior
         reputation.record_misbehavior(2.0);
         assert!(reputation.score < 30.0);
         assert_eq!(reputation.misbehavior_count, 1);
     }
-    
+
     #[test]
     fn test_bootstrap_state() {
         let state = BootstrapState::NotStarted;
         assert_eq!(state, BootstrapState::NotStarted);
-        
+
         let state = BootstrapState::InProgress {
             start_time: Instant::now(),
             connected_nodes: 5,
             attempted_nodes: 10,
         };
-        
-        if let BootstrapState::InProgress { connected_nodes, .. } = state {
+
+        if let BootstrapState::InProgress {
+            connected_nodes, ..
+        } = state
+        {
             assert_eq!(connected_nodes, 5);
         }
     }
-    
+
     #[tokio::test]
     async fn test_dht_creation() {
         let peer_id = LibP2PPeerId::random();
@@ -1061,7 +1122,7 @@ mod tests {
         let bootstrap_config = BootstrapConfig::default();
         let content_config = ContentRoutingConfig::default();
         let scoring_config = PeerScoringConfig::default();
-        
+
         let dht = KademliaDHT::new(
             peer_id,
             config,
@@ -1069,7 +1130,7 @@ mod tests {
             content_config,
             scoring_config,
         );
-        
+
         assert_eq!(dht.local_peer_id, peer_id);
         assert!(!dht.is_bootstrapped());
         assert_eq!(dht.routing_table_size(), 0);

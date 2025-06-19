@@ -1,14 +1,14 @@
 #![deny(unsafe_code)]
 
-use crate::types::{NetworkError, PeerId, ConnectionStatus};
 use crate::connection::{ConnectionInfo, PooledConnection, WarmingState};
+use crate::types::{ConnectionStatus, NetworkError, PeerId};
 use dashmap::DashMap;
 use parking_lot::RwLock;
 use std::collections::{HashMap, VecDeque};
-use std::sync::atomic::{AtomicUsize, AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
-use tokio::sync::{Semaphore, Notify};
+use tokio::sync::{Notify, Semaphore};
 use tokio::time::{interval, sleep};
 use tracing::{debug, warn};
 
@@ -40,8 +40,8 @@ impl Default for PoolConfig {
         Self {
             max_size: 100,
             min_size: 10,
-            idle_timeout: Duration::from_secs(300),      // 5 minutes
-            max_lifetime: Duration::from_secs(3600),     // 1 hour
+            idle_timeout: Duration::from_secs(300), // 5 minutes
+            max_lifetime: Duration::from_secs(3600), // 1 hour
             health_check_interval: Duration::from_secs(30),
             acquire_timeout: Duration::from_secs(10),
             enable_warming: true,
@@ -121,7 +121,7 @@ impl ConnectionPool {
         let handle = tokio::spawn(async move {
             maintenance_pool.run_maintenance().await;
         });
-        
+
         Self {
             maintenance_handle: Some(handle),
             ..pool
@@ -131,13 +131,16 @@ impl ConnectionPool {
     /// Acquire a connection from the pool
     pub async fn acquire(&self, peer_id: PeerId) -> Result<PooledConnection, NetworkError> {
         if self.shutdown.load(Ordering::Acquire) {
-            return Err(NetworkError::ConnectionError("Pool is shutting down".into()));
+            return Err(NetworkError::ConnectionError(
+                "Pool is shutting down".into(),
+            ));
         }
 
         let start_time = Instant::now();
 
         // Get or create semaphore for this peer
-        let semaphore = self.semaphores
+        let semaphore = self
+            .semaphores
             .entry(peer_id)
             .or_insert_with(|| Arc::new(Semaphore::new(self.config.max_size)))
             .clone();
@@ -168,7 +171,7 @@ impl ConnectionPool {
                     // Update connection state
                     conn.last_used = Instant::now();
                     conn.usage_count += 1;
-                    
+
                     // Move to active connections
                     let conn_id = self.connection_counter.fetch_add(1, Ordering::Relaxed) as u64;
                     self.active
@@ -178,10 +181,10 @@ impl ConnectionPool {
 
                     // Update statistics
                     self.update_acquisition_stats(start_time.elapsed());
-                    
+
                     // Forget the permit (keep it alive)
                     std::mem::forget(permit);
-                    
+
                     return Ok(conn);
                 }
             }
@@ -190,7 +193,7 @@ impl ConnectionPool {
         // No available connection, create new one if under limit
         if self.get_peer_connection_count(peer_id) < self.config.max_size {
             let conn = self.create_connection(peer_id).await?;
-            
+
             // Move to active connections
             let conn_id = self.connection_counter.fetch_add(1, Ordering::Relaxed) as u64;
             self.active
@@ -201,14 +204,15 @@ impl ConnectionPool {
             // Update statistics
             self.update_acquisition_stats(start_time.elapsed());
             self.increment_created();
-            
+
             // Forget the permit (keep it alive)
             std::mem::forget(permit);
-            
+
             Ok(conn)
         } else {
             // Wait for a connection to become available
-            let waiter = self.waiters
+            let waiter = self
+                .waiters
                 .entry(peer_id)
                 .or_insert_with(|| Arc::new(Notify::new()))
                 .clone();
@@ -269,7 +273,7 @@ impl ConnectionPool {
         // - Ping test
         // - Resource usage check
         // - Performance metrics validation
-        
+
         true
     }
 
@@ -296,15 +300,14 @@ impl ConnectionPool {
 
     /// Check if connection should be kept in pool
     fn should_keep_connection(&self, conn: &PooledConnection) -> bool {
-        self.is_connection_valid(conn) && 
-        self.get_total_connection_count() < self.config.max_size
+        self.is_connection_valid(conn) && self.get_total_connection_count() < self.config.max_size
     }
 
     /// Create a new connection
     async fn create_connection(&self, _peer_id: PeerId) -> Result<PooledConnection, NetworkError> {
         // Simulate connection creation (in real implementation, this would establish actual connection)
         let info = ConnectionInfo::new(ConnectionStatus::Connected);
-        
+
         let mut conn = PooledConnection {
             info,
             created_at: Instant::now(),
@@ -328,16 +331,16 @@ impl ConnectionPool {
     /// Warm a connection
     async fn warm_connection(&self, conn: &mut PooledConnection) -> Result<(), NetworkError> {
         conn.warming_state = WarmingState::Warming;
-        
+
         // Simulate warming process
         sleep(Duration::from_millis(50)).await;
-        
+
         // In real implementation, this would:
         // - Establish TLS handshake
         // - Perform protocol negotiation
         // - Prime any caches
         // - Run initial health checks
-        
+
         conn.warming_state = WarmingState::Warm;
         Ok(())
     }
@@ -350,47 +353,39 @@ impl ConnectionPool {
 
     /// Get connection count for a peer
     fn get_peer_connection_count(&self, peer_id: PeerId) -> usize {
-        let available_count = self.available
+        let available_count = self
+            .available
             .get(&peer_id)
             .map(|queue| queue.len())
             .unwrap_or(0);
-            
-        let active_count = self.active
-            .get(&peer_id)
-            .map(|map| map.len())
-            .unwrap_or(0);
-            
+
+        let active_count = self.active.get(&peer_id).map(|map| map.len()).unwrap_or(0);
+
         available_count + active_count
     }
 
     /// Get total connection count
     fn get_total_connection_count(&self) -> usize {
-        let available_count: usize = self.available
-            .iter()
-            .map(|entry| entry.value().len())
-            .sum();
-            
-        let active_count: usize = self.active
-            .iter()
-            .map(|entry| entry.value().len())
-            .sum();
-            
+        let available_count: usize = self.available.iter().map(|entry| entry.value().len()).sum();
+
+        let active_count: usize = self.active.iter().map(|entry| entry.value().len()).sum();
+
         available_count + active_count
     }
 
     /// Run maintenance tasks
     async fn run_maintenance(&self) {
         let mut interval = interval(self.config.health_check_interval);
-        
+
         while !self.shutdown.load(Ordering::Acquire) {
             interval.tick().await;
-            
+
             // Clean up expired connections
             self.cleanup_expired_connections();
-            
+
             // Maintain minimum pool size
             self.maintain_minimum_size().await;
-            
+
             // Update pool statistics
             self.update_pool_stats();
         }
@@ -401,7 +396,7 @@ impl ConnectionPool {
         for mut entry in self.available.iter_mut() {
             let peer_id = *entry.key();
             let queue = entry.value_mut();
-            
+
             // Remove invalid connections
             queue.retain(|conn| {
                 if self.is_connection_valid(conn) {
@@ -418,11 +413,11 @@ impl ConnectionPool {
     async fn maintain_minimum_size(&self) {
         // This is a simplified version - in production, you'd want more sophisticated logic
         let total_count = self.get_total_connection_count();
-        
+
         if total_count < self.config.min_size {
             let needed = self.config.min_size - total_count;
             debug!("Pool below minimum size, creating {} connections", needed);
-            
+
             // Create connections for known peers
             for entry in self.available.iter() {
                 let peer_id = *entry.key();
@@ -447,17 +442,11 @@ impl ConnectionPool {
     /// Update pool statistics
     fn update_pool_stats(&self) {
         let mut stats = self.stats.write();
-        
+
         stats.current_size = self.get_total_connection_count();
-        stats.available = self.available
-            .iter()
-            .map(|entry| entry.value().len())
-            .sum();
-        stats.active = self.active
-            .iter()
-            .map(|entry| entry.value().len())
-            .sum();
-            
+        stats.available = self.available.iter().map(|entry| entry.value().len()).sum();
+        stats.active = self.active.iter().map(|entry| entry.value().len()).sum();
+
         // Calculate hit rate
         if stats.acquisitions > 0 {
             stats.hit_rate = 1.0 - (stats.failed_acquisitions as f64 / stats.acquisitions as f64);
@@ -467,12 +456,12 @@ impl ConnectionPool {
     /// Shutdown the pool
     pub async fn shutdown(&mut self) {
         self.shutdown.store(true, Ordering::Release);
-        
+
         // Stop maintenance task
         if let Some(handle) = self.maintenance_handle.take() {
             handle.abort();
         }
-        
+
         // Close all connections
         for entry in self.available.iter() {
             let peer_id = *entry.key();
@@ -480,14 +469,14 @@ impl ConnectionPool {
                 self.destroy_connection(peer_id, conn.clone());
             }
         }
-        
+
         for entry in self.active.iter() {
             let peer_id = *entry.key();
             for (_, conn) in entry.value().iter() {
                 self.destroy_connection(peer_id, conn.clone());
             }
         }
-        
+
         // Clear all data
         self.available.clear();
         self.active.clear();
@@ -524,7 +513,7 @@ impl ConnectionPool {
     fn update_acquisition_stats(&self, wait_time: Duration) {
         let mut stats = self.stats.write();
         stats.acquisitions += 1;
-        
+
         // Update average wait time (exponential moving average)
         let alpha = 0.1;
         let current_avg = stats.avg_wait_time.as_millis() as f64;
@@ -542,12 +531,8 @@ impl Clone for ConnectionPool {
             active: self.active.clone(),
             semaphores: self.semaphores.clone(),
             stats: self.stats.clone(),
-            connection_counter: AtomicUsize::new(
-                self.connection_counter.load(Ordering::Relaxed)
-            ),
-            shutdown: AtomicBool::new(
-                self.shutdown.load(Ordering::Relaxed)
-            ),
+            connection_counter: AtomicUsize::new(self.connection_counter.load(Ordering::Relaxed)),
+            shutdown: AtomicBool::new(self.shutdown.load(Ordering::Relaxed)),
             waiters: self.waiters.clone(),
             maintenance_handle: None, // Don't clone the maintenance task
         }
@@ -562,7 +547,7 @@ mod tests {
     async fn test_pool_creation() {
         let config = PoolConfig::default();
         let pool = ConnectionPool::new(config);
-        
+
         let stats = pool.get_stats();
         assert_eq!(stats.current_size, 0);
         assert_eq!(stats.available, 0);
@@ -578,11 +563,11 @@ mod tests {
         };
         let pool = ConnectionPool::new(config);
         let peer_id = PeerId::random();
-        
+
         // Acquire connection
         let conn = pool.acquire(peer_id).await.unwrap();
         assert_eq!(conn.usage_count, 1);
-        
+
         let stats = pool.get_stats();
         assert_eq!(stats.acquisitions, 1);
         assert_eq!(stats.total_created, 1);
@@ -593,11 +578,11 @@ mod tests {
         let config = PoolConfig::default();
         let pool = ConnectionPool::new(config);
         let peer_id = PeerId::random();
-        
+
         // Acquire and release connection
         let conn = pool.acquire(peer_id).await.unwrap();
         pool.release(peer_id, conn);
-        
+
         let stats = pool.get_stats();
         assert_eq!(stats.releases, 1);
         assert_eq!(stats.available, 1);
@@ -608,17 +593,17 @@ mod tests {
         let config = PoolConfig::default();
         let pool = ConnectionPool::new(config);
         let peer_id = PeerId::random();
-        
+
         // First acquisition
         let conn1 = pool.acquire(peer_id).await.unwrap();
         let created_at = conn1.created_at;
         pool.release(peer_id, conn1);
-        
+
         // Second acquisition should reuse
         let conn2 = pool.acquire(peer_id).await.unwrap();
         assert_eq!(conn2.created_at, created_at);
         assert_eq!(conn2.usage_count, 2);
-        
+
         let stats = pool.get_stats();
         assert_eq!(stats.total_created, 1);
         assert_eq!(stats.acquisitions, 2);
@@ -633,20 +618,20 @@ mod tests {
         };
         let pool = ConnectionPool::new(config);
         let peer_id = PeerId::random();
-        
+
         // Acquire max connections
         let conn1 = pool.acquire(peer_id).await.unwrap();
         let conn2 = pool.acquire(peer_id).await.unwrap();
-        
+
         // Third acquisition should timeout
         let result = pool.acquire(peer_id).await;
         assert!(result.is_err());
-        
+
         // Release one and try again
         pool.release(peer_id, conn1);
         let conn3 = pool.acquire(peer_id).await;
         assert!(conn3.is_ok());
-        
+
         // Cleanup
         pool.release(peer_id, conn2);
         pool.release(peer_id, conn3.unwrap());
@@ -661,14 +646,14 @@ mod tests {
         };
         let pool = ConnectionPool::new(config);
         let peer_id = PeerId::random();
-        
+
         // Create and release connection
         let conn = pool.acquire(peer_id).await.unwrap();
         pool.release(peer_id, conn);
-        
+
         // Wait for expiration
         sleep(Duration::from_millis(200)).await;
-        
+
         // Connection should be cleaned up
         let stats = pool.get_stats();
         assert_eq!(stats.available, 0);

@@ -10,11 +10,11 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use qudag_crypto::ml_dsa::{MlDsa, MlDsaKeyPair, MlDsaPublicKey};
 use rand::{thread_rng, Rng};
-use std::time::{Duration, Instant};
-use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{Arc, Mutex};
 use std::thread;
+use std::time::{Duration, Instant};
 
 // Performance tracking
 static SIGNATURE_OPERATIONS: AtomicU64 = AtomicU64::new(0);
@@ -39,8 +39,11 @@ impl OptimizedMlDsa {
             enable_parallel,
         }
     }
-    
-    fn generate_keypair_cached(&self, seed: &[u8]) -> Result<MlDsaKeyPair, qudag_crypto::ml_dsa::MlDsaError> {
+
+    fn generate_keypair_cached(
+        &self,
+        seed: &[u8],
+    ) -> Result<MlDsaKeyPair, qudag_crypto::ml_dsa::MlDsaError> {
         // Try cache first
         if let Ok(cache) = self.keypair_cache.lock() {
             if let Some(keypair) = cache.get(seed) {
@@ -48,46 +51,52 @@ impl OptimizedMlDsa {
                 return Ok(keypair.clone());
             }
         }
-        
+
         CACHE_MISSES.fetch_add(1, Ordering::Relaxed);
         let mut rng = thread_rng();
         let keypair = MlDsaKeyPair::generate(&mut rng)?;
-        
+
         // Cache the result
         if let Ok(mut cache) = self.keypair_cache.lock() {
             cache.insert(seed.to_vec(), keypair.clone());
         }
-        
+
         Ok(keypair)
     }
-    
-    fn sign_batch(&self, messages: &[Vec<u8>]) -> Result<Vec<Vec<u8>>, qudag_crypto::ml_dsa::MlDsaError> {
+
+    fn sign_batch(
+        &self,
+        messages: &[Vec<u8>],
+    ) -> Result<Vec<Vec<u8>>, qudag_crypto::ml_dsa::MlDsaError> {
         let mut rng = thread_rng();
         let keypair = MlDsaKeyPair::generate(&mut rng)?;
         let mut signatures = Vec::with_capacity(messages.len());
-        
+
         if self.enable_parallel && messages.len() > 4 {
             // Parallel signing for large batches
             let chunk_size = (messages.len() + 3) / 4; // Divide into 4 chunks
             let chunks: Vec<_> = messages.chunks(chunk_size).collect();
-            
-            let handles: Vec<_> = chunks.into_iter().map(|chunk| {
-                let keypair_clone = keypair.clone();
-                let chunk_owned = chunk.to_vec();
-                
-                thread::spawn(move || {
-                    let mut rng = thread_rng();
-                    let mut chunk_signatures = Vec::new();
-                    
-                    for message in chunk_owned {
-                        let signature = keypair_clone.sign(&message, &mut rng)?;
-                        chunk_signatures.push(signature);
-                    }
-                    
-                    Ok::<Vec<Vec<u8>>, qudag_crypto::ml_dsa::MlDsaError>(chunk_signatures)
+
+            let handles: Vec<_> = chunks
+                .into_iter()
+                .map(|chunk| {
+                    let keypair_clone = keypair.clone();
+                    let chunk_owned = chunk.to_vec();
+
+                    thread::spawn(move || {
+                        let mut rng = thread_rng();
+                        let mut chunk_signatures = Vec::new();
+
+                        for message in chunk_owned {
+                            let signature = keypair_clone.sign(&message, &mut rng)?;
+                            chunk_signatures.push(signature);
+                        }
+
+                        Ok::<Vec<Vec<u8>>, qudag_crypto::ml_dsa::MlDsaError>(chunk_signatures)
+                    })
                 })
-            }).collect();
-            
+                .collect();
+
             for handle in handles {
                 let chunk_signatures = handle.join().unwrap()?;
                 signatures.extend(chunk_signatures);
@@ -100,36 +109,47 @@ impl OptimizedMlDsa {
                 SIGNATURE_OPERATIONS.fetch_add(1, Ordering::Relaxed);
             }
         }
-        
+
         Ok(signatures)
     }
-    
-    fn verify_batch(&self, messages: &[Vec<u8>], signatures: &[Vec<u8>], public_key: &MlDsaPublicKey) -> Result<Vec<bool>, qudag_crypto::ml_dsa::MlDsaError> {
+
+    fn verify_batch(
+        &self,
+        messages: &[Vec<u8>],
+        signatures: &[Vec<u8>],
+        public_key: &MlDsaPublicKey,
+    ) -> Result<Vec<bool>, qudag_crypto::ml_dsa::MlDsaError> {
         let mut results = Vec::with_capacity(messages.len());
-        
+
         if self.enable_parallel && messages.len() > 4 {
             // Parallel verification
             let chunk_size = (messages.len() + 3) / 4;
             let message_chunks: Vec<_> = messages.chunks(chunk_size).collect();
             let signature_chunks: Vec<_> = signatures.chunks(chunk_size).collect();
-            
-            let handles: Vec<_> = message_chunks.iter().zip(signature_chunks.iter()).map(|(msg_chunk, sig_chunk)| {
-                let public_key_clone = public_key.clone();
-                let msg_chunk_owned = msg_chunk.to_vec();
-                let sig_chunk_owned = sig_chunk.to_vec();
-                
-                thread::spawn(move || {
-                    let mut chunk_results = Vec::new();
-                    
-                    for (message, signature) in msg_chunk_owned.iter().zip(sig_chunk_owned.iter()) {
-                        let result = public_key_clone.verify(message, signature).is_ok();
-                        chunk_results.push(result);
-                    }
-                    
-                    chunk_results
+
+            let handles: Vec<_> = message_chunks
+                .iter()
+                .zip(signature_chunks.iter())
+                .map(|(msg_chunk, sig_chunk)| {
+                    let public_key_clone = public_key.clone();
+                    let msg_chunk_owned = msg_chunk.to_vec();
+                    let sig_chunk_owned = sig_chunk.to_vec();
+
+                    thread::spawn(move || {
+                        let mut chunk_results = Vec::new();
+
+                        for (message, signature) in
+                            msg_chunk_owned.iter().zip(sig_chunk_owned.iter())
+                        {
+                            let result = public_key_clone.verify(message, signature).is_ok();
+                            chunk_results.push(result);
+                        }
+
+                        chunk_results
+                    })
                 })
-            }).collect();
-            
+                .collect();
+
             for handle in handles {
                 let chunk_results = handle.join().unwrap();
                 results.extend(chunk_results);
@@ -142,10 +162,10 @@ impl OptimizedMlDsa {
                 VERIFICATION_OPERATIONS.fetch_add(1, Ordering::Relaxed);
             }
         }
-        
+
         Ok(results)
     }
-    
+
     fn clear_caches(&self) {
         if let Ok(mut cache) = self.keypair_cache.lock() {
             cache.clear();
@@ -180,7 +200,7 @@ fn bench_ml_dsa_keygen(c: &mut Criterion) {
             let _ = MlDsaKeyPair::generate(&mut rng);
         })
     });
-    
+
     // Cached key generation
     group.bench_function("keygen_cached", |b| {
         b.iter(|| {
@@ -188,7 +208,7 @@ fn bench_ml_dsa_keygen(c: &mut Criterion) {
             let _ = optimized.generate_keypair_cached(seed);
         })
     });
-    
+
     // Batch key generation
     let batch_sizes = [1, 5, 10, 25, 50];
     for &batch_size in &batch_sizes {
@@ -208,7 +228,7 @@ fn bench_ml_dsa_keygen(c: &mut Criterion) {
             },
         );
     }
-    
+
     // Parallel key generation
     let thread_counts = [1, 2, 4, 8];
     for &thread_count in &thread_counts {
@@ -225,10 +245,8 @@ fn bench_ml_dsa_keygen(c: &mut Criterion) {
                             })
                         })
                         .collect();
-                    
-                    let results: Vec<_> = handles.into_iter()
-                        .map(|h| h.join().unwrap())
-                        .collect();
+
+                    let results: Vec<_> = handles.into_iter().map(|h| h.join().unwrap()).collect();
                     criterion::black_box(results)
                 });
             },
@@ -255,21 +273,25 @@ fn bench_ml_dsa_signing(c: &mut Criterion) {
         let message: Vec<u8> = (0..size).map(|_| rng.gen()).collect();
 
         group.throughput(Throughput::Bytes(size as u64));
-        group.bench_with_input(BenchmarkId::new("sign_baseline", size), &message, |b, msg| {
-            b.iter(|| {
-                let mut rng = thread_rng();
-                let _ = keypair.sign(msg, &mut rng);
-            })
-        });
+        group.bench_with_input(
+            BenchmarkId::new("sign_baseline", size),
+            &message,
+            |b, msg| {
+                b.iter(|| {
+                    let mut rng = thread_rng();
+                    let _ = keypair.sign(msg, &mut rng);
+                })
+            },
+        );
     }
-    
+
     // Batch signing performance
     let batch_sizes = [1, 5, 10, 25, 50];
     for &batch_size in &batch_sizes {
         let messages: Vec<Vec<u8>> = (0..batch_size)
             .map(|_| (0..1024).map(|_| rng.gen()).collect())
             .collect();
-        
+
         group.throughput(Throughput::Elements(batch_size as u64));
         group.bench_with_input(
             BenchmarkId::new("sign_batch", batch_size),
@@ -281,27 +303,27 @@ fn bench_ml_dsa_signing(c: &mut Criterion) {
             },
         );
     }
-    
+
     // Memory-efficient signing
     group.bench_function("sign_memory_efficient", |b| {
         let message = vec![0x42u8; 1024];
-        
+
         b.iter_custom(|iters| {
             let mut total_duration = Duration::new(0, 0);
             let mut max_memory = 0;
-            
+
             for _ in 0..iters {
                 let start = Instant::now();
                 let mut rng = thread_rng();
                 let signature = keypair.sign(&message, &mut rng).unwrap();
                 let duration = start.elapsed();
-                
+
                 max_memory = max_memory.max(signature.len());
                 total_duration += duration;
-                
+
                 criterion::black_box(signature);
             }
-            
+
             println!("Max signature size: {} bytes", max_memory);
             total_duration
         });
@@ -342,17 +364,18 @@ fn bench_ml_dsa_verification(c: &mut Criterion) {
             },
         );
     }
-    
+
     // Batch verification performance
     let batch_sizes = [1, 5, 10, 25, 50];
     for &batch_size in &batch_sizes {
         let messages: Vec<Vec<u8>> = (0..batch_size)
             .map(|_| (0..1024).map(|_| rng.gen()).collect())
             .collect();
-        let signatures: Vec<Vec<u8>> = messages.iter()
+        let signatures: Vec<Vec<u8>> = messages
+            .iter()
             .map(|msg| keypair.sign(msg, &mut rng).unwrap())
             .collect();
-        
+
         group.throughput(Throughput::Elements(batch_size as u64));
         group.bench_with_input(
             BenchmarkId::new("verify_batch", batch_size),
@@ -364,54 +387,55 @@ fn bench_ml_dsa_verification(c: &mut Criterion) {
             },
         );
     }
-    
+
     // Constant-time verification testing
     group.bench_function("verify_constant_time", |b| {
         let message = vec![0x42u8; 1024];
         let valid_signature = keypair.sign(&message, &mut rng).unwrap();
         let mut invalid_signature = valid_signature.clone();
         invalid_signature[0] ^= 1; // Tamper with signature
-        
+
         b.iter_custom(|iters| {
             let mut total_duration = Duration::new(0, 0);
             let mut valid_times = Vec::new();
             let mut invalid_times = Vec::new();
-            
+
             for i in 0..iters {
                 let (msg, sig) = if i % 2 == 0 {
                     (&message, &valid_signature)
                 } else {
                     (&message, &invalid_signature)
                 };
-                
+
                 let start = Instant::now();
                 let _ = public_key.verify(msg, sig);
                 let duration = start.elapsed();
-                
+
                 if i % 2 == 0 {
                     valid_times.push(duration);
                 } else {
                     invalid_times.push(duration);
                 }
-                
+
                 total_duration += duration;
             }
-            
+
             // Check timing consistency
             if !valid_times.is_empty() && !invalid_times.is_empty() {
                 let avg_valid = valid_times.iter().sum::<Duration>() / valid_times.len() as u32;
-                let avg_invalid = invalid_times.iter().sum::<Duration>() / invalid_times.len() as u32;
-                let timing_diff = if avg_valid > avg_invalid { 
-                    avg_valid - avg_invalid 
-                } else { 
-                    avg_invalid - avg_valid 
+                let avg_invalid =
+                    invalid_times.iter().sum::<Duration>() / invalid_times.len() as u32;
+                let timing_diff = if avg_valid > avg_invalid {
+                    avg_valid - avg_invalid
+                } else {
+                    avg_invalid - avg_valid
                 };
-                
+
                 if timing_diff > Duration::from_micros(100) {
                     println!("WARNING: Timing difference detected: {:?}", timing_diff);
                 }
             }
-            
+
             total_duration
         });
     });

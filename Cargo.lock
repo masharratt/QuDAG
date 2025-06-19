@@ -987,6 +987,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "dashmap"
+version = "6.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "5041cc499144891f3790297212f32a74fb938e5136a14943f338ef9e0ae276cf"
+dependencies = [
+ "cfg-if",
+ "crossbeam-utils",
+ "hashbrown 0.14.5",
+ "lock_api",
+ "once_cell",
+ "parking_lot_core",
+]
+
+[[package]]
 name = "data-encoding"
 version = "2.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3815,7 +3829,7 @@ dependencies = [
  "anyhow",
  "bincode",
  "blake3",
- "dashmap",
+ "dashmap 5.5.3",
  "futures",
  "lru 0.12.5",
  "metrics",
@@ -3846,7 +3860,7 @@ dependencies = [
  "bytes",
  "chacha20poly1305",
  "curve25519-dalek",
- "dashmap",
+ "dashmap 5.5.3",
  "ed25519-dalek",
  "either",
  "futures",
@@ -3884,8 +3898,10 @@ dependencies = [
  "async-trait",
  "bincode",
  "blake3",
+ "dashmap 6.1.0",
  "futures",
  "hex",
+ "libp2p",
  "metrics",
  "parking_lot",
  "proptest",
@@ -3910,12 +3926,14 @@ name = "qudag-simulator"
 version = "0.1.0"
 dependencies = [
  "anyhow",
+ "chrono",
  "csv",
  "plotters",
  "proptest",
  "qudag-protocol",
  "rand 0.8.5",
  "serde",
+ "serde_json",
  "thiserror 1.0.69",
  "tokio",
  "tracing",

@@ -228,10 +228,15 @@ pub struct SecurityVulnerability {
 /// Vulnerability severity levels
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum VulnerabilitySeverity {
+    /// Critical vulnerability requiring immediate attention
     Critical,
+    /// High severity vulnerability
     High,
+    /// Medium severity vulnerability
     Medium,
+    /// Low severity vulnerability
     Low,
+    /// Informational finding
     Info,
 }
 
@@ -303,28 +308,41 @@ pub struct Recommendation {
 /// Recommendation categories
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RecommendationCategory {
+    /// Performance-related recommendations
     Performance,
+    /// Security-related recommendations
     Security,
+    /// Scalability improvements
     Scalability,
+    /// Reliability enhancements
     Reliability,
+    /// Usability improvements
     Usability,
 }
 
 /// Recommendation priorities
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum RecommendationPriority {
+    /// Critical priority - immediate action required
     Critical,
+    /// High priority - action required soon
     High,
+    /// Medium priority - plan for implementation
     Medium,
+    /// Low priority - consider for future implementation
     Low,
 }
 
 /// Implementation complexity levels
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum ImplementationComplexity {
+    /// Low complexity - quick implementation
     Low,
+    /// Medium complexity - moderate effort required
     Medium,
+    /// High complexity - significant effort required
     High,
+    /// Very high complexity - major undertaking
     VeryHigh,
 }
 
@@ -964,9 +982,13 @@ impl ReportGenerator {
 /// Report output formats
 #[derive(Debug, Clone)]
 pub enum ReportFormat {
+    /// JSON format for programmatic consumption
     Json,
+    /// HTML format for web viewing
     Html,
+    /// CSV format for spreadsheet analysis
     Csv,
+    /// Markdown format for documentation
     Markdown,
 }
 

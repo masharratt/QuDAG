@@ -126,6 +126,18 @@ struct ActiveAttack {
     status: AttackStatus,
 }
 
+// Allow unused fields since they may be used in future implementations
+#[allow(dead_code)]
+impl ActiveAttack {
+    fn get_attack_type(&self) -> &AttackType {
+        &self.attack_type
+    }
+
+    fn get_start_time(&self) -> Instant {
+        self.start_time
+    }
+}
+
 /// Status of an attack
 #[derive(Debug, Clone)]
 enum AttackStatus {
@@ -134,10 +146,21 @@ enum AttackStatus {
     Failed(String),
 }
 
+#[allow(dead_code)]
+impl AttackStatus {
+    fn get_failure_reason(&self) -> Option<&str> {
+        match self {
+            AttackStatus::Failed(reason) => Some(reason),
+            _ => None,
+        }
+    }
+}
+
 /// Network state for attack simulation
 struct NetworkState {
     nodes: HashSet<String>,
     connections: HashMap<String, HashSet<String>>,
+    #[allow(dead_code)] // May be used in future routing attack implementations
     message_routes: HashMap<String, Vec<String>>,
 }
 

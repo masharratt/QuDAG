@@ -2,10 +2,10 @@
 //! dark addressing support, and sophisticated peer reputation management.
 
 use crate::dark_resolver::DarkResolver;
-use crate::shadow_address::{ShadowAddress, DefaultShadowAddressHandler, NetworkType};
+use crate::shadow_address::{DefaultShadowAddressHandler, NetworkType, ShadowAddress};
 use crate::types::NetworkError;
 use libp2p::PeerId as LibP2PPeerId;
-use rand::{Rng, seq::SliceRandom};
+use rand::{seq::SliceRandom, Rng};
 use serde::{Deserialize, Serialize};
 use std::collections::{BTreeMap, HashMap, HashSet, VecDeque};
 use std::net::SocketAddr;
@@ -567,7 +567,8 @@ impl DiscoveredPeer {
         // Check backoff based on recent failures
         if self.connection_attempts > 3 {
             if let Some(last_attempt) = self.last_connection_attempt {
-                let backoff_time = Duration::from_secs((self.connection_attempts as u64).pow(2) * 30);
+                let backoff_time =
+                    Duration::from_secs((self.connection_attempts as u64).pow(2) * 30);
                 if last_attempt.elapsed() < backoff_time {
                     return false;
                 }
@@ -586,16 +587,18 @@ impl DiscoveredPeer {
     pub fn record_connection_attempt(&mut self, success: bool, config: &PeerScoringConfig) {
         self.connection_attempts += 1;
         self.last_connection_attempt = Some(Instant::now());
-        
+
         if success {
             self.successful_connections += 1;
             self.last_successful_connection = Some(Instant::now());
             self.reputation += config.connection_success_bonus;
             self.reputation = self.reputation.min(config.max_score);
-            
+
             // Reset circuit breaker on success
             match &self.circuit_breaker_state {
-                CircuitBreakerState::HalfOpen { successful_tests, .. } => {
+                CircuitBreakerState::HalfOpen {
+                    successful_tests, ..
+                } => {
                     let new_successful = successful_tests + 1;
                     if new_successful >= 3 {
                         self.circuit_breaker_state = CircuitBreakerState::Closed;
@@ -610,13 +613,13 @@ impl DiscoveredPeer {
                     self.circuit_breaker_state = CircuitBreakerState::Closed;
                 }
             }
-            
+
             // Update quality scores
             self.update_connection_quality(true);
         } else {
             self.reputation -= config.connection_failure_penalty;
             self.reputation = self.reputation.max(config.min_score);
-            
+
             // Update circuit breaker on failure
             match &self.circuit_breaker_state {
                 CircuitBreakerState::Closed => {
@@ -635,7 +638,7 @@ impl DiscoveredPeer {
                 }
                 _ => {}
             }
-            
+
             // Update quality scores
             self.update_connection_quality(false);
         }
@@ -650,18 +653,17 @@ impl DiscoveredPeer {
         };
 
         self.connection_quality.reliability_score = success_rate;
-        
+
         // Update overall score based on multiple factors
         let performance_factor = 1.0 - (self.performance_metrics.error_rate * 0.5);
         let availability_factor = self.uptime_stats.uptime_percentage / 100.0;
-        
-        self.connection_quality.overall_score = (
-            self.connection_quality.reliability_score * 0.4 +
-            performance_factor * 0.3 +
-            availability_factor * 0.2 +
-            self.connection_quality.security_score * 0.1
-        ).clamp(0.0, 1.0);
-        
+
+        self.connection_quality.overall_score = (self.connection_quality.reliability_score * 0.4
+            + performance_factor * 0.3
+            + availability_factor * 0.2
+            + self.connection_quality.security_score * 0.1)
+            .clamp(0.0, 1.0);
+
         self.connection_quality.last_assessed = Some(Instant::now());
     }
 
@@ -674,11 +676,15 @@ impl DiscoveredPeer {
                 self.performance_metrics.max_response_time = response_time;
                 self.performance_metrics.avg_response_time = response_time;
             } else {
-                self.performance_metrics.min_response_time = 
-                    self.performance_metrics.min_response_time.min(response_time);
-                self.performance_metrics.max_response_time = 
-                    self.performance_metrics.max_response_time.max(response_time);
-                
+                self.performance_metrics.min_response_time = self
+                    .performance_metrics
+                    .min_response_time
+                    .min(response_time);
+                self.performance_metrics.max_response_time = self
+                    .performance_metrics
+                    .max_response_time
+                    .max(response_time);
+
                 // Update average with exponential moving average
                 let alpha = 0.1;
                 let current_avg = self.performance_metrics.avg_response_time.as_secs_f64();
@@ -701,40 +707,42 @@ impl DiscoveredPeer {
     pub fn update_load_metrics(&mut self, active_connections: usize, queue_depth: usize) {
         self.load_metrics.active_connections = active_connections;
         self.load_metrics.queue_depth = queue_depth;
-        
+
         // Calculate load score based on multiple factors
-        let connection_factor = if let Some(max_conn) = self.capabilities.max_concurrent_connections {
+        let connection_factor = if let Some(max_conn) = self.capabilities.max_concurrent_connections
+        {
             active_connections as f64 / max_conn as f64
         } else {
             active_connections as f64 / 100.0 // Assume 100 as default max
         };
-        
+
         let queue_factor = queue_depth as f64 / 50.0; // Assume 50 as normal queue depth
-        
-        self.load_metrics.load_score = ((connection_factor + queue_factor) * 50.0).clamp(0.0, 100.0);
-        
+
+        self.load_metrics.load_score =
+            ((connection_factor + queue_factor) * 50.0).clamp(0.0, 100.0);
+
         // Update weight for load balancing (inverse of load)
         self.load_metrics.weight = (100.0 - self.load_metrics.load_score).max(1.0);
     }
 
     /// Check if peer is healthy for load balancing
     pub fn is_healthy(&self) -> bool {
-        !self.is_blacklisted &&
-        self.circuit_breaker_state == CircuitBreakerState::Closed &&
-        self.connection_quality.overall_score > 0.5 &&
-        self.load_metrics.load_score < 90.0
+        !self.is_blacklisted
+            && self.circuit_breaker_state == CircuitBreakerState::Closed
+            && self.connection_quality.overall_score > 0.5
+            && self.load_metrics.load_score < 90.0
     }
 
     /// Calculate peer priority for selection
     pub fn calculate_priority(&self, config: &PeerScoringConfig) -> f64 {
         let mut priority = self.reputation;
-        
+
         // Adjust for connection quality
         priority += self.connection_quality.overall_score * 20.0;
-        
+
         // Adjust for load (prefer less loaded peers)
         priority += (100.0 - self.load_metrics.load_score) * 0.1;
-        
+
         // Adjust for geographic preferences if available
         if let Some(geo_info) = &self.geographic_info {
             if config.enable_geographic_scoring {
@@ -745,10 +753,10 @@ impl DiscoveredPeer {
                 }
             }
         }
-        
+
         // Adjust for uptime
         priority += self.uptime_stats.uptime_percentage * 0.1;
-        
+
         priority.max(0.0)
     }
 
@@ -788,18 +796,18 @@ impl DiscoveredPeer {
     /// Update uptime statistics
     pub fn update_uptime(&mut self, is_online: bool, duration: Duration) {
         self.uptime_stats.total_observed_time += duration;
-        
+
         if is_online {
             self.uptime_stats.total_uptime += duration;
         } else {
             self.uptime_stats.disconnection_count += 1;
         }
-        
+
         // Recalculate uptime percentage
         if self.uptime_stats.total_observed_time > Duration::ZERO {
-            self.uptime_stats.uptime_percentage = 
-                (self.uptime_stats.total_uptime.as_secs_f64() / 
-                 self.uptime_stats.total_observed_time.as_secs_f64()) * 100.0;
+            self.uptime_stats.uptime_percentage = (self.uptime_stats.total_uptime.as_secs_f64()
+                / self.uptime_stats.total_observed_time.as_secs_f64())
+                * 100.0;
         }
     }
 }
@@ -1064,13 +1072,14 @@ impl LoadBalancer {
             }
             LoadBalancingAlgorithm::WeightedRoundRobin => {
                 // Select based on weights
-                let total_weight: f64 = available_peers.iter()
+                let total_weight: f64 = available_peers
+                    .iter()
                     .map(|p| self.peer_weights.get(p).unwrap_or(&1.0))
                     .sum();
-                
+
                 let mut rng = rand::thread_rng();
                 let mut target = rng.gen::<f64>() * total_weight;
-                
+
                 for peer in available_peers {
                     let weight = self.peer_weights.get(peer).unwrap_or(&1.0);
                     if target < *weight {
@@ -1078,24 +1087,23 @@ impl LoadBalancer {
                     }
                     target -= weight;
                 }
-                
+
                 available_peers.last().copied()
             }
-            LoadBalancingAlgorithm::LeastConnections => {
-                available_peers.iter()
-                    .min_by_key(|p| self.connection_counts.get(p).unwrap_or(&0))
-                    .copied()
-            }
-            LoadBalancingAlgorithm::LeastResponseTime => {
-                available_peers.iter()
-                    .min_by_key(|p| {
-                        self.response_times.get(p)
-                            .and_then(|times| times.back())
-                            .map(|d| d.as_millis())
-                            .unwrap_or(u128::MAX)
-                    })
-                    .copied()
-            }
+            LoadBalancingAlgorithm::LeastConnections => available_peers
+                .iter()
+                .min_by_key(|p| self.connection_counts.get(p).unwrap_or(&0))
+                .copied(),
+            LoadBalancingAlgorithm::LeastResponseTime => available_peers
+                .iter()
+                .min_by_key(|p| {
+                    self.response_times
+                        .get(p)
+                        .and_then(|times| times.back())
+                        .map(|d| d.as_millis())
+                        .unwrap_or(u128::MAX)
+                })
+                .copied(),
             LoadBalancingAlgorithm::Random => {
                 let mut rng = rand::thread_rng();
                 available_peers.choose(&mut rng).copied()
@@ -1105,14 +1113,20 @@ impl LoadBalancer {
     }
 
     /// Update peer metrics
-    pub fn update_metrics(&mut self, peer: LibP2PPeerId, connections: usize, response_time: Option<Duration>) {
+    pub fn update_metrics(
+        &mut self,
+        peer: LibP2PPeerId,
+        connections: usize,
+        response_time: Option<Duration>,
+    ) {
         self.connection_counts.insert(peer, connections);
-        
+
         if let Some(rt) = response_time {
-            self.response_times.entry(peer)
+            self.response_times
+                .entry(peer)
                 .or_insert_with(|| VecDeque::with_capacity(10))
                 .push_back(rt);
-            
+
             if let Some(times) = self.response_times.get_mut(&peer) {
                 if times.len() > 10 {
                     times.pop_front();
@@ -1157,14 +1171,15 @@ impl PeerSelector {
         scoring_config: &PeerScoringConfig,
     ) -> Vec<LibP2PPeerId> {
         let mut selected = Vec::new();
-        
+
         // Filter candidates based on criteria
-        let mut eligible: Vec<_> = candidates.iter()
+        let mut eligible: Vec<_> = candidates
+            .iter()
             .filter(|p| p.is_healthy() && !p.is_blacklisted)
             .filter(|p| p.connection_quality.reliability_score >= 0.5)
             .filter(|p| self.meets_capability_requirements(p))
             .collect();
-        
+
         // Sort based on strategy
         match &self.strategy {
             PeerSelectionStrategy::BestFirst => {
@@ -1177,7 +1192,10 @@ impl PeerSelector {
             PeerSelectionStrategy::Diversity => {
                 // Prefer peers we haven't selected recently
                 eligible.sort_by_key(|p| {
-                    self.recent_selections.iter().position(|id| id == &p.peer_id).unwrap_or(usize::MAX)
+                    self.recent_selections
+                        .iter()
+                        .position(|id| id == &p.peer_id)
+                        .unwrap_or(usize::MAX)
                 });
             }
             PeerSelectionStrategy::Probabilistic => {
@@ -1187,7 +1205,7 @@ impl PeerSelector {
             }
             _ => {}
         }
-        
+
         // Select required number of peers
         for peer in eligible.into_iter().take(count) {
             selected.push(peer.peer_id);
@@ -1197,7 +1215,7 @@ impl PeerSelector {
             }
             *self.selection_history.entry(peer.peer_id).or_insert(0) += 1;
         }
-        
+
         selected
     }
 
@@ -1206,14 +1224,15 @@ impl PeerSelector {
         if self.required_capabilities.is_empty() {
             return true;
         }
-        
+
         for required in &self.required_capabilities {
-            if !peer.capabilities.supported_message_types.contains(required) &&
-               !peer.capabilities.protocol_versions.contains(required) {
+            if !peer.capabilities.supported_message_types.contains(required)
+                && !peer.capabilities.protocol_versions.contains(required)
+            {
                 return false;
             }
         }
-        
+
         true
     }
 }
@@ -1456,7 +1475,7 @@ impl KademliaPeerDiscovery {
     /// Create a new production-ready Kademlia peer discovery service
     pub fn new(config: DiscoveryConfig) -> Self {
         let max_connections = config.max_concurrent_connections;
-        
+
         Self {
             discovered_peers: Arc::new(RwLock::new(HashMap::new())),
             static_peers: HashSet::new(),
@@ -1467,19 +1486,25 @@ impl KademliaPeerDiscovery {
             last_discovery: None,
             dark_resolver: Arc::new(DarkResolver::new()),
             shadow_handler: DefaultShadowAddressHandler::new(
-                NetworkType::Mainnet, 
-                [0u8; 32] // TODO: Use proper seed
+                NetworkType::Mainnet,
+                [0u8; 32], // TODO: Use proper seed
             ),
             dht_buckets: Arc::new(RwLock::new(BTreeMap::new())),
             connection_semaphore: Arc::new(Semaphore::new(max_connections)),
-            load_balancer: Arc::new(Mutex::new(LoadBalancer::new(config.load_balancing_config.algorithm.clone()))),
-            peer_selector: Arc::new(Mutex::new(PeerSelector::new(config.geo_preferences.clone()))),
+            load_balancer: Arc::new(Mutex::new(LoadBalancer::new(
+                config.load_balancing_config.algorithm.clone(),
+            ))),
+            peer_selector: Arc::new(Mutex::new(PeerSelector::new(
+                config.geo_preferences.clone(),
+            ))),
             topology_optimizer: Arc::new(Mutex::new(TopologyOptimizer::new())),
-            health_checker: Arc::new(Mutex::new(HealthChecker::new(config.load_balancing_config.health_check_interval))),
+            health_checker: Arc::new(Mutex::new(HealthChecker::new(
+                config.load_balancing_config.health_check_interval,
+            ))),
             performance_monitor: Arc::new(Mutex::new(PerformanceMonitor::new())),
-            bootstrap_strategy: BootstrapStrategy::Adaptive { 
-                aggressiveness: 0.5, 
-                last_adapted: Instant::now() 
+            bootstrap_strategy: BootstrapStrategy::Adaptive {
+                aggressiveness: 0.5,
+                last_adapted: Instant::now(),
             },
             config,
         }
@@ -1521,7 +1546,10 @@ impl KademliaPeerDiscovery {
             return Ok(());
         }
 
-        info!("Starting DHT bootstrap with {} nodes", self.config.bootstrap_nodes.len());
+        info!(
+            "Starting DHT bootstrap with {} nodes",
+            self.config.bootstrap_nodes.len()
+        );
         let start_time = Instant::now();
         let mut discovered_peers = 0;
 
@@ -1531,35 +1559,40 @@ impl KademliaPeerDiscovery {
             }
 
             self.bootstrap_tried.insert(*bootstrap_addr);
-            
+
             // Create a discovered peer for the bootstrap node
             let peer_id = LibP2PPeerId::random(); // In real implementation, resolve from address
-            let discovered_peer = DiscoveredPeer::new(
-                peer_id,
-                *bootstrap_addr,
-                DiscoveryMethod::Bootstrap,
-            );
+            let discovered_peer =
+                DiscoveredPeer::new(peer_id, *bootstrap_addr, DiscoveryMethod::Bootstrap);
 
             // Add to discovered peers
-            self.discovered_peers.write().await.insert(peer_id, discovered_peer.clone());
+            self.discovered_peers
+                .write()
+                .await
+                .insert(peer_id, discovered_peer.clone());
             discovered_peers += 1;
 
             // Send discovery event
             if let Some(tx) = &self.event_tx {
-                let _ = tx.send(DiscoveryEvent::PeerDiscovered(discovered_peer)).await;
+                let _ = tx
+                    .send(DiscoveryEvent::PeerDiscovered(discovered_peer))
+                    .await;
             }
 
             debug!("Added bootstrap peer: {} -> {:?}", bootstrap_addr, peer_id);
         }
 
         self.bootstrap_completed = true;
-        
+
         if let Some(tx) = &self.event_tx {
-            let _ = tx.send(DiscoveryEvent::BootstrapCompleted {
-                peers_discovered: discovered_peers,
-                duration: start_time.elapsed(),
-                success_rate: discovered_peers as f64 / self.config.bootstrap_nodes.len().max(1) as f64,
-            }).await;
+            let _ = tx
+                .send(DiscoveryEvent::BootstrapCompleted {
+                    peers_discovered: discovered_peers,
+                    duration: start_time.elapsed(),
+                    success_rate: discovered_peers as f64
+                        / self.config.bootstrap_nodes.len().max(1) as f64,
+                })
+                .await;
         }
 
         info!("DHT bootstrap completed");
@@ -1576,15 +1609,16 @@ impl KademliaPeerDiscovery {
 
         tokio::spawn(async move {
             let mut interval_timer = tokio::time::interval(interval);
-            
+
             loop {
                 interval_timer.tick().await;
-                
+
                 // Perform discovery based on configured methods
                 for method in &methods {
                     match method {
                         DiscoveryMethod::Kademlia => {
-                            Self::discover_kademlia_peers(&discovered_peers, &event_tx, max_peers).await;
+                            Self::discover_kademlia_peers(&discovered_peers, &event_tx, max_peers)
+                                .await;
                         }
                         DiscoveryMethod::Mdns => {
                             Self::discover_mdns_peers(&discovered_peers, &event_tx).await;
@@ -1609,23 +1643,25 @@ impl KademliaPeerDiscovery {
 
         // Simulate DHT peer discovery
         let peers_to_discover = (max_peers - current_count).min(5);
-        
+
         for _ in 0..peers_to_discover {
             let peer_id = LibP2PPeerId::random();
-            let address = SocketAddr::from(([192, 168, 1, 100], 8000 + rand::random::<u16>() % 1000));
-            
-            let discovered_peer = DiscoveredPeer::new(
-                peer_id,
-                address,
-                DiscoveryMethod::Kademlia,
-            );
+            let address =
+                SocketAddr::from(([192, 168, 1, 100], 8000 + rand::random::<u16>() % 1000));
+
+            let discovered_peer = DiscoveredPeer::new(peer_id, address, DiscoveryMethod::Kademlia);
 
             // Add to discovered peers
-            discovered_peers.write().await.insert(peer_id, discovered_peer.clone());
+            discovered_peers
+                .write()
+                .await
+                .insert(peer_id, discovered_peer.clone());
 
             // Send discovery event
             if let Some(tx) = event_tx {
-                let _ = tx.send(DiscoveryEvent::PeerDiscovered(discovered_peer)).await;
+                let _ = tx
+                    .send(DiscoveryEvent::PeerDiscovered(discovered_peer))
+                    .await;
             }
 
             debug!("Discovered peer via Kademlia: {:?} at {}", peer_id, address);
@@ -1639,28 +1675,29 @@ impl KademliaPeerDiscovery {
     ) {
         // Simulate mDNS discovery for local network peers
         let local_peers = 2; // Discover a few local peers
-        
+
         for _ in 0..local_peers {
             let peer_id = LibP2PPeerId::random();
             let address = SocketAddr::from(([192, 168, 1, 10 + rand::random::<u8>() % 50], 8000));
-            
+
             // Check if already discovered
             if discovered_peers.read().await.contains_key(&peer_id) {
                 continue;
             }
-            
-            let discovered_peer = DiscoveredPeer::new(
-                peer_id,
-                address,
-                DiscoveryMethod::Mdns,
-            );
+
+            let discovered_peer = DiscoveredPeer::new(peer_id, address, DiscoveryMethod::Mdns);
 
             // Add to discovered peers
-            discovered_peers.write().await.insert(peer_id, discovered_peer.clone());
+            discovered_peers
+                .write()
+                .await
+                .insert(peer_id, discovered_peer.clone());
 
             // Send discovery event
             if let Some(tx) = event_tx {
-                let _ = tx.send(DiscoveryEvent::PeerDiscovered(discovered_peer)).await;
+                let _ = tx
+                    .send(DiscoveryEvent::PeerDiscovered(discovered_peer))
+                    .await;
             }
 
             debug!("Discovered peer via mDNS: {:?} at {}", peer_id, address);
@@ -1669,7 +1706,12 @@ impl KademliaPeerDiscovery {
 
     /// Get discovered peers
     pub async fn get_discovered_peers(&self) -> Vec<DiscoveredPeer> {
-        self.discovered_peers.read().await.values().cloned().collect()
+        self.discovered_peers
+            .read()
+            .await
+            .values()
+            .cloned()
+            .collect()
     }
 
     /// Get peers suitable for connection
@@ -1689,14 +1731,16 @@ impl KademliaPeerDiscovery {
             let old_reputation = peer.reputation;
             peer.reputation += delta;
             peer.reputation = peer.reputation.clamp(-50.0, 50.0);
-            
+
             if let Some(tx) = &self.event_tx {
-                let _ = tx.send(DiscoveryEvent::ReputationUpdated {
-                    peer_id,
-                    old_reputation,
-                    new_reputation: peer.reputation,
-                    reason: "Connection update".to_string(),
-                }).await;
+                let _ = tx
+                    .send(DiscoveryEvent::ReputationUpdated {
+                        peer_id,
+                        old_reputation,
+                        new_reputation: peer.reputation,
+                        reason: "Connection update".to_string(),
+                    })
+                    .await;
             }
         }
     }
@@ -1705,11 +1749,14 @@ impl KademliaPeerDiscovery {
     pub async fn record_connection_attempt(&self, peer_id: LibP2PPeerId, success: bool) {
         if let Some(peer) = self.discovered_peers.write().await.get_mut(&peer_id) {
             peer.record_connection_attempt(success, &self.config.scoring_config);
-            
+
             if success {
                 info!("Successful connection to peer: {:?}", peer_id);
             } else {
-                warn!("Failed connection to peer: {:?} (attempts: {})", peer_id, peer.connection_attempts);
+                warn!(
+                    "Failed connection to peer: {:?} (attempts: {})",
+                    peer_id, peer.connection_attempts
+                );
             }
         }
     }
@@ -1723,7 +1770,7 @@ impl KademliaPeerDiscovery {
     /// Remove old discovered peers (older than 1 hour)
     pub async fn cleanup_old_peers(&self) {
         let cutoff = Instant::now() - Duration::from_secs(3600);
-        
+
         self.discovered_peers.write().await.retain(|peer_id, peer| {
             let keep = peer.discovered_at > cutoff;
             if !keep {
@@ -1737,15 +1784,17 @@ impl KademliaPeerDiscovery {
     pub async fn get_discovery_stats(&self) -> DiscoveryStats {
         let peers = self.discovered_peers.read().await;
         let total_peers = peers.len();
-        
+
         let mut method_counts = HashMap::new();
         let mut avg_reputation = 0.0;
         let mut connectable_count = 0;
 
         for peer in peers.values() {
-            *method_counts.entry(peer.discovery_method.clone()).or_insert(0) += 1;
+            *method_counts
+                .entry(peer.discovery_method.clone())
+                .or_insert(0) += 1;
             avg_reputation += peer.reputation;
-            
+
             if peer.should_attempt_connection() {
                 connectable_count += 1;
             }
@@ -1797,14 +1846,14 @@ mod tests {
     async fn test_bootstrap() {
         let mut config = DiscoveryConfig::default();
         config.bootstrap_nodes = vec![SocketAddr::from(([127, 0, 0, 1], 8000))];
-        
+
         let mut discovery = KademliaPeerDiscovery::new(config);
         let (tx, mut rx) = mpsc::channel(10);
         discovery.set_event_channel(tx);
-        
+
         discovery.bootstrap().await.unwrap();
         assert!(discovery.bootstrap_completed);
-        
+
         // Should receive discovery events
         let event = timeout(Duration::from_millis(100), rx.recv()).await;
         assert!(event.is_ok());
@@ -1814,16 +1863,20 @@ mod tests {
     async fn test_peer_reputation() {
         let config = DiscoveryConfig::default();
         let discovery = KademliaPeerDiscovery::new(config);
-        
+
         let peer_id = LibP2PPeerId::random();
         let address = SocketAddr::from(([127, 0, 0, 1], 8000));
         let peer = DiscoveredPeer::new(peer_id, address, DiscoveryMethod::Kademlia);
-        
-        discovery.discovered_peers.write().await.insert(peer_id, peer);
-        
+
+        discovery
+            .discovered_peers
+            .write()
+            .await
+            .insert(peer_id, peer);
+
         // Update reputation
         discovery.update_peer_reputation(peer_id, 5.0).await;
-        
+
         let peers = discovery.get_discovered_peers().await;
         assert_eq!(peers[0].reputation, 5.0);
     }
@@ -1832,16 +1885,20 @@ mod tests {
     async fn test_connection_attempts() {
         let config = DiscoveryConfig::default();
         let discovery = KademliaPeerDiscovery::new(config);
-        
+
         let peer_id = LibP2PPeerId::random();
         let address = SocketAddr::from(([127, 0, 0, 1], 8000));
         let peer = DiscoveredPeer::new(peer_id, address, DiscoveryMethod::Kademlia);
-        
-        discovery.discovered_peers.write().await.insert(peer_id, peer);
-        
+
+        discovery
+            .discovered_peers
+            .write()
+            .await
+            .insert(peer_id, peer);
+
         // Record failed attempt
         discovery.record_connection_attempt(peer_id, false).await;
-        
+
         let peers = discovery.get_discovered_peers().await;
         assert_eq!(peers[0].connection_attempts, 1);
         assert!(peers[0].reputation < 0.0);

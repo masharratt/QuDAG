@@ -1,19 +1,19 @@
 use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
-use std::collections::HashMap;
 use std::sync::Mutex;
+use std::time::{Duration, Instant};
 
 // SIMD optimizations
-#[cfg(target_arch = "x86_64")]
-use std::arch::x86_64::*;
 #[cfg(target_arch = "aarch64")]
 use std::arch::aarch64::*;
+#[cfg(target_arch = "x86_64")]
+use std::arch::x86_64::*;
 
 // Hardware acceleration detection
-use std::thread::available_parallelism;
 use std::hint::black_box as compiler_fence;
+use std::thread::available_parallelism;
 
 /// Optimized ML-KEM implementation with SIMD and caching
 #[derive(Clone)]
@@ -34,7 +34,7 @@ struct MlKem768Optimized {
 impl MlKem768Optimized {
     fn new() -> Self {
         let cpu_cores = available_parallelism().map(|n| n.get()).unwrap_or(1);
-        
+
         Self {
             key_size: 1184,
             ciphertext_size: 1088,
@@ -47,29 +47,35 @@ impl MlKem768Optimized {
             cpu_cores,
         }
     }
-    
+
     // Hardware feature detection
     #[cfg(target_arch = "x86_64")]
     fn detect_avx2() -> bool {
         is_x86_feature_detected!("avx2")
     }
-    
+
     #[cfg(target_arch = "x86_64")]
     fn detect_avx512() -> bool {
         is_x86_feature_detected!("avx512f")
     }
-    
+
     #[cfg(target_arch = "aarch64")]
     fn detect_neon() -> bool {
         std::arch::is_aarch64_feature_detected!("neon")
     }
-    
+
     #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
-    fn detect_avx2() -> bool { false }
+    fn detect_avx2() -> bool {
+        false
+    }
     #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
-    fn detect_avx512() -> bool { false }
+    fn detect_avx512() -> bool {
+        false
+    }
     #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
-    fn detect_neon() -> bool { false }
+    fn detect_neon() -> bool {
+        false
+    }
 
     fn keygen(&self) -> (Vec<u8>, Vec<u8>) {
         // Simulate key generation with cryptographically secure operations
@@ -127,27 +133,31 @@ struct Blake3HasherOptimized {
 
 impl Blake3HasherOptimized {
     fn new() -> Self {
-        Self { 
+        Self {
             block_size: 64,
             has_avx2: Self::detect_avx2(),
             has_neon: Self::detect_neon(),
         }
     }
-    
+
     #[cfg(target_arch = "x86_64")]
     fn detect_avx2() -> bool {
         is_x86_feature_detected!("avx2")
     }
-    
+
     #[cfg(target_arch = "aarch64")]
     fn detect_neon() -> bool {
         std::arch::is_aarch64_feature_detected!("neon")
     }
-    
+
     #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
-    fn detect_avx2() -> bool { false }
+    fn detect_avx2() -> bool {
+        false
+    }
     #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
-    fn detect_neon() -> bool { false }
+    fn detect_neon() -> bool {
+        false
+    }
 
     fn hash(&self, data: &[u8]) -> Vec<u8> {
         if self.has_avx2 {
@@ -158,14 +168,16 @@ impl Blake3HasherOptimized {
             self.hash_scalar(data)
         }
     }
-    
+
     fn hash_scalar(&self, data: &[u8]) -> Vec<u8> {
         let mut result = vec![0u8; 32];
         let mut state = 0x6A09E667F3BCC908u64;
 
         for chunk in data.chunks(self.block_size) {
             for &byte in chunk {
-                state = state.wrapping_mul(0x9E3779B97F4A7C15u64).wrapping_add(byte as u64);
+                state = state
+                    .wrapping_mul(0x9E3779B97F4A7C15u64)
+                    .wrapping_add(byte as u64);
             }
         }
 
@@ -175,7 +187,7 @@ impl Blake3HasherOptimized {
 
         result
     }
-    
+
     #[cfg(target_arch = "x86_64")]
     fn hash_avx2(&self, data: &[u8]) -> Vec<u8> {
         unsafe {
@@ -191,7 +203,7 @@ impl Blake3HasherOptimized {
                     padded[..chunk.len()].copy_from_slice(chunk);
                     _mm256_loadu_si256(padded.as_ptr() as *const __m256i)
                 };
-                
+
                 let bytes_as_u64 = _mm256_unpacklo_epi8(chunk_vec, _mm256_setzero_si256());
                 state = _mm256_add_epi64(_mm256_mul_epi32(state, multiplier), bytes_as_u64);
             }
@@ -199,7 +211,7 @@ impl Blake3HasherOptimized {
             // Extract final hash
             let state_vals: [i64; 4] = std::mem::transmute(state);
             let final_state = state_vals[0] ^ state_vals[1] ^ state_vals[2] ^ state_vals[3];
-            
+
             for i in 0..32 {
                 result[i] = ((final_state >> (i * 2)) & 0xFF) as u8;
             }
@@ -207,7 +219,7 @@ impl Blake3HasherOptimized {
             result
         }
     }
-    
+
     #[cfg(target_arch = "aarch64")]
     fn hash_neon(&self, data: &[u8]) -> Vec<u8> {
         unsafe {
@@ -223,14 +235,16 @@ impl Blake3HasherOptimized {
                     padded[..chunk.len()].copy_from_slice(chunk);
                     vld1q_u8(padded.as_ptr())
                 };
-                
-                let bytes_as_u64 = vmovl_u32(vget_low_u32(vmovl_u16(vget_low_u16(vmovl_u8(vget_low_u8(chunk_vec))))));
+
+                let bytes_as_u64 = vmovl_u32(vget_low_u32(vmovl_u16(vget_low_u16(vmovl_u8(
+                    vget_low_u8(chunk_vec),
+                )))));
                 state = vaddq_u64(vmulq_u64(state, multiplier), bytes_as_u64);
             }
 
             // Extract final hash
             let final_state = vgetq_lane_u64(state, 0) ^ vgetq_lane_u64(state, 1);
-            
+
             for i in 0..32 {
                 result[i] = ((final_state >> (i * 2)) & 0xFF) as u8;
             }
@@ -238,12 +252,12 @@ impl Blake3HasherOptimized {
             result
         }
     }
-    
+
     #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
     fn hash_avx2(&self, data: &[u8]) -> Vec<u8> {
         self.hash_scalar(data)
     }
-    
+
     #[cfg(not(any(target_arch = "x86_64", target_arch = "aarch64")))]
     fn hash_neon(&self, data: &[u8]) -> Vec<u8> {
         self.hash_scalar(data)
@@ -309,7 +323,10 @@ fn benchmark_blake3_performance(c: &mut Criterion) {
     group.measurement_time(Duration::from_secs(10));
 
     let hasher = Blake3HasherOptimized::new();
-    println!("BLAKE3 hardware capabilities: AVX2={}, NEON={}", hasher.has_avx2, hasher.has_neon);
+    println!(
+        "BLAKE3 hardware capabilities: AVX2={}, NEON={}",
+        hasher.has_avx2, hasher.has_neon
+    );
 
     // Test different data sizes
     for &size in &[64, 256, 1024, 4096, 16384, 65536] {
@@ -485,7 +502,7 @@ fn benchmark_parallel_operations(c: &mut Criterion) {
 
     let mlkem = MlKem768Optimized::new();
     let thread_counts = [1, 2, 4, 8, 16];
-    
+
     for &thread_count in &thread_counts {
         group.bench_with_input(
             BenchmarkId::new("parallel_keygen", thread_count),
@@ -495,12 +512,10 @@ fn benchmark_parallel_operations(c: &mut Criterion) {
                     let handles: Vec<_> = (0..thread_count)
                         .map(|_| {
                             let mlkem_clone = mlkem.clone();
-                            std::thread::spawn(move || {
-                                black_box(mlkem_clone.keygen())
-                            })
+                            std::thread::spawn(move || black_box(mlkem_clone.keygen()))
                         })
                         .collect();
-                    
+
                     for handle in handles {
                         black_box(handle.join().unwrap());
                     }
@@ -508,7 +523,7 @@ fn benchmark_parallel_operations(c: &mut Criterion) {
             },
         );
     }
-    
+
     group.finish();
 }
 
@@ -519,43 +534,39 @@ fn benchmark_cache_performance(c: &mut Criterion) {
     group.measurement_time(Duration::from_secs(10));
 
     let mlkem = MlKem768Optimized::new();
-    
+
     // Test cache hit performance
     group.bench_function("cache_hit_keygen", |b| {
         // Pre-populate cache
         let _ = mlkem.keygen();
-        
-        b.iter(|| {
-            black_box(mlkem.keygen())
-        });
+
+        b.iter(|| black_box(mlkem.keygen()));
     });
-    
+
     group.bench_function("cache_miss_keygen", |b| {
         b.iter(|| {
             mlkem.clear_caches();
             black_box(mlkem.keygen())
         });
     });
-    
+
     // Test encapsulation cache performance
     let (pk, _) = mlkem.keygen();
-    
+
     group.bench_function("cache_hit_encapsulate", |b| {
         // Pre-populate cache
         let _ = mlkem.encapsulate(&pk);
-        
-        b.iter(|| {
-            black_box(mlkem.encapsulate(black_box(&pk)))
-        });
+
+        b.iter(|| black_box(mlkem.encapsulate(black_box(&pk))));
     });
-    
+
     group.bench_function("cache_miss_encapsulate", |b| {
         b.iter(|| {
             mlkem.clear_caches();
             black_box(mlkem.encapsulate(black_box(&pk)))
         });
     });
-    
+
     group.finish();
 }
 
@@ -566,7 +577,7 @@ fn benchmark_memory_allocation(c: &mut Criterion) {
     group.measurement_time(Duration::from_secs(10));
 
     let mlkem = MlKem768Optimized::new();
-    
+
     // Test stack vs heap allocation patterns
     group.bench_function("stack_allocation_small", |b| {
         b.iter(|| {
@@ -576,7 +587,7 @@ fn benchmark_memory_allocation(c: &mut Criterion) {
             black_box((buffer, hash));
         });
     });
-    
+
     group.bench_function("heap_allocation_large", |b| {
         b.iter(|| {
             let buffer = vec![0u8; 1024 * 1024]; // 1MB
@@ -585,16 +596,16 @@ fn benchmark_memory_allocation(c: &mut Criterion) {
             black_box((buffer, hash));
         });
     });
-    
+
     // Test memory reuse patterns
     group.bench_function("memory_reuse_pattern", |b| {
         let mut buffers = Vec::new();
-        
+
         b.iter(|| {
             if buffers.len() < 10 {
                 buffers.push(vec![0u8; 4096]);
             }
-            
+
             let buffer = &mut buffers[buffers.len() - 1];
             buffer.fill(0x42);
             let hasher = Blake3HasherOptimized::new();
@@ -602,7 +613,7 @@ fn benchmark_memory_allocation(c: &mut Criterion) {
             black_box(hash);
         });
     });
-    
+
     group.finish();
 }
 
@@ -615,40 +626,42 @@ fn benchmark_constant_time_operations(c: &mut Criterion) {
     let mlkem = MlKem768Optimized::new();
     let (pk, sk) = mlkem.keygen();
     let (ct, _) = mlkem.encapsulate(&pk);
-    
+
     // Measure timing variance for constant-time operations
     group.bench_function("constant_time_decapsulate", |b| {
         let mut timings = Vec::new();
-        
+
         b.iter_custom(|iters| {
             let mut total_duration = Duration::new(0, 0);
-            
+
             for _ in 0..iters {
                 let start = Instant::now();
                 let result = mlkem.decapsulate(black_box(&sk), black_box(&ct));
                 let duration = start.elapsed();
-                
+
                 timings.push(duration);
                 total_duration += duration;
                 black_box(result);
             }
-            
+
             // Calculate timing variance
             if !timings.is_empty() {
                 let mean = total_duration / timings.len() as u32;
-                let variance: Duration = timings.iter()
+                let variance: Duration = timings
+                    .iter()
                     .map(|&t| if t > mean { t - mean } else { mean - t })
-                    .sum::<Duration>() / timings.len() as u32;
-                
+                    .sum::<Duration>()
+                    / timings.len() as u32;
+
                 if variance > Duration::from_millis(1) {
                     println!("WARNING: High timing variance detected: {:?}", variance);
                 }
             }
-            
+
             total_duration
         });
     });
-    
+
     group.finish();
 }
 
@@ -659,92 +672,105 @@ fn benchmark_performance_regression(c: &mut Criterion) {
     group.measurement_time(Duration::from_secs(10));
 
     let mlkem = MlKem768Optimized::new();
-    
+
     // Performance targets (in milliseconds)
     let target_keygen_ms = 10.0;
     let target_encapsulate_ms = 5.0;
     let target_decapsulate_ms = 5.0;
-    
+
     group.bench_function("regression_keygen", |b| {
         b.iter_custom(|iters| {
             let mut total_duration = Duration::new(0, 0);
             let mut max_duration = Duration::new(0, 0);
-            
+
             for _ in 0..iters {
                 let start = Instant::now();
                 let result = mlkem.keygen();
                 let duration = start.elapsed();
-                
+
                 total_duration += duration;
                 max_duration = max_duration.max(duration);
                 black_box(result);
             }
-            
+
             let avg_ms = total_duration.as_secs_f64() * 1000.0 / iters as f64;
             let max_ms = max_duration.as_secs_f64() * 1000.0;
-            
+
             if avg_ms > target_keygen_ms {
-                println!("REGRESSION: Average keygen time {:.2}ms exceeds target {:.2}ms", avg_ms, target_keygen_ms);
+                println!(
+                    "REGRESSION: Average keygen time {:.2}ms exceeds target {:.2}ms",
+                    avg_ms, target_keygen_ms
+                );
             }
-            
+
             if max_ms > target_keygen_ms * 2.0 {
-                println!("REGRESSION: Max keygen time {:.2}ms exceeds 2x target {:.2}ms", max_ms, target_keygen_ms * 2.0);
+                println!(
+                    "REGRESSION: Max keygen time {:.2}ms exceeds 2x target {:.2}ms",
+                    max_ms,
+                    target_keygen_ms * 2.0
+                );
             }
-            
+
             total_duration
         });
     });
-    
+
     let (pk, sk) = mlkem.keygen();
-    
+
     group.bench_function("regression_encapsulate", |b| {
         b.iter_custom(|iters| {
             let mut total_duration = Duration::new(0, 0);
-            
+
             for _ in 0..iters {
                 let start = Instant::now();
                 let result = mlkem.encapsulate(&pk);
                 let duration = start.elapsed();
-                
+
                 total_duration += duration;
                 black_box(result);
             }
-            
+
             let avg_ms = total_duration.as_secs_f64() * 1000.0 / iters as f64;
-            
+
             if avg_ms > target_encapsulate_ms {
-                println!("REGRESSION: Average encapsulate time {:.2}ms exceeds target {:.2}ms", avg_ms, target_encapsulate_ms);
+                println!(
+                    "REGRESSION: Average encapsulate time {:.2}ms exceeds target {:.2}ms",
+                    avg_ms, target_encapsulate_ms
+                );
             }
-            
+
             total_duration
         });
     });
-    
+
     let (ct, _) = mlkem.encapsulate(&pk);
-    
+
     group.bench_function("regression_decapsulate", |b| {
         b.iter_custom(|iters| {
             let mut total_duration = Duration::new(0, 0);
-            
+
             for _ in 0..iters {
                 let start = Instant::now();
                 let result = mlkem.decapsulate(&sk, &ct);
                 let duration = start.elapsed();
-                
+
                 total_duration += duration;
                 black_box(result);
             }
-            
+
             let avg_ms = total_duration.as_secs_f64() * 1000.0 / iters as f64;
-            
+
             if avg_ms > target_decapsulate_ms {
-                println!("REGRESSION: Average decapsulate time {:.2}ms exceeds target {:.2}ms", avg_ms, target_decapsulate_ms);
+                println!(
+                    "REGRESSION: Average decapsulate time {:.2}ms exceeds target {:.2}ms",
+                    avg_ms, target_decapsulate_ms
+                );
             }
-            
+
             total_duration
         });
     });
-    
+
     group.finish();
 }
 

@@ -151,7 +151,7 @@ impl MessageQueue {
     pub async fn enable_obfuscation(&mut self, config: TrafficObfuscationConfig) {
         self.obfuscator = Some(Arc::new(TrafficObfuscator::new(config.clone())));
         *self.obfuscation_config.write().await = config;
-        
+
         // Start the obfuscator
         if let Some(obfuscator) = &self.obfuscator {
             obfuscator.start().await;
@@ -164,16 +164,16 @@ impl MessageQueue {
         if let Some(obfuscator) = &self.obfuscator {
             // Process message through obfuscation pipeline
             let obfuscated_payload = obfuscator.obfuscate_message(msg.clone()).await?;
-            
+
             // If obfuscation returns empty (batching), don't enqueue directly
             if obfuscated_payload.is_empty() {
                 return Ok(());
             }
-            
+
             // Update message with obfuscated payload
             msg.payload = obfuscated_payload;
         }
-        
+
         let envelope = MessageEnvelope::new(msg.clone());
 
         // Verify message integrity
@@ -243,7 +243,7 @@ impl MessageQueue {
     pub async fn process_batch(&self) -> Result<Vec<MessageEnvelope>, NetworkError> {
         if let Some(obfuscator) = &self.obfuscator {
             let obfuscated_messages = obfuscator.process_batch().await?;
-            
+
             let mut envelopes = Vec::new();
             for obfuscated_data in obfuscated_messages {
                 // Create a dummy message envelope for obfuscated data
@@ -257,7 +257,7 @@ impl MessageQueue {
                 };
                 envelopes.push(MessageEnvelope::new(msg));
             }
-            
+
             Ok(envelopes)
         } else {
             Ok(Vec::new())
@@ -265,7 +265,9 @@ impl MessageQueue {
     }
 
     /// Get obfuscation statistics
-    pub async fn get_obfuscation_stats(&self) -> Option<crate::traffic_obfuscation::ObfuscationStats> {
+    pub async fn get_obfuscation_stats(
+        &self,
+    ) -> Option<crate::traffic_obfuscation::ObfuscationStats> {
         if let Some(obfuscator) = &self.obfuscator {
             Some(obfuscator.get_stats().await)
         } else {

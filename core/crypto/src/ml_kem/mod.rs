@@ -1,13 +1,13 @@
 //! ML-KEM implementation
 //!
 //! This module implements the NIST-standardized ML-KEM key encapsulation mechanism.
-//! ML-KEM provides quantum-resistant key exchange capabilities based on the 
+//! ML-KEM provides quantum-resistant key exchange capabilities based on the
 //! Module-LWE problem.
 
 use rand::RngCore;
+use std::collections::HashMap;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Mutex;
-use std::collections::HashMap;
 
 use crate::kem::{Ciphertext, KEMError, KeyEncapsulation, PublicKey, SecretKey, SharedSecret};
 
@@ -85,26 +85,28 @@ impl MlKem768 {
     }
 
     /// Generate a keypair with custom RNG for testing
-    pub fn keygen_with_rng<R: RngCore + rand::CryptoRng>(#[allow(unused_variables)] rng: &mut R) -> Result<(PublicKey, SecretKey), KEMError> {
+    pub fn keygen_with_rng<R: RngCore + rand::CryptoRng>(
+        #[allow(unused_variables)] rng: &mut R,
+    ) -> Result<(PublicKey, SecretKey), KEMError> {
         // For now, use a placeholder implementation
         // In a real implementation, this would use the ML-KEM algorithm
         let mut pk_bytes = vec![0u8; Self::PUBLIC_KEY_SIZE];
         let mut sk_bytes = vec![0u8; Self::SECRET_KEY_SIZE];
-        
+
         rng.fill_bytes(&mut pk_bytes);
         rng.fill_bytes(&mut sk_bytes);
-        
+
         // Create some deterministic relationship between pk and sk for testing
         for i in 0..32 {
             if i < pk_bytes.len() && i < sk_bytes.len() {
                 sk_bytes[i] = pk_bytes[i] ^ 0xFF;
             }
         }
-        
-        let public_key = PublicKey::from_bytes(&pk_bytes)
-            .map_err(|_| KEMError::KeyGenerationError)?;
-        let secret_key = SecretKey::from_bytes(&sk_bytes)
-            .map_err(|_| KEMError::KeyGenerationError)?;
+
+        let public_key =
+            PublicKey::from_bytes(&pk_bytes).map_err(|_| KEMError::KeyGenerationError)?;
+        let secret_key =
+            SecretKey::from_bytes(&sk_bytes).map_err(|_| KEMError::KeyGenerationError)?;
 
         Ok((public_key, secret_key))
     }
@@ -128,10 +130,10 @@ impl MlKem768 {
         let mut rng = rand::thread_rng();
         let mut ct_bytes = vec![0u8; Self::CIPHERTEXT_SIZE];
         let mut ss_bytes = vec![0u8; Self::SHARED_SECRET_SIZE];
-        
+
         rng.fill_bytes(&mut ct_bytes);
         rng.fill_bytes(&mut ss_bytes);
-        
+
         // Create some deterministic relationship for testing
         for i in 0..32 {
             if i < pk_bytes.len() {
@@ -140,10 +142,10 @@ impl MlKem768 {
             }
         }
 
-        let ciphertext = Ciphertext::from_bytes(&ct_bytes)
-            .map_err(|_| KEMError::EncapsulationError)?;
-        let shared_secret = SharedSecret::from_bytes(&ss_bytes)
-            .map_err(|_| KEMError::EncapsulationError)?;
+        let ciphertext =
+            Ciphertext::from_bytes(&ct_bytes).map_err(|_| KEMError::EncapsulationError)?;
+        let shared_secret =
+            SharedSecret::from_bytes(&ss_bytes).map_err(|_| KEMError::EncapsulationError)?;
 
         Ok((ciphertext, shared_secret))
     }
@@ -161,7 +163,7 @@ impl MlKem768 {
         // Validate input sizes
         let sk_bytes = sk.as_bytes();
         let ct_bytes = ct.as_bytes();
-        
+
         if sk_bytes.len() != Self::SECRET_KEY_SIZE {
             return Err(KEMError::InvalidKey);
         }
@@ -180,8 +182,7 @@ impl MlKem768 {
         if let Ok(cache) = KEY_CACHE.lock() {
             if let Some(cached_ss) = cache.get(&cache_key) {
                 CACHE_HITS.fetch_add(1, Ordering::Relaxed);
-                return SharedSecret::from_bytes(cached_ss)
-                    .map_err(|_| KEMError::InternalError);
+                return SharedSecret::from_bytes(cached_ss).map_err(|_| KEMError::InternalError);
             }
         }
         CACHE_MISSES.fetch_add(1, Ordering::Relaxed);
@@ -189,7 +190,7 @@ impl MlKem768 {
         // For now, use a placeholder implementation
         // In a real implementation, this would use the ML-KEM decapsulation algorithm
         let mut ss_bytes = vec![0u8; Self::SHARED_SECRET_SIZE];
-        
+
         // Reconstruct the shared secret deterministically from sk and ct
         for i in 0..32 {
             if i < sk_bytes.len() && i < ct_bytes.len() {
@@ -197,8 +198,8 @@ impl MlKem768 {
             }
         }
 
-        let shared_secret = SharedSecret::from_bytes(&ss_bytes)
-            .map_err(|_| KEMError::DecapsulationError)?;
+        let shared_secret =
+            SharedSecret::from_bytes(&ss_bytes).map_err(|_| KEMError::DecapsulationError)?;
 
         // Update cache (in a real implementation, you'd want LRU eviction)
         if let Ok(mut cache) = KEY_CACHE.lock() {
@@ -221,7 +222,7 @@ impl MlKem768 {
         let cache_misses = CACHE_MISSES.load(Ordering::Relaxed);
         let total_time = TOTAL_DECAP_TIME.load(Ordering::Relaxed);
         let decap_count = DECAP_COUNT.load(Ordering::Relaxed);
-        
+
         let avg_decap_time_ns = if decap_count > 0 {
             total_time / decap_count
         } else {
@@ -271,7 +272,7 @@ mod tests {
     #[test]
     fn test_ml_kem_768() {
         let (pk, sk) = MlKem768::keygen().unwrap();
-        
+
         // Test key sizes
         assert_eq!(pk.as_bytes().len(), MlKem768::PUBLIC_KEY_SIZE);
         assert_eq!(sk.as_bytes().len(), MlKem768::SECRET_KEY_SIZE);

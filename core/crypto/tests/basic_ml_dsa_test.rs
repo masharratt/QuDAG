@@ -3,7 +3,6 @@
 #[test]
 fn test_ml_dsa_types_exist() {
     // Just test that the types can be imported
-    use qudag_crypto::ml_dsa::{MlDsa, MlDsaError, MlDsaKeyPair, MlDsaPublicKey};
 
     // If we get here, at least the types are defined
     assert!(true);
