@@ -1,0 +1,23 @@
+[package]
+name = "qudag"
+version = "1.0.2"
+edition.workspace = true
+authors.workspace = true
+repository.workspace = true
+license.workspace = true
+description = "QuDAG - Quantum Ultra-Fast Distributed Acyclic Graph: A high-performance DAG-based distributed ledger with quantum-resistant cryptography"
+documentation = "https://docs.rs/qudag"
+readme = "README.md"
+keywords = ["blockchain", "dag", "quantum-resistant", "distributed-ledger", "cryptography"]
+categories = ["cryptography", "network-programming"]
+
+[dependencies]
+qudag-crypto = { version = "0.1.1", path = "../core/crypto" }
+qudag-dag = { version = "0.1.1", path = "../core/dag" }
+qudag-network = { version = "0.1.1", path = "../core/network" }
+qudag-protocol = { version = "0.1.1", path = "../core/protocol" }
+
+[features]
+default = []
+optimizations = ["qudag-dag/optimizations"]
+rocksdb = ["qudag-protocol/rocksdb"]
