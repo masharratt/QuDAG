@@ -5,6 +5,11 @@ edition.workspace = true
 authors.workspace = true
 repository.workspace = true
 license.workspace = true
+description = "Protocol implementation for QuDAG - Orchestrates crypto, DAG, and network components"
+documentation = "https://docs.rs/qudag-protocol"
+readme = "README.md"
+keywords = ["protocol", "distributed-systems", "coordination", "state-machine"]
+categories = ["network-programming"]
 
 [dependencies]
 thiserror.workspace = true
@@ -33,9 +38,9 @@ sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "sqlite"] }
 rocksdb = { version = "0.22", optional = true }
 
 # Inter-crate dependencies
-qudag-crypto = { path = "../crypto" }
-qudag-dag = { path = "../dag" }
-qudag-network = { path = "../network" }
+qudag-crypto = { version = "0.1.0", path = "../crypto" }
+qudag-dag = { version = "0.1.0", path = "../dag" }
+qudag-network = { version = "0.1.0", path = "../network" }
 
 [features]
 default = []

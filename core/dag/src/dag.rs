@@ -6,6 +6,9 @@ use tracing::error;
 
 use crate::consensus::{ConsensusError, QRAvalanche};
 use crate::vertex::{Vertex, VertexError, VertexId};
+// Optimization features disabled for initial release
+// #[cfg(any(feature = "optimizations", feature = "validation-cache", feature = "traversal-index"))]
+// use crate::optimized::{ValidationCache, ValidationResult};
 
 /// Errors that can occur during DAG operations
 #[derive(Error, Debug)]
@@ -54,7 +57,7 @@ struct ProcessingState {
 }
 
 /// Main DAG structure for parallel message processing
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Dag {
     /// Vertices in the DAG
     pub vertices: Arc<RwLock<HashMap<VertexId, Vertex>>>,
@@ -68,6 +71,8 @@ pub struct Dag {
     /// Maximum concurrent messages
     #[allow(dead_code)]
     max_concurrent: usize,
+    // Validation cache disabled for initial release
+    // validation_cache: Arc<ValidationCache>,
 }
 
 impl Dag {
@@ -80,10 +85,13 @@ impl Dag {
             conflicts: HashMap::new(),
         }));
         let consensus = Arc::new(Mutex::new(QRAvalanche::new()));
+        // Validation cache disabled for initial release
+        // let validation_cache = Arc::new(ValidationCache::new(Default::default()));
 
         let vertices_clone = vertices.clone();
         let state_clone = state.clone();
         let consensus_clone = consensus.clone();
+        // let validation_cache_clone = validation_cache.clone();
 
         // Spawn message processing task
         tokio::spawn(async move {
@@ -100,6 +108,7 @@ impl Dag {
                 let vertices = vertices_clone.clone();
                 let state = state_clone.clone();
                 let consensus = consensus_clone.clone();
+                // let validation_cache = validation_cache_clone.clone();
 
                 tokio::spawn(async move {
                     if let Err(e) =
@@ -119,6 +128,7 @@ impl Dag {
             msg_tx,
             consensus,
             max_concurrent,
+            // validation_cache,
         }
     }
 
@@ -136,6 +146,7 @@ impl Dag {
         vertices: Arc<RwLock<HashMap<VertexId, Vertex>>>,
         state: Arc<RwLock<ProcessingState>>,
         consensus: Arc<Mutex<QRAvalanche>>,
+        // validation_cache: Arc<ValidationCache>,
     ) -> Result<(), DagError> {
         // Validate parents exist
         {
@@ -157,6 +168,12 @@ impl Dag {
 
         // Create new vertex
         let vertex = Vertex::new(msg.id.clone(), msg.payload, msg.parents);
+        
+        // Validation cache disabled for initial release
+        // let validation_result = validation_cache.validate(&vertex)?;
+        // if !validation_result.is_valid {
+        //     return Err(DagError::VertexError(VertexError::InvalidSignature));
+        // }
 
         // Add to DAG
         {

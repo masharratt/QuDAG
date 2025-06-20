@@ -16,7 +16,8 @@ pub mod message;
 pub mod metrics;
 pub mod nat_traversal;
 pub mod onion;
-pub mod optimized;
+// Optimization features disabled for initial release
+// pub mod optimized;
 pub mod p2p;
 pub mod peer;
 pub mod quantum_crypto;

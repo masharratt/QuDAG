@@ -112,6 +112,9 @@ use tokio::sync::{mpsc, Mutex};
 use tracing::{debug, info, warn};
 
 use crate::routing::Router;
+// Optimization features disabled for initial release
+// use crate::optimized::message_chunking::{MessageChunker, ChunkerConfig, ChunkedMessage};
+use crate::types::{NetworkMessage, MessagePriority};
 
 /// Configuration for the P2P network node
 #[derive(Debug, Clone)]
@@ -296,6 +299,8 @@ pub struct P2PNode {
     metrics: Option<()>, // TODO: Use proper metrics type
     /// Network configuration
     config: NetworkConfig,
+    // Message chunker for large messages (disabled for initial release)
+    // message_chunker: MessageChunker,
 }
 
 /// Handle for sending commands to the P2P node
@@ -530,6 +535,15 @@ impl P2PNode {
             event_rx: Arc::new(Mutex::new(event_rx)),
         };
 
+        // Initialize message chunker (disabled for initial release)
+        // let chunker_config = ChunkerConfig {
+        //     max_chunk_size: 65536, // 64KB chunks
+        //     enable_compression: true,
+        //     compression_threshold: 1024, // Compress messages larger than 1KB
+        //     ..Default::default()
+        // };
+        // let message_chunker = MessageChunker::new(chunker_config);
+
         let node = Self {
             local_peer_id,
             swarm,
@@ -541,6 +555,7 @@ impl P2PNode {
             pending_requests: HashMap::new(),
             metrics,
             config,
+            // message_chunker,
         };
 
         Ok((node, handle))
@@ -1082,15 +1097,36 @@ impl P2PNode {
         Ok(())
     }
 
-    /// Internal send request method
+    /// Internal send request method with chunking support
     async fn send_request_internal(
         &mut self,
         peer_id: LibP2PPeerId,
         request: QuDagRequest,
     ) -> Result<QuDagResponse, Box<dyn Error + Send + Sync>> {
         let request_id = request.request_id.clone();
+        
+        // Check if message needs chunking
+        let network_message = NetworkMessage {
+            id: request.request_id.clone(),
+            source: vec![0], // Placeholder source
+            destination: vec![0], // Placeholder destination
+            payload: request.payload.clone(),
+            priority: MessagePriority::Normal,
+            ttl: Duration::from_secs(60),
+        };
+        
+        // Chunking disabled for initial release - send message directly
+        // let chunks = self.message_chunker.chunk_message(&network_message).await
+        //     .map_err(|e| format!("Chunking error: {:?}", e))?;
+        
+        // Send message directly without chunking
+        let request = QuDagRequest {
+            request_id: request_id.clone(),
+            payload: bincode::serialize(&network_message).map_err(|e| format!("Serialization error: {}", e))?,
+        };
+        
+        // Setup response handling
         let (tx, rx) = oneshot::channel();
-
         self.pending_requests.insert(request_id.clone(), tx);
 
         self.swarm

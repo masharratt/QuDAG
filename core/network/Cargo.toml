@@ -5,6 +5,11 @@ edition.workspace = true
 authors.workspace = true
 repository.workspace = true
 license.workspace = true
+description = "P2P networking layer for QuDAG - LibP2P with onion routing, dark addressing, and quantum encryption"
+documentation = "https://docs.rs/qudag-network"
+readme = "README.md"
+keywords = ["p2p", "libp2p", "onion-routing", "anonymity", "networking"]
+categories = ["network-programming"]
 
 [dependencies]
 thiserror.workspace = true
@@ -49,7 +54,17 @@ sha2 = "0.10"
 hkdf = "0.12"
 
 # Other dependencies
-qudag-crypto = { path = "../crypto" }
+qudag-crypto = { version = "0.1.0", path = "../crypto" }
+
+# Compression for message chunking
+zstd = "0.13"
 
 [dev-dependencies]
 proptest.workspace = true
+
+[features]
+default = []
+optimizations = ["message-chunking", "adaptive-batching"]
+message-chunking = []
+adaptive-batching = []
+full-optimizations = ["optimizations"]

@@ -5,6 +5,11 @@ edition.workspace = true
 authors.workspace = true
 repository.workspace = true
 license.workspace = true
+description = "DAG consensus implementation for QuDAG - QR-Avalanche algorithm with Byzantine fault tolerance"
+documentation = "https://docs.rs/qudag-dag"
+readme = "README.md"
+keywords = ["dag", "consensus", "distributed-ledger", "byzantine", "avalanche"]
+categories = ["algorithms", "data-structures"]
 
 [dependencies]
 thiserror.workspace = true
@@ -26,8 +31,18 @@ anyhow.workspace = true
 dashmap = "5.5"
 rayon = "1.8"
 
+# Graph algorithms for traversal index
+petgraph = "0.6"
+
 # Other dependencies
-qudag-crypto = { path = "../crypto" }
+qudag-crypto = { version = "0.1.0", path = "../crypto" }
 
 [dev-dependencies]
 proptest.workspace = true
+
+[features]
+default = []
+optimizations = ["validation-cache", "traversal-index"]
+validation-cache = []
+traversal-index = []
+full-optimizations = ["optimizations"]

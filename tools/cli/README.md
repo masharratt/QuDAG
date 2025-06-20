@@ -1,217 +1,313 @@
 # QuDAG CLI
 
-Command-line interface for the QuDAG quantum-resistant anonymous communication protocol.
+Command-line interface for the QuDAG quantum-resistant distributed protocol.
 
 ## Installation
 
-Build from source:
 ```bash
-cargo build --release
-cp target/release/qudag /usr/local/bin/
+cargo install qudag-cli
 ```
 
-## Usage
+## Quick Start
+
+```bash
+# Start a QuDAG node
+qudag-cli start --port 8000
+
+# Create your own darknet domain
+qudag-cli address register mynode.dark
+
+# Connect to peers
+qudag-cli peer add /ip4/192.168.1.100/tcp/8000/p2p/12D3KooW...
+
+# Check node status
+qudag-cli status
+```
+
+## Commands
 
 ### Node Management
 
-Start a QuDAG node:
 ```bash
-qudag start --port 8000 --data-dir ./node-data --peers peer1.example.com:8000 peer2.example.com:8000
+# Start a node
+qudag-cli start [--port 8000] [--rpc-port 9090]
+
+# Stop the node
+qudag-cli stop
+
+# Get node status
+qudag-cli status
+
+# Restart node
+qudag-cli restart
 ```
 
-Stop the running node:
-```bash
-qudag stop
-```
-
-Check node status:
-```bash
-qudag status
-```
-
-### Peer Management
-
-List connected peers:
-```bash
-qudag peer list
-```
-
-Add a new peer:
-```bash
-qudag peer add peer3.example.com:8000
-```
-
-Remove a peer:
-```bash
-qudag peer remove peer3.example.com:8000
-```
-
-### Network Management
-
-Display network statistics:
-```bash
-qudag network stats
-```
-
-Test network connectivity:
-```bash
-qudag network test
-```
-
-### DAG Visualization
-
-Generate DAG visualization:
-```bash
-qudag dag --output dag.dot --format dot
-```
-
-## Command Reference
-
-### `qudag start`
-
-Starts a QuDAG node with the specified configuration.
-
-Options:
-- `--port <PORT>`: Port to listen on (default: 8000)
-- `--data-dir <DIR>`: Data directory path (default: ./data)
-- `--peers <ADDR>...`: Initial peer addresses to connect to
-
-### `qudag stop`
-
-Gracefully stops the running QuDAG node.
-
-### `qudag status`
-
-Displays the current status of the running node including:
-- Connection status
-- Number of connected peers
-- DAG statistics
-- Network uptime
-
-### `qudag peer`
-
-Peer management commands:
-
-#### `qudag peer list`
-Lists all currently connected peers with their addresses and connection status.
-
-#### `qudag peer add <ADDRESS>`
-Connects to a new peer at the specified address.
-
-#### `qudag peer remove <ADDRESS>`
-Disconnects from the specified peer.
-
-### `qudag network`
-
-Network diagnostic commands:
-
-#### `qudag network stats`
-Displays comprehensive network statistics including:
-- Total peers
-- Active connections
-- Message throughput
-- Bandwidth usage
-- Average latency
-
-#### `qudag network test`
-Performs connectivity tests to all connected peers and reports results.
-
-### `qudag dag`
-
-DAG visualization and analysis:
-
-Options:
-- `--output <FILE>`: Output file path (default: dag_visualization.dot)
-- `--format <FORMAT>`: Output format (default: dot)
-
-Generates a visual representation of the current DAG state.
-
-## Configuration
-
-The CLI can be configured using a configuration file specified with the `--config` flag:
+### Peer Operations
 
 ```bash
-qudag --config config.toml start
+# List connected peers
+qudag-cli peer list
+
+# Add a peer
+qudag-cli peer add <multiaddr>
+
+# Remove a peer
+qudag-cli peer remove <peer_id>
+
+# Ban a peer
+qudag-cli peer ban <peer_id>
+
+# Test connectivity
+qudag-cli network test
 ```
 
-Example configuration file (`config.toml`):
-```toml
-[node]
-port = 8000
-data_dir = "./node-data"
-peers = ["peer1.example.com:8000", "peer2.example.com:8000"]
+### Dark Addressing
 
-[network]
-max_peers = 50
-connection_timeout = 30
+```bash
+# Register a .dark domain
+qudag-cli address register mydomain.dark
 
-[logging]
-level = "info"
+# Resolve a domain
+qudag-cli address resolve somedomain.dark
+
+# Create temporary shadow address
+qudag-cli address shadow --ttl 3600
+
+# Generate quantum fingerprint
+qudag-cli address fingerprint --data "Hello World"
+
+# List your registered domains
+qudag-cli address list
+```
+
+### Network Operations
+
+```bash
+# Show network statistics
+qudag-cli network stats
+
+# Test peer connectivity
+qudag-cli network test
+
+# Monitor network events
+qudag-cli logs --follow
+```
+
+### Configuration
+
+```bash
+# Show current configuration
+qudag-cli config show
+
+# Set configuration value
+qudag-cli config set key value
+
+# Generate systemd service
+qudag-cli systemd --output /etc/systemd/system/
 ```
 
 ## Examples
 
-### Basic Node Operation
+### Setting Up Your First Node
 
-1. Start a node:
-   ```bash
-   qudag start --port 8000
-   ```
-
-2. In another terminal, check status:
-   ```bash
-   qudag status
-   ```
-
-3. Add some peers:
-   ```bash
-   qudag peer add 192.168.1.100:8000
-   qudag peer add node.qudag.example.com:8000
-   ```
-
-4. Monitor network:
-   ```bash
-   qudag network stats
-   qudag network test
-   ```
-
-### DAG Analysis
-
-Generate and view DAG visualization:
 ```bash
-qudag dag --output current_dag.dot
-dot -Tpng current_dag.dot -o dag.png
-open dag.png  # or xdg-open on Linux
+# 1. Start your node
+qudag-cli start --port 8000
+
+# 2. Register your identity
+qudag-cli address register mynode.dark
+
+# 3. Connect to the network (use bootstrap peers)
+qudag-cli peer add /ip4/bootstrap.qudag.io/tcp/8000/p2p/12D3KooW...
+
+# 4. Check status
+qudag-cli status
 ```
+
+### Creating a Private Network
+
+```bash
+# Node 1
+qudag-cli start --port 8001
+qudag-cli address register node1.dark
+
+# Node 2
+qudag-cli start --port 8002
+qudag-cli address register node2.dark
+qudag-cli peer add /ip4/127.0.0.1/tcp/8001/p2p/...
+
+# Node 3
+qudag-cli start --port 8003
+qudag-cli address register node3.dark
+qudag-cli peer add /ip4/127.0.0.1/tcp/8001/p2p/...
+qudag-cli peer add /ip4/127.0.0.1/tcp/8002/p2p/...
+```
+
+### Dark Domain System
+
+```bash
+# Register domains for different services
+qudag-cli address register chat.dark
+qudag-cli address register files.dark
+qudag-cli address register api.dark
+
+# Create temporary addresses for ephemeral communication
+qudag-cli address shadow --ttl 3600  # 1 hour
+qudag-cli address shadow --ttl 86400 # 24 hours
+
+# Resolve any .dark domain to find peers
+qudag-cli address resolve chat.dark
+qudag-cli address resolve files.dark
+```
+
+## Configuration File
+
+QuDAG CLI uses a configuration file at `~/.qudag/config.toml`:
+
+```toml
+[node]
+port = 8000
+rpc_port = 9090
+data_dir = "~/.qudag/data"
+log_level = "info"
+
+[network]
+max_peers = 50
+bootstrap_peers = [
+    "/ip4/bootstrap1.qudag.io/tcp/8000/p2p/12D3KooW...",
+    "/ip4/bootstrap2.qudag.io/tcp/8000/p2p/12D3KooW..."
+]
+
+[dark_addressing]
+enable = true
+ttl_default = 3600
+
+[security]
+enable_encryption = true
+quantum_resistant = true
+```
+
+## Output Formats
+
+Many commands support different output formats:
+
+```bash
+# JSON output
+qudag-cli status --output json
+
+# Table output (default)
+qudag-cli peer list --output table
+
+# Raw output for scripting
+qudag-cli peer list --output raw
+```
+
+## Logging
+
+```bash
+# View logs
+qudag-cli logs
+
+# Follow logs in real-time
+qudag-cli logs --follow
+
+# Filter by level
+qudag-cli logs --level error
+
+# Save logs to file
+qudag-cli logs --output /var/log/qudag.log
+```
+
+## Systemd Integration
+
+Generate systemd service files:
+
+```bash
+# Generate service file
+qudag-cli systemd --output /etc/systemd/system/
+
+# Enable and start
+sudo systemctl enable qudag
+sudo systemctl start qudag
+sudo systemctl status qudag
+```
+
+## Environment Variables
+
+- `QUDAG_CONFIG` - Path to configuration file
+- `QUDAG_DATA_DIR` - Data directory override
+- `QUDAG_LOG_LEVEL` - Log level (trace, debug, info, warn, error)
+- `QUDAG_PORT` - Default port override
+- `QUDAG_RPC_PORT` - RPC port override
+
+## Exit Codes
+
+- `0` - Success
+- `1` - General error
+- `2` - Configuration error
+- `3` - Network error
+- `4` - Permission error
+- `5` - Not found error
+
+## Shell Completion
+
+Generate shell completion scripts:
+
+```bash
+# Bash
+qudag-cli completions bash > /etc/bash_completion.d/qudag-cli
+
+# Zsh
+qudag-cli completions zsh > ~/.zsh/completions/_qudag-cli
+
+# Fish
+qudag-cli completions fish > ~/.config/fish/completions/qudag-cli.fish
+```
+
+## Security Considerations
+
+- All communication is quantum-resistant encrypted
+- Private keys are stored securely in `~/.qudag/keys/`
+- Configuration supports file permissions verification
+- Network traffic uses onion routing for anonymity
 
 ## Troubleshooting
 
 ### Common Issues
 
-1. **Port already in use**: Use a different port with `--port`
-2. **Permission denied**: Ensure proper permissions for data directory
-3. **Connection refused**: Check peer addresses and network connectivity
-
-### Debug Mode
-
-Enable verbose logging:
+**Node won't start**
 ```bash
-RUST_LOG=debug qudag start
+# Check if port is in use
+netstat -ln | grep :8000
+
+# Check logs
+qudag-cli logs --level error
 ```
 
-### Log Files
+**Can't connect to peers**
+```bash
+# Test network connectivity
+qudag-cli network test
 
-Logs are written to:
-- stdout/stderr (console output)
-- `<data-dir>/logs/qudag.log` (file output)
+# Check firewall settings
+sudo ufw status
+```
 
-## Security Considerations
+**Permission errors**
+```bash
+# Check data directory permissions
+ls -la ~/.qudag/
 
-- Keep your private keys secure
-- Use encrypted connections between peers
-- Regularly update to the latest version
-- Monitor for suspicious network activity
+# Fix permissions
+chmod 700 ~/.qudag/
+```
 
-## Contributing
+## Documentation
 
-See the main project repository for contribution guidelines.
+- [API Documentation](https://docs.rs/qudag-cli)
+- [QuDAG Project](https://github.com/ruvnet/QuDAG)
+- [User Guide](https://github.com/ruvnet/QuDAG/blob/main/docs/cli/README.md)
+
+## License
+
+Licensed under either MIT or Apache-2.0 at your option.

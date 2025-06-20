@@ -53,6 +53,9 @@ pub mod error;
 pub mod graph;
 /// Node representation with state management
 pub mod node;
+// Optimized DAG operations with caching and indexing (disabled for initial release)
+// #[cfg(any(feature = "optimizations", feature = "validation-cache", feature = "traversal-index"))]
+// pub mod optimized;
 /// Tip selection algorithms for choosing vertices to extend
 pub mod tip_selection;
 /// Vertex representation and operations for the DAG structure
@@ -82,6 +85,10 @@ pub use consensus::{
     QRAvalancheConfig, VotingRecord,
 };
 pub use dag::{Dag, DagError as DagModuleError, DagMessage};
+// #[cfg(any(feature = "optimizations", feature = "validation-cache", feature = "traversal-index"))]
+// pub use optimized::{
+//     ValidationCache, ValidationResult, TraversalIndex, IndexedDAG
+// };
 pub use tip_selection::{
     AdvancedTipSelection, ParentSelectionAlgorithm, TipSelection, TipSelectionConfig,
     TipSelectionError, VertexWeight,

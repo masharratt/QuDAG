@@ -1,226 +1,88 @@
 {
-  "timeout": 600000,
-  "temperature": 0.1,
-  "project_context": {
-    "name": "QuDAG Protocol",
-    "type": "cryptographic_system",
-    "language": "rust",
-    "methodology": "tdd",
-    "security_level": "high",
-    "performance_critical": true
-  },
-  "development_settings": {
-    "auto_test": true,
-    "test_before_commit": true,
-    "coverage_threshold": 85,
-    "lint_on_save": true,
-    "format_on_save": true,
-    "security_scan_frequency": "always",
-    "benchmark_on_change": true
-  },
-  "rust_specific": {
-    "edition": "2021",
-    "toolchain": "stable",
-    "features": {
-      "deny_unsafe_code": true,
-      "warn_missing_docs": true,
-      "optimize_for_size": false,
-      "lto": true,
-      "codegen_units": 1
-    },
-    "clippy_args": ["--", "-D", "warnings"],
-    "fmt_args": ["--check"],
-    "test_args": ["--all-features", "--workspace"],
-    "bench_args": ["--all-features"]
-  },
-  "default_agents": {
-    "crypto": {
-      "role": "cryptographic_specialist",
-      "timeout": 900000,
-      "max_iterations": 10,
-      "focus": [
-        "post_quantum_crypto",
-        "timing_safety",
-        "side_channel_resistance",
-        "constant_time_operations",
-        "memory_safety"
-      ],
-      "validation": {
-        "require_security_tests": true,
-        "require_benchmarks": true,
-        "require_formal_verification": false
-      }
-    },
-    "network": {
-      "role": "network_engineer",
-      "timeout": 600000,
-      "max_iterations": 8,
-      "focus": [
-        "p2p_protocols",
-        "anonymous_routing",
-        "nat_traversal",
-        "ddos_resistance",
-        "traffic_analysis_prevention"
-      ]
-    },
-    "consensus": {
-      "role": "distributed_systems_expert",
-      "timeout": 600000,
-      "max_iterations": 8,
-      "focus": [
-        "dag_consensus",
-        "byzantine_fault_tolerance",
-        "liveness",
-        "safety_properties",
-        "finality_guarantees"
-      ]
-    },
-    "security": {
-      "role": "security_auditor",
-      "timeout": 900000,
-      "max_iterations": 5,
-      "focus": [
-        "vulnerability_assessment",
-        "threat_modeling",
-        "penetration_testing",
-        "code_audit",
-        "dependency_scanning"
-      ],
-      "tools": [
-        "cargo-audit",
-        "cargo-geiger",
-        "cargo-fuzz",
-        "proptest"
-      ]
-    },
-    "performance": {
-      "role": "performance_engineer",
-      "timeout": 600000,
-      "max_iterations": 8,
-      "focus": [
-        "benchmarking",
-        "optimization",
-        "scalability",
-        "profiling",
-        "resource_usage"
-      ],
-      "targets": {
-        "latency_ms": 1000,
-        "throughput_msg_per_sec": 10000,
-        "memory_mb": 100,
-        "cpu_percent": 80
-      }
-    },
-    "integration": {
-      "role": "integration_specialist",
-      "timeout": 600000,
-      "max_iterations": 5,
-      "focus": [
-        "system_testing",
-        "deployment",
-        "monitoring",
-        "compatibility",
-        "interoperability"
-      ]
-    }
-  },
-  "workspace_config": {
-    "test_runner": "cargo test",
-    "benchmark_runner": "cargo bench",
-    "lint_runner": "cargo clippy -- -D warnings",
-    "format_runner": "cargo fmt --check",
-    "security_scanner": "cargo audit",
-    "coverage_tool": "cargo tarpaulin --all-features --workspace --timeout 120",
-    "doc_generator": "cargo doc --all-features --no-deps",
-    "build_command": "cargo build --release",
-    "clean_command": "cargo clean"
-  },
-  "quality_gates": {
-    "min_test_coverage": 85,
-    "max_build_time": 300,
-    "max_test_time": 600,
-    "security_scan_required": true,
-    "performance_regression_threshold": 5,
-    "max_clippy_warnings": 0,
-    "require_documentation": true,
-    "max_dependencies": 50,
-    "max_unsafe_blocks": 0
-  },
-  "tdd_workflow": {
-    "red_phase": {
-      "timeout": 300000,
-      "require_failing_tests": true,
-      "min_test_cases": 3,
-      "include_edge_cases": true,
-      "include_property_tests": true
-    },
-    "green_phase": {
-      "timeout": 600000,
-      "minimal_implementation": true,
-      "allow_todo_comments": true,
-      "require_all_tests_pass": true
-    },
-    "refactor_phase": {
-      "timeout": 300000,
-      "maintain_test_coverage": true,
-      "improve_performance": true,
-      "enhance_readability": true,
-      "reduce_complexity": true
-    }
-  },
-  "file_templates": {
-    "test_file": {
-      "header": "#[cfg(test)]\nmod tests {\n    use super::*;\n    use proptest::prelude::*;\n",
-      "unit_test": "    #[test]\n    fn test_${name}() {\n        // Arrange\n        \n        // Act\n        \n        // Assert\n        assert!(false, \"Test not implemented\");\n    }\n",
-      "property_test": "    proptest! {\n        #[test]\n        fn prop_${name}(input: ${type}) {\n            // Property to verify\n            prop_assert!(false, \"Property not implemented\");\n        }\n    }\n"
-    },
-    "module_file": {
-      "header": "//! ${description}\n\n#![deny(unsafe_code)]\n#![warn(missing_docs)]\n\n",
-      "imports": "use crate::{Result, Error};\nuse tracing::{debug, info, warn, error};\n"
-    }
-  },
-  "automation": {
-    "pre_commit_hooks": [
-      "cargo fmt --check",
-      "cargo clippy -- -D warnings",
-      "cargo test --workspace",
-      "cargo audit"
+  "permissions": {
+    "allow": [
+      "Bash(*)",
+      "Read(*)",
+      "Write(*)",
+      "Edit(*)",
+      "MultiEdit(*)",
+      "Glob(*)",
+      "Grep(*)",
+      "LS(*)",
+      "NotebookEdit(*)",
+      "NotebookRead(*)",
+      "WebFetch(*)",
+      "WebSearch(*)",
+      "TodoRead",
+      "TodoWrite",
+      "Agent(*)"
     ],
-    "ci_pipeline": [
-      "cargo fmt --check",
-      "cargo clippy --all-targets --all-features -- -D warnings",
-      "cargo test --all-features --workspace",
-      "cargo bench --workspace",
-      "cargo audit",
-      "cargo tarpaulin --all-features --workspace --out Xml"
-    ]
+    "deny": []
   },
-  "debugging": {
-    "log_level": "debug",
-    "backtrace": "full",
-    "panic_handler": "abort",
-    "profiling_enabled": true,
-    "flamegraph_enabled": true
+  "env": {
+    "BASH_DEFAULT_TIMEOUT_MS": "300000",
+    "BASH_MAX_TIMEOUT_MS": "600000",
+    "BASH_MAX_OUTPUT_LENGTH": "500000",
+    "CLAUDE_BASH_MAINTAIN_PROJECT_WORKING_DIR": "true",
+    "MAX_THINKING_TOKENS": "20000",
+    "MCP_TIMEOUT": "60000",
+    "MCP_TOOL_TIMEOUT": "120000",
+    "DISABLE_COST_WARNINGS": "1",
+    "DISABLE_NON_ESSENTIAL_MODEL_CALLS": "0",
+    "CLAUDE_CODE_MAX_OUTPUT_TOKENS": "8192"
   },
-  "optimization_hints": {
-    "parallel_compilation": true,
-    "incremental_compilation": true,
-    "cache_artifacts": true,
-    "use_mold_linker": true,
-    "profile_guided_optimization": false
+  "cleanupPeriodDays": 90,
+  "includeCoAuthoredBy": true,
+  "automation": {
+    "enabled": true,
+    "defaultTimeout": 300000,
+    "maxRetries": 3,
+    "retryBackoff": 2000,
+    "parallelExecution": true,
+    "batchOperations": true,
+    "autoSaveMemory": true,
+    "autoCommit": false
   },
-  "documentation": {
-    "auto_generate": true,
-    "include_examples": true,
-    "include_benchmarks": true,
-    "diagram_generation": true,
-    "api_versioning": true
-  },
-  "collaboration": {
-    "code_review_required": true,
-    "min_reviewers": 1,
-    "require_issue_reference": true,
-    "branch_protection": true,
-    "squash_merge": true
+  "claudeFlow": {
+    "version": "1.0.72",
+    "swarmDefaults": {
+      "maxAgents": 10,
+      "timeout": 3600000,
+      "parallel": true,
+      "monitor": true,
+      "outputFormat": "json"
+    },
+    "sparcDefaults": {
+      "timeout": 3600000,
+      "parallel": true,
+      "batch": true,
+      "memoryKey": "sparc_session"
+    },
+    "memoryDefaults": {
+      "maxSize": "1GB",
+      "autoCompress": true,
+      "autoCleanup": true,
+      "indexingEnabled": true,
+      "persistenceEnabled": true,
+      "namespaces": {
+        "swarm": "For swarm agent coordination",
+        "sparc": "For SPARC mode sessions",
+        "tasks": "For task management",
+        "analysis": "For analysis results",
+        "config": "For configuration data"
+      },
+      "retentionPolicy": {
+        "default": 90,
+        "swarm": 30,
+        "sparc": 60,
+        "tasks": 30,
+        "analysis": 180,
+        "config": 365
+      },
+      "compressionThreshold": 1024,
+      "cacheTTL": 300000,
+      "backupInterval": 3600000,
+      "backupRetention": 7
+    }
   }
 }

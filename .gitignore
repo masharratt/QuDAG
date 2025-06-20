@@ -11,6 +11,11 @@ debug/
 *.swp
 *.swo
 *~
+# Dependency directories
+/node_modules/
+/vendor/    
+.env
+cargo.lock
 
 # OS files
 .DS_Store

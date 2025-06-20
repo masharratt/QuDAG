@@ -1,11 +1,11 @@
 [workspace]
 members = [
+    "qudag",
     "core/crypto",
     "core/dag",
     "core/network",
     "core/protocol",
     "tools/cli",
-    "tools/simulator",
 ]
 resolver = "2"
 
@@ -37,7 +37,7 @@ hex = "0.4"
 sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "sqlite"] }
 
 [workspace.package]
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["rUv <https://github.com/ruvnet>"]
 repository = "https://github.com/ruvnet/QuDAG"

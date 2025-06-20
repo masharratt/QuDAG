@@ -14,6 +14,7 @@ pub mod metrics;
 pub mod node;
 pub mod node_runner;
 pub mod node_runner_adapter;
+pub mod optimization_config;
 pub mod persistence;
 pub mod rpc_server;
 pub mod state;
@@ -40,6 +41,10 @@ pub use persistence::{
 };
 pub use rpc_server::{
     NetworkStats, NodeRunnerTrait, PeerInfo as RpcPeerInfo, RpcCommand, RpcServer, RpcTransport,
+};
+pub use optimization_config::{
+    OptimizationConfig, ConfigError as OptimizationConfigError,
+    MessageChunkingConfig, ValidationCacheConfig, AsyncCoordinationConfig,
 };
 pub use state::{ProtocolState, ProtocolStateMachine, StateError, StateMachineConfig};
 pub use types::{ProtocolError, ProtocolEvent};
