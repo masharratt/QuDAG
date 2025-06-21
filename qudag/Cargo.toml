@@ -12,10 +12,10 @@ keywords = ["blockchain", "dag", "quantum-resistant", "distributed-ledger", "cry
 categories = ["cryptography", "network-programming"]
 
 [dependencies]
-qudag-crypto = { version = "0.1.1", path = "../core/crypto" }
-qudag-dag = { version = "0.1.1", path = "../core/dag" }
-qudag-network = { version = "0.1.1", path = "../core/network" }
-qudag-protocol = { version = "0.1.1", path = "../core/protocol" }
+qudag-crypto = { version = "0.2.0", path = "../core/crypto" }
+qudag-dag = { version = "0.2.0", path = "../core/dag" }
+qudag-network = { version = "0.2.0", path = "../core/network" }
+qudag-protocol = { version = "0.2.0", path = "../core/protocol" }
 
 [features]
 default = []

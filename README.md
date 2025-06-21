@@ -13,6 +13,7 @@ Think of it as combining the anonymity of Tor with the decentralization of Bitco
 - ⚡ High-performance asynchronous DAG with QR-Avalanche consensus
 - 🌐 Built-in `.dark` domain system for decentralized darknet addressing
 - 🕵️ Anonymous onion routing with ChaCha20Poly1305 traffic obfuscation
+- 🔐 Quantum-resistant password vault with AES-256-GCM encryption
 - 🛡️ Memory-safe Rust implementation with zero unsafe code
 - 🔗 LibP2P-based networking with Kademlia DHT peer discovery
 - 📊 Real-time performance metrics and benchmarking
@@ -25,10 +26,14 @@ Think of it as combining the anonymity of Tor with the decentralization of Bitco
 cargo install qudag-cli
 
 # Verify installation
-qudag-cli --help
+qudag --help
 
 # Start your first node
-qudag-cli start --port 8000
+qudag start --port 8000
+
+# Use the built-in password vault
+qudag vault generate --length 16
+qudag vault config show
 ```
 
 ### For Developers (Library)
@@ -37,9 +42,10 @@ qudag-cli start --port 8000
 cargo add qudag
 
 # Or add specific components
-cargo add qudag-crypto    # Quantum-resistant cryptography
-cargo add qudag-network   # P2P networking with dark addressing
-cargo add qudag-dag       # DAG consensus implementation
+cargo add qudag-crypto      # Quantum-resistant cryptography
+cargo add qudag-network     # P2P networking with dark addressing
+cargo add qudag-dag         # DAG consensus implementation
+cargo add qudag-vault-core  # Password vault with post-quantum crypto
 ```
 
 ### Quick Start Example
@@ -69,6 +75,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 - [**qudag-crypto**](https://crates.io/crates/qudag-crypto) - Quantum-resistant cryptography
 - [**qudag-network**](https://crates.io/crates/qudag-network) - P2P networking & dark addressing
 - [**qudag-dag**](https://crates.io/crates/qudag-dag) - DAG consensus implementation
+- [**qudag-vault-core**](https://crates.io/crates/qudag-vault-core) - Password vault with post-quantum encryption
 - [**qudag-protocol**](https://crates.io/crates/qudag-protocol) - Protocol coordination
 
 ## Use Cases
@@ -91,6 +98,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 | | Private data transfer | Untraceable data exchange between parties |
 | | Secure group coordination | Private collaboration without identity exposure |
 | | Metadata protection | Full protocol-level metadata obfuscation |
+| **🔐 Password Management** | Quantum-resistant vault | AES-256-GCM encrypted passwords with ML-KEM/ML-DSA |
+| | Secure password generation | Cryptographically secure random password generation |
+| | DAG-based organization | Hierarchical password storage with categories |
+| | Encrypted backup/restore | Secure vault export/import functionality |
 
 ## Core Features
 
