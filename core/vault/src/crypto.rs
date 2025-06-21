@@ -7,7 +7,7 @@ use aes_gcm::{
 // QuDAG integration disabled for initial standalone publishing
 // #[cfg(feature = "qudag-integration")]
 // use qudag_crypto::{
-//     ml_kem::MlKem768, 
+//     ml_kem::MlKem768,
 //     ml_dsa::MlDsaKeyPair,
 //     kem::PublicKey as KemPublicKey,
 // };
@@ -51,7 +51,7 @@ impl VaultCrypto {
         let mut key = [0u8; VAULT_KEY_SIZE];
         getrandom::getrandom(&mut key)
             .map_err(|e| VaultError::Crypto(format!("Failed to generate random key: {}", e)))?;
-        
+
         Ok(Self {
             vault_key: VaultKey(key),
         })
@@ -73,29 +73,31 @@ impl VaultCrypto {
     pub fn encrypt(&self, plaintext: &[u8]) -> VaultResult<Vec<u8>> {
         let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(&self.vault_key.0));
         let nonce = Aes256Gcm::generate_nonce(&mut OsRng);
-        
+
         let ciphertext = cipher
             .encrypt(&nonce, plaintext)
             .map_err(|e| VaultError::Crypto(format!("Encryption failed: {}", e)))?;
-        
+
         // Prepend nonce to ciphertext
         let mut result = nonce.to_vec();
         result.extend_from_slice(&ciphertext);
-        
+
         Ok(result)
     }
 
     /// Decrypt data using AES-256-GCM.
     pub fn decrypt(&self, ciphertext: &[u8]) -> VaultResult<Vec<u8>> {
         if ciphertext.len() < NONCE_SIZE {
-            return Err(VaultError::Crypto("Invalid ciphertext: too short".to_string()));
+            return Err(VaultError::Crypto(
+                "Invalid ciphertext: too short".to_string(),
+            ));
         }
 
         let (nonce_bytes, encrypted) = ciphertext.split_at(NONCE_SIZE);
         let nonce = Nonce::from_slice(nonce_bytes);
-        
+
         let cipher = Aes256Gcm::new(Key::<Aes256Gcm>::from_slice(&self.vault_key.0));
-        
+
         cipher
             .decrypt(nonce, encrypted)
             .map_err(|e| VaultError::Crypto(format!("Decryption failed: {}", e)))
@@ -109,15 +111,15 @@ impl VaultCrypto {
         // Users should enable qudag-integration feature for real post-quantum crypto
         let mut kem_public = vec![0u8; 1184]; // ML-KEM-768 public key size
         let mut dsa_public = vec![0u8; 1312]; // ML-DSA-65 public key size
-        
+
         getrandom::getrandom(&mut kem_public)
             .map_err(|e| VaultError::Crypto(format!("Failed to generate KEM key: {}", e)))?;
         getrandom::getrandom(&mut dsa_public)
             .map_err(|e| VaultError::Crypto(format!("Failed to generate DSA key: {}", e)))?;
-        
+
         let kem_secret_encrypted = self.encrypt(&[0u8; 2400])?; // ML-KEM-768 secret key size
         let dsa_secret_encrypted = self.encrypt(&[0u8; 4032])?; // ML-DSA-65 secret key size
-        
+
         Ok(VaultKeyPair {
             kem_public,
             kem_secret_encrypted,
@@ -133,7 +135,7 @@ impl VaultCrypto {
         _recipient_public_key: &[u8],
     ) -> VaultResult<(Vec<u8>, Vec<u8>)> {
         Err(VaultError::Crypto(
-            "Key encapsulation requires qudag-integration feature".to_string()
+            "Key encapsulation requires qudag-integration feature".to_string(),
         ))
     }
 
@@ -158,10 +160,10 @@ mod tests {
     fn test_encrypt_decrypt() {
         let crypto = VaultCrypto::new().unwrap();
         let plaintext = b"Hello, Vault!";
-        
+
         let ciphertext = crypto.encrypt(plaintext).unwrap();
         assert_ne!(ciphertext, plaintext);
-        
+
         let decrypted = crypto.decrypt(&ciphertext).unwrap();
         assert_eq!(decrypted, plaintext);
     }
@@ -171,7 +173,7 @@ mod tests {
         let data = b"test data";
         let hash1 = VaultCrypto::hash(data);
         let hash2 = VaultCrypto::hash(data);
-        
+
         assert_eq!(hash1, hash2);
         assert_eq!(hash1.len(), 32); // BLAKE3 output is 256 bits
     }

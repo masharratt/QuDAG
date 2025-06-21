@@ -13,6 +13,7 @@ Think of it as combining the anonymity of Tor with the decentralization of Bitco
 - ⚡ High-performance asynchronous DAG with QR-Avalanche consensus
 - 🌐 Built-in `.dark` domain system for decentralized darknet addressing
 - 🕵️ Anonymous onion routing with ChaCha20Poly1305 traffic obfuscation
+- 🔐 Quantum-resistant password vault with AES-256-GCM encryption
 - 🛡️ Memory-safe Rust implementation with zero unsafe code
 - 🔗 LibP2P-based networking with Kademlia DHT peer discovery
 - 📊 Real-time performance metrics and benchmarking
@@ -25,10 +26,14 @@ Think of it as combining the anonymity of Tor with the decentralization of Bitco
 cargo install qudag-cli
 
 # Verify installation
-qudag-cli --help
+qudag --help
 
 # Start your first node
-qudag-cli start --port 8000
+qudag start --port 8000
+
+# Use the built-in password vault
+qudag vault generate --length 16
+qudag vault config show
 ```
 
 ### For Developers (Library)
@@ -37,9 +42,11 @@ qudag-cli start --port 8000
 cargo add qudag
 
 # Or add specific components
-cargo add qudag-crypto    # Quantum-resistant cryptography
-cargo add qudag-network   # P2P networking with dark addressing
-cargo add qudag-dag       # DAG consensus implementation
+cargo add qudag-crypto      # Quantum-resistant cryptography
+cargo add qudag-network     # P2P networking with dark addressing
+cargo add qudag-dag         # DAG consensus implementation
+cargo add qudag-vault-core  # Password vault with post-quantum crypto
+cargo add qudag-mcp         # Model Context Protocol server
 ```
 
 ### Quick Start Example
@@ -69,6 +76,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 - [**qudag-crypto**](https://crates.io/crates/qudag-crypto) - Quantum-resistant cryptography
 - [**qudag-network**](https://crates.io/crates/qudag-network) - P2P networking & dark addressing
 - [**qudag-dag**](https://crates.io/crates/qudag-dag) - DAG consensus implementation
+- [**qudag-vault-core**](https://crates.io/crates/qudag-vault-core) - Password vault with post-quantum encryption
 - [**qudag-protocol**](https://crates.io/crates/qudag-protocol) - Protocol coordination
 
 ## Use Cases
@@ -91,6 +99,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 | | Private data transfer | Untraceable data exchange between parties |
 | | Secure group coordination | Private collaboration without identity exposure |
 | | Metadata protection | Full protocol-level metadata obfuscation |
+| **🔐 Password Management** | Quantum-resistant vault | AES-256-GCM encrypted passwords with ML-KEM/ML-DSA |
+| | Secure password generation | Cryptographically secure random password generation |
+| | DAG-based organization | Hierarchical password storage with categories |
+| | Encrypted backup/restore | Secure vault export/import functionality |
 
 ## Core Features
 
@@ -151,6 +163,49 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 | **SIMD Optimization** | Hardware-accelerated crypto operations | 10x performance boost |
 | **NAT Traversal** | STUN/TURN/UPnP implementation | Works behind firewalls |
 | **Dark Addressing** | Quantum-resistant domain system | Decentralized naming |
+| **MCP Integration** | Model Context Protocol server | AI development tools integration |
+
+## 🤖 MCP Server Integration
+
+QuDAG now includes a complete **Model Context Protocol (MCP)** server implementation, enabling seamless integration with AI development tools like Claude Desktop, VS Code, and custom applications.
+
+### MCP Features
+- **Quantum-Resistant Security**: All MCP operations secured with post-quantum cryptography
+- **Vault Integration**: Direct access to QuDAG's encrypted password vault via MCP tools
+- **DAG Operations**: Query and monitor DAG consensus through MCP resources
+- **Network Management**: Peer discovery and network statistics via MCP
+- **Multiple Transports**: HTTP, WebSocket, and stdio transport support
+- **Real-time Updates**: Live resource subscriptions for dynamic data
+
+### Quick MCP Setup
+```bash
+# Start MCP server (default: HTTP on port 3000)
+qudag mcp start
+
+# Configure MCP server settings
+qudag mcp config init
+qudag mcp config show
+
+# List available tools and resources
+qudag mcp tools
+qudag mcp resources
+
+# Test server connectivity
+qudag mcp test --endpoint http://localhost:3000
+```
+
+### Integration with Development Tools
+```json
+// Claude Desktop configuration
+{
+  "mcpServers": {
+    "qudag": {
+      "command": "qudag",
+      "args": ["mcp", "start", "--transport", "stdio"]
+    }
+  }
+}
+```
 
 ## How It Works
 
@@ -246,8 +301,9 @@ When you run commands, you'll see different types of responses:
 | **qudag-network** | ✅ Passing | 62/62 | 89% |
 | **qudag-dag** | ✅ Passing | 38/38 | 91% |
 | **qudag-protocol** | ✅ Passing | 27/27 | 87% |
+| **qudag-mcp** | ✅ Passing | 35/35 | 88% |
 | **qudag-cli** | ✅ Passing | 51/51 | 92% |
-| **Overall** | ✅ Passing | 223/223 | 91% |
+| **Overall** | ✅ Passing | 258/258 | 91% |
 
 ### Compilation
 
@@ -926,4 +982,4 @@ Licensed under either:
 
 Created by [rUv](https://github.com/ruvnet)
 
-[GitHub](https://github.com/ruvnet/QuDAG) • [Documentation](https://docs.qudag.io) • [Research](https://github.com/ruvnet/QuDAG/tree/main/research)
+[GitHub](https://github.com/ruvnet/QuDAG) • [Research](https://github.com/ruvnet/QuDAG/tree/main/research)

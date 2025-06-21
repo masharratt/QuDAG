@@ -131,6 +131,12 @@ enum Commands {
         #[command(subcommand)]
         command: VaultCommands,
     },
+
+    /// MCP server commands
+    Mcp {
+        #[command(subcommand)]
+        command: McpCommands,
+    },
 }
 
 #[derive(Subcommand)]
@@ -394,6 +400,84 @@ enum VaultConfigCommands {
         /// Force reset without confirmation
         #[arg(short, long)]
         force: bool,
+    },
+}
+
+#[derive(Subcommand)]
+enum McpCommands {
+    /// Start MCP server
+    Start {
+        /// Server bind address
+        #[arg(short, long, default_value = "127.0.0.1:3000")]
+        bind: String,
+
+        /// Transport type (http, websocket, stdio)
+        #[arg(short, long, default_value = "http")]
+        transport: String,
+
+        /// Configuration file path
+        #[arg(short, long)]
+        config: Option<PathBuf>,
+
+        /// Enable verbose logging
+        #[arg(short, long)]
+        verbose: bool,
+
+        /// Run in background (daemon mode)
+        #[arg(short = 'd', long = "background")]
+        background: bool,
+    },
+
+    /// Stop running MCP server
+    Stop {
+        /// Force stop without graceful shutdown
+        #[arg(short, long)]
+        force: bool,
+    },
+
+    /// Show MCP server status
+    Status,
+
+    /// Configure MCP server settings
+    Config {
+        #[command(subcommand)]
+        command: McpConfigCommands,
+    },
+
+    /// List available MCP tools
+    Tools,
+
+    /// List available MCP resources
+    Resources,
+
+    /// Test MCP server connectivity
+    Test {
+        /// Server endpoint to test
+        #[arg(short, long, default_value = "http://127.0.0.1:3000")]
+        endpoint: String,
+    },
+}
+
+#[derive(Subcommand)]
+enum McpConfigCommands {
+    /// Show current MCP configuration
+    Show,
+
+    /// Generate default configuration file
+    Init {
+        /// Output file path
+        #[arg(short, long)]
+        output: Option<PathBuf>,
+
+        /// Force overwrite existing file
+        #[arg(short, long)]
+        force: bool,
+    },
+
+    /// Validate configuration file
+    Validate {
+        /// Configuration file path
+        config: PathBuf,
     },
 }
 
@@ -858,6 +942,91 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 }
             }
         },
+
+        Commands::Mcp { command } => {
+            use qudag_cli::mcp;
+
+            match command {
+                McpCommands::Start {
+                    bind,
+                    transport,
+                    config,
+                    verbose,
+                    background,
+                } => {
+                    match mcp::handle_mcp_start(bind, transport, config, verbose, background).await
+                    {
+                        Ok(()) => {}
+                        Err(e) => {
+                            eprintln!("Error starting MCP server: {}", e);
+                            std::process::exit(1);
+                        }
+                    }
+                }
+                McpCommands::Stop { force } => match mcp::handle_mcp_stop(force).await {
+                    Ok(()) => {}
+                    Err(e) => {
+                        eprintln!("Error stopping MCP server: {}", e);
+                        std::process::exit(1);
+                    }
+                },
+                McpCommands::Status => match mcp::handle_mcp_status().await {
+                    Ok(()) => {}
+                    Err(e) => {
+                        eprintln!("Error getting MCP server status: {}", e);
+                        std::process::exit(1);
+                    }
+                },
+                McpCommands::Config { command } => match command {
+                    McpConfigCommands::Show => match mcp::handle_mcp_config_show().await {
+                        Ok(()) => {}
+                        Err(e) => {
+                            eprintln!("Error showing MCP config: {}", e);
+                            std::process::exit(1);
+                        }
+                    },
+                    McpConfigCommands::Init { output, force } => {
+                        match mcp::handle_mcp_config_init(output, force).await {
+                            Ok(()) => {}
+                            Err(e) => {
+                                eprintln!("Error initializing MCP config: {}", e);
+                                std::process::exit(1);
+                            }
+                        }
+                    }
+                    McpConfigCommands::Validate { config } => {
+                        match mcp::handle_mcp_config_validate(config).await {
+                            Ok(()) => {}
+                            Err(e) => {
+                                eprintln!("Error validating MCP config: {}", e);
+                                std::process::exit(1);
+                            }
+                        }
+                    }
+                },
+                McpCommands::Tools => match mcp::handle_mcp_tools().await {
+                    Ok(()) => {}
+                    Err(e) => {
+                        eprintln!("Error listing MCP tools: {}", e);
+                        std::process::exit(1);
+                    }
+                },
+                McpCommands::Resources => match mcp::handle_mcp_resources().await {
+                    Ok(()) => {}
+                    Err(e) => {
+                        eprintln!("Error listing MCP resources: {}", e);
+                        std::process::exit(1);
+                    }
+                },
+                McpCommands::Test { endpoint } => match mcp::handle_mcp_test(endpoint).await {
+                    Ok(()) => {}
+                    Err(e) => {
+                        eprintln!("Error testing MCP server: {}", e);
+                        std::process::exit(1);
+                    }
+                },
+            }
+        }
 
         Commands::Vault { command } => {
             // Create a new CommandRouter instance for vault commands

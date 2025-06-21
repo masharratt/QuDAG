@@ -1,6 +1,6 @@
 [package]
 name = "qudag-vault-core"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 authors = ["QuDAG Team <team@qudag.com>", "rUv <ruv@ruv.net>"]
 description = "Quantum-resistant password vault library with post-quantum cryptography"
@@ -14,9 +14,9 @@ categories = ["cryptography", "authentication"]
 rust-version = "1.75"
 
 [dependencies]
-# QuDAG dependencies (optional for integration) - commented out for initial publishing
-# qudag-crypto = { path = "../crypto", optional = true }
-# qudag-dag = { path = "../dag", optional = true }
+# QuDAG dependencies for integration
+qudag-crypto = { version = "0.3.0", path = "../crypto" }
+qudag-dag = { version = "0.3.0", path = "../dag" }
 
 # Cryptography
 aes-gcm = "0.10"
@@ -65,8 +65,8 @@ name = "password_generation"
 path = "examples/password_generation.rs"
 
 [features]
-default = []
-# qudag-integration = ["qudag-crypto", "qudag-dag"]  # Disabled for initial publishing
+default = ["qudag-integration"]
+qudag-integration = []
 enterprise = ["rbac", "audit-log", "mfa"]
 rbac = []
 audit-log = []

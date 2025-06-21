@@ -168,7 +168,7 @@ impl Dag {
 
         // Create new vertex
         let vertex = Vertex::new(msg.id.clone(), msg.payload, msg.parents);
-        
+
         // Validation cache disabled for initial release
         // let validation_result = validation_cache.validate(&vertex)?;
         // if !validation_result.is_valid {

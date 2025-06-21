@@ -63,26 +63,7 @@
       "autoCompress": true,
       "autoCleanup": true,
       "indexingEnabled": true,
-      "persistenceEnabled": true,
-      "namespaces": {
-        "swarm": "For swarm agent coordination",
-        "sparc": "For SPARC mode sessions",
-        "tasks": "For task management",
-        "analysis": "For analysis results",
-        "config": "For configuration data"
-      },
-      "retentionPolicy": {
-        "default": 90,
-        "swarm": 30,
-        "sparc": 60,
-        "tasks": 30,
-        "analysis": 180,
-        "config": 365
-      },
-      "compressionThreshold": 1024,
-      "cacheTTL": 300000,
-      "backupInterval": 3600000,
-      "backupRetention": 7
+      "persistenceEnabled": true
     }
   }
 }

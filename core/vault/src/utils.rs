@@ -44,7 +44,7 @@ impl CharacterSet {
 pub fn generate_password(length: usize, charset: CharacterSet) -> String {
     let chars = charset.as_str();
     let mut rng = rand::thread_rng();
-    
+
     (0..length)
         .map(|_| {
             let idx = rng.gen_range(0..chars.len());
@@ -85,23 +85,23 @@ pub fn validate_password(password: &str) -> Result<(), String> {
     if password.len() < 8 {
         return Err("Password must be at least 8 characters long".to_string());
     }
-    
+
     let has_lowercase = password.chars().any(|c| c.is_lowercase());
     let has_uppercase = password.chars().any(|c| c.is_uppercase());
     let has_digit = password.chars().any(|c| c.is_numeric());
-    
+
     if !has_lowercase {
         return Err("Password must contain at least one lowercase letter".to_string());
     }
-    
+
     if !has_uppercase {
         return Err("Password must contain at least one uppercase letter".to_string());
     }
-    
+
     if !has_digit {
         return Err("Password must contain at least one digit".to_string());
     }
-    
+
     Ok(())
 }
 
@@ -110,12 +110,12 @@ pub fn secure_compare(a: &[u8], b: &[u8]) -> bool {
     if a.len() != b.len() {
         return false;
     }
-    
+
     let mut result = 0u8;
     for (x, y) in a.iter().zip(b.iter()) {
         result |= x ^ y;
     }
-    
+
     result == 0
 }
 
@@ -128,7 +128,7 @@ mod tests {
         let password = generate_password(16, CharacterSet::Alphanumeric);
         assert_eq!(password.len(), 16);
         assert!(password.chars().all(|c| c.is_alphanumeric()));
-        
+
         let password2 = generate_password(16, CharacterSet::Alphanumeric);
         assert_ne!(password, password2); // Should be random
     }
@@ -153,7 +153,7 @@ mod tests {
         let a = b"hello";
         let b = b"hello";
         let c = b"world";
-        
+
         assert!(secure_compare(a, b));
         assert!(!secure_compare(a, c));
         assert!(!secure_compare(a, &b"hell"[..])); // Different lengths

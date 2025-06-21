@@ -1,5 +1,5 @@
 //! QuDAG - Quantum Ultra-Fast Distributed Acyclic Graph
-//! 
+//!
 //! A high-performance DAG-based distributed ledger with quantum-resistant cryptography.
 
 pub use qudag_crypto as crypto;
@@ -9,26 +9,13 @@ pub use qudag_protocol as protocol;
 
 pub mod prelude {
     pub use crate::crypto::{
-        Fingerprint, FingerprintError,
-        MlDsaPublicKey, MlDsaKeyPair,
-        MlKem768, 
-        PublicKey, SecretKey, KeyPair,
-        HashFunction,
+        Fingerprint, FingerprintError, HashFunction, KeyPair, MlDsaKeyPair, MlDsaPublicKey,
+        MlKem768, PublicKey, SecretKey,
     };
-    
-    pub use crate::dag::{
-        Node, Dag, Vertex, VertexId,
-        Consensus, QRAvalanche,
-    };
-    
-    pub use crate::network::{
-        peer::Peer,
-        NetworkManager,
-    };
-    
-    pub use crate::protocol::{
-        NodeConfig,
-        Message,
-        ProtocolConfig,
-    };
+
+    pub use crate::dag::{Consensus, Dag, Node, QRAvalanche, Vertex, VertexId};
+
+    pub use crate::network::{peer::Peer, NetworkManager};
+
+    pub use crate::protocol::{Message, NodeConfig, ProtocolConfig};
 }

@@ -1,6 +1,6 @@
+use std::fs;
 use std::process::Command;
 use tempfile::TempDir;
-use std::fs;
 
 #[cfg(test)]
 mod vault_cli_tests {
@@ -30,11 +30,14 @@ mod vault_cli_tests {
             "init",
             vault_path.to_str().unwrap(),
             "--password",
-            "TestPassword123!"
+            "TestPassword123!",
         ]);
 
         assert!(success, "Vault init should succeed: stderr={}", stderr);
-        assert!(stdout.contains("Vault initialized"), "Should show success message");
+        assert!(
+            stdout.contains("Vault initialized"),
+            "Should show success message"
+        );
         assert!(vault_path.exists(), "Vault file should be created");
     }
 
@@ -45,15 +48,14 @@ mod vault_cli_tests {
         let temp_dir = TempDir::new().unwrap();
         let vault_path = temp_dir.path().join("test_vault.qdag");
 
-        let (_, stderr, success) = run_qudag_command(&[
-            "vault",
-            "init",
-            vault_path.to_str().unwrap()
-        ]);
+        let (_, stderr, success) =
+            run_qudag_command(&["vault", "init", vault_path.to_str().unwrap()]);
 
         assert!(!success, "Should fail without password");
-        assert!(stderr.contains("password") || stderr.contains("required"),
-                "Should mention password requirement");
+        assert!(
+            stderr.contains("password") || stderr.contains("required"),
+            "Should mention password requirement"
+        );
     }
 
     #[test]
@@ -67,7 +69,7 @@ mod vault_cli_tests {
             "init",
             vault_path.to_str().unwrap(),
             "--password",
-            "TestPassword123!"
+            "TestPassword123!",
         ]);
 
         // Add secret
@@ -82,12 +84,14 @@ mod vault_cli_tests {
             "--username",
             "user@gmail.com",
             "--secret-password",
-            "GmailPassword123"
+            "GmailPassword123",
         ]);
 
         assert!(success, "Adding secret should succeed");
-        assert!(stdout.contains("Secret") && stdout.contains("added"),
-                "Should confirm secret was added");
+        assert!(
+            stdout.contains("Secret") && stdout.contains("added"),
+            "Should confirm secret was added"
+        );
     }
 
     #[test]
@@ -101,7 +105,7 @@ mod vault_cli_tests {
             "init",
             vault_path.to_str().unwrap(),
             "--password",
-            "TestPassword123!"
+            "TestPassword123!",
         ]);
 
         // Add secret with generated password
@@ -115,12 +119,17 @@ mod vault_cli_tests {
             "TestPassword123!",
             "--username",
             "admin",
-            "--generate"
+            "--generate",
         ]);
 
-        assert!(success, "Adding secret with generated password should succeed");
-        assert!(stdout.contains("Generated password"),
-                "Should show generated password");
+        assert!(
+            success,
+            "Adding secret with generated password should succeed"
+        );
+        assert!(
+            stdout.contains("Generated password"),
+            "Should show generated password"
+        );
     }
 
     #[test]
@@ -134,7 +143,7 @@ mod vault_cli_tests {
             "init",
             vault_path.to_str().unwrap(),
             "--password",
-            "TestPassword123!"
+            "TestPassword123!",
         ]);
 
         run_qudag_command(&[
@@ -148,7 +157,7 @@ mod vault_cli_tests {
             "--username",
             "testuser",
             "--secret-password",
-            "TestSecretPass"
+            "TestSecretPass",
         ]);
 
         // Get secret
@@ -159,7 +168,7 @@ mod vault_cli_tests {
             "--vault",
             vault_path.to_str().unwrap(),
             "--password",
-            "TestPassword123!"
+            "TestPassword123!",
         ]);
 
         assert!(success, "Getting secret should succeed");
@@ -178,7 +187,7 @@ mod vault_cli_tests {
             "init",
             vault_path.to_str().unwrap(),
             "--password",
-            "TestPassword123!"
+            "TestPassword123!",
         ]);
 
         run_qudag_command(&[
@@ -192,7 +201,7 @@ mod vault_cli_tests {
             "--username",
             "api_service",
             "--secret-password",
-            "api_key_12345"
+            "api_key_12345",
         ]);
 
         // Get secret as JSON
@@ -205,15 +214,15 @@ mod vault_cli_tests {
             "--password",
             "TestPassword123!",
             "--format",
-            "json"
+            "json",
         ]);
 
         assert!(success, "Getting secret as JSON should succeed");
-        
+
         // Parse JSON output
-        let json: serde_json::Value = serde_json::from_str(&stdout)
-            .expect("Output should be valid JSON");
-        
+        let json: serde_json::Value =
+            serde_json::from_str(&stdout).expect("Output should be valid JSON");
+
         assert_eq!(json["label"], "api/key");
         assert_eq!(json["username"], "api_service");
         assert_eq!(json["password"], "api_key_12345");
@@ -230,7 +239,7 @@ mod vault_cli_tests {
             "init",
             vault_path.to_str().unwrap(),
             "--password",
-            "TestPassword123!"
+            "TestPassword123!",
         ]);
 
         let secrets = vec![
@@ -251,7 +260,7 @@ mod vault_cli_tests {
                 "TestPassword123!",
                 "--username",
                 username,
-                "--generate"
+                "--generate",
             ]);
         }
 
@@ -262,7 +271,7 @@ mod vault_cli_tests {
             "--vault",
             vault_path.to_str().unwrap(),
             "--password",
-            "TestPassword123!"
+            "TestPassword123!",
         ]);
 
         assert!(success, "Listing secrets should succeed");
@@ -279,7 +288,7 @@ mod vault_cli_tests {
             "--password",
             "TestPassword123!",
             "--category",
-            "email"
+            "email",
         ]);
 
         assert!(success, "Listing by category should succeed");
@@ -301,7 +310,7 @@ mod vault_cli_tests {
             "init",
             vault_path.to_str().unwrap(),
             "--password",
-            "TestPassword123!"
+            "TestPassword123!",
         ]);
 
         run_qudag_command(&[
@@ -315,7 +324,7 @@ mod vault_cli_tests {
             "--username",
             "exportuser",
             "--secret-password",
-            "ExportPass123"
+            "ExportPass123",
         ]);
 
         // Export vault
@@ -326,7 +335,7 @@ mod vault_cli_tests {
             "--vault",
             vault_path.to_str().unwrap(),
             "--password",
-            "TestPassword123!"
+            "TestPassword123!",
         ]);
 
         assert!(success, "Export should succeed");
@@ -339,7 +348,7 @@ mod vault_cli_tests {
             "init",
             import_vault_path.to_str().unwrap(),
             "--password",
-            "ImportPassword"
+            "ImportPassword",
         ]);
 
         let (stdout, _, success) = run_qudag_command(&[
@@ -349,7 +358,7 @@ mod vault_cli_tests {
             "--vault",
             import_vault_path.to_str().unwrap(),
             "--password",
-            "ImportPassword"
+            "ImportPassword",
         ]);
 
         assert!(success, "Import should succeed");
@@ -363,7 +372,7 @@ mod vault_cli_tests {
             "--vault",
             import_vault_path.to_str().unwrap(),
             "--password",
-            "ImportPassword"
+            "ImportPassword",
         ]);
 
         assert!(success, "Getting imported secret should succeed");
@@ -373,20 +382,17 @@ mod vault_cli_tests {
 
     #[test]
     fn test_vault_generate_password_command() {
-        let (stdout, _, success) = run_qudag_command(&[
-            "vault",
-            "genpw",
-            "--length",
-            "24",
-            "--no-symbols"
-        ]);
+        let (stdout, _, success) =
+            run_qudag_command(&["vault", "genpw", "--length", "24", "--no-symbols"]);
 
         assert!(success, "Password generation should succeed");
-        
+
         let password = stdout.trim();
         assert_eq!(password.len(), 24, "Generated password should be 24 chars");
-        assert!(password.chars().all(|c| c.is_alphanumeric()),
-                "Password should only contain alphanumeric chars");
+        assert!(
+            password.chars().all(|c| c.is_alphanumeric()),
+            "Password should only contain alphanumeric chars"
+        );
     }
 
     #[test]
@@ -402,12 +408,14 @@ mod vault_cli_tests {
             "--vault",
             vault_path.to_str().unwrap(),
             "--password",
-            "TestPassword"
+            "TestPassword",
         ]);
 
         assert!(!success, "Should fail for non-existent vault");
-        assert!(stderr.contains("not found") || stderr.contains("does not exist"),
-                "Should show appropriate error");
+        assert!(
+            stderr.contains("not found") || stderr.contains("does not exist"),
+            "Should show appropriate error"
+        );
 
         // Create vault and try wrong password
         run_qudag_command(&[
@@ -415,7 +423,7 @@ mod vault_cli_tests {
             "init",
             vault_path.to_str().unwrap(),
             "--password",
-            "CorrectPassword"
+            "CorrectPassword",
         ]);
 
         let (_, stderr, success) = run_qudag_command(&[
@@ -424,12 +432,14 @@ mod vault_cli_tests {
             "--vault",
             vault_path.to_str().unwrap(),
             "--password",
-            "WrongPassword"
+            "WrongPassword",
         ]);
 
         assert!(!success, "Should fail with wrong password");
-        assert!(stderr.contains("authentication") || stderr.contains("incorrect"),
-                "Should show authentication error");
+        assert!(
+            stderr.contains("authentication") || stderr.contains("incorrect"),
+            "Should show authentication error"
+        );
     }
 
     #[test]
