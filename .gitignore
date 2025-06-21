@@ -4,6 +4,7 @@ debug/
 **/*.rs.bk
 *.pdb
 **/mutants.out*/
+target/
 
 # IDE files
 .vscode/
