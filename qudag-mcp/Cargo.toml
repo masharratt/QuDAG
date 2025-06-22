@@ -31,9 +31,9 @@ tower-http = { version = "0.5", features = ["cors", "fs"] }
 hyper = "1.0"
 rand = "0.8"
 qudag-vault-core = { version = "0.2.1", path = "../core/vault" }
-qudag-dag = { version = "0.3.0", path = "../core/dag" }
-qudag-network = { version = "0.3.0", path = "../core/network" }
-qudag-crypto = { version = "0.3.0", path = "../core/crypto" }
+qudag-dag = { version = "0.3.1", path = "../core/dag" }
+qudag-network = { version = "0.3.1", path = "../core/network" }
+qudag-crypto = { version = "0.3.1", path = "../core/crypto" }
 reqwest = { version = "0.11", features = ["json", "rustls-tls"], default-features = false }
 url = "2.4"
 tungstenite = "0.20"
