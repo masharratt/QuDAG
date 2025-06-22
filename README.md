@@ -2,11 +2,13 @@
 
 > The Darkest of Darknets - Built for the Quantum Age
 
-QuDAG is a revolutionary quantum-resistant distributed communication platform built on a Directed Acyclic Graph (DAG) architecture. Unlike traditional blockchain systems that use linear chains, QuDAG uses a DAG structure for parallel message processing and consensus, enabling high throughput while maintaining cryptographic security against quantum computing attacks.
+QuDAG is a revolutionary quantum-resistant distributed communication platform built on a Directed Acyclic Graph (DAG) architecture. Unlike traditional blockchain systems that use linear chains, QuDAG uses a DAG structure for parallel message processing and consensus, enabling high throughput while maintaining cryptographic security against quantum computing attacks. **The platform is uniquely suited for distributed agentic systems and swarms**, providing the secure, decentralized infrastructure needed for autonomous AI agents to coordinate and communicate at scale.
 
 The platform creates a decentralized mesh network where messages are processed through a DAG-based consensus mechanism and routed through multiple encrypted layers (onion routing), making communication both scalable and anonymous. **What makes QuDAG truly unique is its built-in dark domain system** - allowing you to register and resolve human-readable `.dark` addresses (like `myservice.dark`) without any central authority, creating your own darknet namespace with quantum-resistant authentication.
 
-Think of it as combining the anonymity of Tor with the decentralization of Bitcoin, but built for the quantum age and optimized for high-performance communication rather than financial transactions.
+Built with an **MCP-first approach**, QuDAG seamlessly integrates with modern AI development workflows through the Model Context Protocol, providing native support for stdio/HTTP transports, comprehensive CLI tools, SDK libraries, and RESTful APIs. This makes it the ideal backbone for next-generation distributed AI systems that require both quantum-resistant security and high-performance communication.
+
+Think of it as combining the anonymity of Tor with the decentralization of Bitcoin, but built for the quantum age and optimized for high-performance communication rather than financial transactions - all while providing first-class support for AI agent coordination and swarm intelligence.
 
 **Key Highlights:**
 - 🔒 Post-quantum cryptography using ML-KEM-768 & ML-DSA with BLAKE3
@@ -17,6 +19,8 @@ Think of it as combining the anonymity of Tor with the decentralization of Bitco
 - 🛡️ Memory-safe Rust implementation with zero unsafe code
 - 🔗 LibP2P-based networking with Kademlia DHT peer discovery
 - 📊 Real-time performance metrics and benchmarking
+- 🤖 Native MCP server with stdio/HTTP/WebSocket transports for AI integration
+- 🌍 WebAssembly support for browser and Node.js applications
 
 ## 🚀 Quick Installation
 
@@ -49,7 +53,19 @@ cargo add qudag-vault-core  # Password vault with post-quantum crypto
 cargo add qudag-mcp         # Model Context Protocol server
 ```
 
-### Quick Start Example
+### For Web/JavaScript (WASM)
+```bash
+# Use QuDAG in browser or Node.js via npm
+npx qudag@latest --help
+
+# Or install globally
+npm install -g qudag
+
+# Or use programmatically
+npm install qudag
+```
+
+### Quick Start Example (Rust)
 ```rust
 use qudag::prelude::*;
 
@@ -70,6 +86,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 ```
 
+### Quick Start Example (JavaScript/WASM)
+```javascript
+import { QuDAGClient, WasmMlDsaKeyPair, Blake3Hash } from 'qudag';
+
+// Initialize QuDAG client
+const client = new QuDAGClient();
+console.log(`QuDAG version: ${client.getVersion()}`);
+
+// Generate quantum-resistant keys
+const keyPair = new WasmMlDsaKeyPair();
+const publicKey = keyPair.getPublicKey();
+
+// Create quantum fingerprints
+const message = "Hello QuDAG WASM!";
+const hash = Blake3Hash.hash(message);
+
+console.log("QuDAG WASM client ready! 🌐");
+```
+
 **📦 Available Packages:**
 - [**qudag**](https://crates.io/crates/qudag) - Main library with all components
 - [**qudag-cli**](https://crates.io/crates/qudag-cli) - Command-line interface tool
@@ -78,6 +113,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 - [**qudag-dag**](https://crates.io/crates/qudag-dag) - DAG consensus implementation
 - [**qudag-vault-core**](https://crates.io/crates/qudag-vault-core) - Password vault with post-quantum encryption
 - [**qudag-protocol**](https://crates.io/crates/qudag-protocol) - Protocol coordination
+- [**qudag-mcp**](https://crates.io/crates/qudag-mcp) - Model Context Protocol server for AI integration
+- [**qudag-wasm**](https://www.npmjs.com/package/qudag) - WebAssembly bindings for browser and Node.js
 
 ## Use Cases
 
@@ -103,6 +140,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 | | Secure password generation | Cryptographically secure random password generation |
 | | DAG-based organization | Hierarchical password storage with categories |
 | | Encrypted backup/restore | Secure vault export/import functionality |
+| **🤖 Distributed AI Systems** | Agent coordination | Secure communication backbone for autonomous AI agents |
+| | Swarm intelligence | Decentralized coordination for AI agent swarms |
+| | MCP integration | Native Model Context Protocol server for AI tools |
+| | Tool orchestration | Distributed tool execution across agent networks |
 
 ## Core Features
 
@@ -167,20 +208,48 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ## 🤖 MCP Server Integration
 
-QuDAG now includes a complete **Model Context Protocol (MCP)** server implementation, enabling seamless integration with AI development tools like Claude Desktop, VS Code, and custom applications.
+QuDAG includes a complete **Model Context Protocol (MCP)** server implementation, enabling seamless integration with AI development tools like Claude Desktop, VS Code, and custom applications. This MCP-first approach makes QuDAG the ideal infrastructure for distributed AI agent systems.
 
 ### MCP Features
 - **Quantum-Resistant Security**: All MCP operations secured with post-quantum cryptography
-- **Vault Integration**: Direct access to QuDAG's encrypted password vault via MCP tools
-- **DAG Operations**: Query and monitor DAG consensus through MCP resources
-- **Network Management**: Peer discovery and network statistics via MCP
-- **Multiple Transports**: HTTP, WebSocket, and stdio transport support
+- **Comprehensive Tool Suite**: 6 built-in tools for vault, DAG, network, crypto, system, and config operations
+- **Rich Resource Access**: 4 dynamic resources providing real-time system state
+- **Multiple Transports**: stdio (for Claude Desktop), HTTP, and WebSocket support
+- **AI-Ready Prompts**: 10 pre-built prompts for common QuDAG workflows
 - **Real-time Updates**: Live resource subscriptions for dynamic data
+- **JWT Authentication**: Secure authentication with configurable RBAC
+- **Audit Logging**: Complete audit trail of all MCP operations
+
+### Available MCP Tools
+
+| Tool | Description | Key Operations |
+|------|-------------|----------------|
+| **vault** | Quantum-resistant password management | create, list, read, delete, search |
+| **dag** | DAG consensus operations | query, add, validate, status |
+| **network** | P2P network management | peers, connect, discover, status |
+| **crypto** | Cryptographic operations | keygen, sign, verify, encrypt, hash |
+| **system** | System information and monitoring | info, resources, processes, health |
+| **config** | Configuration management | get, set, list, validate, export |
+
+### Available MCP Resources
+
+| Resource | URI | Description |
+|----------|-----|-------------|
+| **Vault State** | `qudag://vault/state` | Current vault entries and metadata |
+| **DAG Status** | `qudag://dag/status` | DAG consensus state and metrics |
+| **Network Info** | `qudag://network/info` | Peer connections and network stats |
+| **System Status** | `qudag://system/status` | System health and performance metrics |
 
 ### Quick MCP Setup
 ```bash
 # Start MCP server (default: HTTP on port 3000)
 qudag mcp start
+
+# Start with stdio transport (for Claude Desktop)
+qudag mcp start --transport stdio
+
+# Start with WebSocket support
+qudag mcp start --transport ws --port 8080
 
 # Configure MCP server settings
 qudag mcp config init
@@ -194,9 +263,11 @@ qudag mcp resources
 qudag mcp test --endpoint http://localhost:3000
 ```
 
-### Integration with Development Tools
+### Integration Examples
+
+#### Claude Desktop Configuration
 ```json
-// Claude Desktop configuration
+// ~/.claude/claude_desktop_config.json
 {
   "mcpServers": {
     "qudag": {
@@ -205,6 +276,44 @@ qudag mcp test --endpoint http://localhost:3000
     }
   }
 }
+```
+
+#### VS Code Extension
+```typescript
+// Use QuDAG MCP in VS Code extensions
+import { MCPClient } from 'qudag-mcp-client';
+
+const client = new MCPClient('http://localhost:3000');
+await client.connect();
+
+// Use tools
+const passwords = await client.callTool('vault', {
+  operation: 'list',
+  category: 'development'
+});
+
+// Subscribe to resources
+client.subscribe('qudag://network/info', (data) => {
+  console.log('Network update:', data);
+});
+```
+
+#### Python Integration
+```python
+# Use QuDAG MCP from Python
+from qudag_mcp import MCPClient
+
+client = MCPClient("http://localhost:3000")
+client.connect()
+
+# Query DAG status
+dag_status = client.call_tool("dag", {
+    "operation": "status"
+})
+
+# Monitor system resources
+for update in client.subscribe("qudag://system/status"):
+    print(f"CPU: {update['cpu_usage']}%, Memory: {update['memory_usage']}%")
 ```
 
 ## How It Works

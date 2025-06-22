@@ -8,6 +8,7 @@ members = [
     "core/vault",
     "tools/cli",
     "qudag-mcp",
+    "qudag-wasm",
 ]
 resolver = "2"
 
