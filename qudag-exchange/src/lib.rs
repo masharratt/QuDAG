@@ -49,23 +49,11 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-pub mod account;
-pub mod consensus;
-pub mod crypto;
 pub mod error;
-pub mod market;
-pub mod network;
-pub mod resource;
-pub mod transaction;
-pub mod vault;
 
-pub use account::{Account, AccountId, Balance};
-pub use consensus::{ConsensusEngine, QrAvalanche};
-pub use crypto::{KeyPair, PublicKey, Signature};
-pub use error::{Error, Result};
-pub use market::{Offer, OfferId, ResourceQuery};
-pub use resource::{Resource, ResourceType, ResourceSpec};
-pub use transaction::{Transaction, TransactionId, TransactionStatus};
+// Re-export from core
+pub use qudag_exchange_core::*;
+pub use error::{ExchangeError as Error, Result};
 
 /// The main exchange interface for interacting with the QuDAG Exchange network.
 ///
@@ -101,9 +89,9 @@ pub struct Exchange {
 
 struct ExchangeInner {
     network: String,
-    consensus: ConsensusEngine,
-    vault: vault::Vault,
-    accounts: HashMap<AccountId, Account>,
+    consensus: ConsensusAdapter,
+    ledger: Ledger,
+    config: ExchangeConfig,
 }
 
 impl Exchange {
@@ -465,17 +453,13 @@ pub struct TransactionResult {
 /// # Examples
 ///
 /// ```rust
-/// use qudag_exchange::{Provider, ResourceSpec, PricingStrategy};
+/// use qudag_exchange::{Provider};
 ///
 /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 /// # let exchange = Exchange::new("testnet").await?;
 /// # let account = exchange.create_account("provider", "password").await?;
 /// let provider = Provider::builder()
 ///     .account(&account)
-///     .add_resource(ResourceSpec::cpu(8))
-///     .add_resource(ResourceSpec::memory_gb(32))
-///     .add_resource(ResourceSpec::gpu("RTX 4090", 2))
-///     .pricing_strategy(PricingStrategy::market_based())
 ///     .build()?;
 ///
 /// // Start providing resources
@@ -489,8 +473,9 @@ pub struct Provider {
 
 struct ProviderInner {
     account: Account,
-    resources: Vec<ResourceSpec>,
-    pricing: PricingStrategy,
+    // TODO: Add resource specification types
+    // resources: Vec<ResourceSpec>,
+    // pricing: PricingStrategy,
 }
 
 impl Provider {
@@ -610,8 +595,9 @@ impl Provider {
 /// ```
 pub struct ProviderBuilder {
     account: Option<Account>,
-    resources: Vec<ResourceSpec>,
-    pricing: Option<PricingStrategy>,
+    // TODO: Add resource specification types
+    // resources: Vec<ResourceSpec>,
+    // pricing: Option<PricingStrategy>,
     min_job_duration: Option<std::time::Duration>,
 }
 
@@ -620,8 +606,8 @@ impl ProviderBuilder {
     pub fn new() -> Self {
         Self {
             account: None,
-            resources: vec![],
-            pricing: None,
+            // resources: vec![],
+            // pricing: None,
             min_job_duration: None,
         }
     }
@@ -640,33 +626,35 @@ impl ProviderBuilder {
         self
     }
     
-    /// Adds a resource to offer.
-    ///
-    /// # Arguments
-    ///
-    /// * `resource` - The resource specification to add
-    ///
-    /// # Returns
-    ///
-    /// Returns the builder for chaining.
-    pub fn add_resource(mut self, resource: ResourceSpec) -> Self {
-        self.resources.push(resource);
-        self
-    }
+    // TODO: Re-enable when ResourceSpec is implemented
+    // /// Adds a resource to offer.
+    // ///
+    // /// # Arguments
+    // ///
+    // /// * `resource` - The resource specification to add
+    // ///
+    // /// # Returns
+    // ///
+    // /// Returns the builder for chaining.
+    // pub fn add_resource(mut self, resource: ResourceSpec) -> Self {
+    //     self.resources.push(resource);
+    //     self
+    // }
     
-    /// Sets the pricing strategy.
-    ///
-    /// # Arguments
-    ///
-    /// * `strategy` - The pricing strategy to use
-    ///
-    /// # Returns
-    ///
-    /// Returns the builder for chaining.
-    pub fn pricing_strategy(mut self, strategy: PricingStrategy) -> Self {
-        self.pricing = Some(strategy);
-        self
-    }
+    // TODO: Re-enable when PricingStrategy is implemented
+    // /// Sets the pricing strategy.
+    // ///
+    // /// # Arguments
+    // ///
+    // /// * `strategy` - The pricing strategy to use
+    // ///
+    // /// # Returns
+    // ///
+    // /// Returns the builder for chaining.
+    // pub fn pricing_strategy(mut self, strategy: PricingStrategy) -> Self {
+    //     self.pricing = Some(strategy);
+    //     self
+    // }
     
     /// Builds the Provider instance.
     ///
@@ -686,106 +674,19 @@ impl ProviderBuilder {
     }
 }
 
-/// Pricing strategy for resource offerings.
-///
-/// # Examples
-///
-/// ```rust
-/// use qudag_exchange::PricingStrategy;
-///
-/// // Fixed pricing
-/// let fixed = PricingStrategy::fixed(100.0);
-///
-/// // Market-based dynamic pricing
-/// let market = PricingStrategy::market_based();
-///
-/// // Custom pricing with discounts
-/// let custom = PricingStrategy::custom()
-///     .base_price(50.0)
-///     .volume_discount(0.1)  // 10% discount for large orders
-///     .time_of_day_adjustment(true)
-///     .build();
-/// ```
-#[derive(Clone, Debug)]
-pub enum PricingStrategy {
-    /// Fixed price per resource unit
-    Fixed(f64),
-    
-    /// Market-based dynamic pricing
-    MarketBased,
-    
-    /// Custom pricing rules
-    Custom(CustomPricing),
-}
-
-impl PricingStrategy {
-    /// Creates a fixed pricing strategy.
-    pub fn fixed(price: f64) -> Self {
-        Self::Fixed(price)
-    }
-    
-    /// Creates a market-based pricing strategy.
-    pub fn market_based() -> Self {
-        Self::MarketBased
-    }
-    
-    /// Creates a custom pricing builder.
-    pub fn custom() -> CustomPricingBuilder {
-        CustomPricingBuilder::new()
-    }
-}
-
-/// Custom pricing configuration.
-#[derive(Clone, Debug)]
-pub struct CustomPricing {
-    base_price: f64,
-    volume_discount: f64,
-    time_of_day_adjustment: bool,
-}
-
-/// Builder for custom pricing strategies.
-pub struct CustomPricingBuilder {
-    base_price: f64,
-    volume_discount: f64,
-    time_of_day_adjustment: bool,
-}
-
-impl CustomPricingBuilder {
-    fn new() -> Self {
-        Self {
-            base_price: 0.0,
-            volume_discount: 0.0,
-            time_of_day_adjustment: false,
-        }
-    }
-    
-    /// Sets the base price.
-    pub fn base_price(mut self, price: f64) -> Self {
-        self.base_price = price;
-        self
-    }
-    
-    /// Sets volume discount percentage.
-    pub fn volume_discount(mut self, discount: f64) -> Self {
-        self.volume_discount = discount;
-        self
-    }
-    
-    /// Enables time-of-day pricing adjustments.
-    pub fn time_of_day_adjustment(mut self, enabled: bool) -> Self {
-        self.time_of_day_adjustment = enabled;
-        self
-    }
-    
-    /// Builds the custom pricing strategy.
-    pub fn build(self) -> PricingStrategy {
-        PricingStrategy::Custom(CustomPricing {
-            base_price: self.base_price,
-            volume_discount: self.volume_discount,
-            time_of_day_adjustment: self.time_of_day_adjustment,
-        })
-    }
-}
+// TODO: Implement pricing strategy types
+// /// Pricing strategy for resource offerings.
+// #[derive(Clone, Debug)]
+// pub enum PricingStrategy {
+//     /// Fixed price per resource unit
+//     Fixed(f64),
+//     
+//     /// Market-based dynamic pricing
+//     MarketBased,
+//     
+//     /// Custom pricing rules
+//     Custom(CustomPricing),
+// }
 
 /// Statistics for a resource provider.
 ///
@@ -848,36 +749,12 @@ pub struct Market {
 }
 
 impl Market {
-    /// Searches for resource offers matching the query.
-    ///
-    /// # Arguments
-    ///
-    /// * `query` - Search criteria for resources
-    ///
-    /// # Returns
-    ///
-    /// Returns a vector of matching `Offer`s sorted by relevance.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// # use qudag_exchange::{Market, ResourceQuery, ResourceType};
-    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// # let market = Market::test_market();
-    /// let query = ResourceQuery::new()
-    ///     .resource_type(ResourceType::Compute)
-    ///     .min_cpu(8)
-    ///     .max_price(50.0)
-    ///     .location("US-EAST");
-    ///
-    /// let offers = market.search(query).await?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub async fn search(&self, query: ResourceQuery) -> Result<Vec<Offer>> {
-        // Implementation details...
-        todo!()
-    }
+    // TODO: Implement when ResourceQuery and Offer types are available
+    // /// Searches for resource offers matching the query.
+    // pub async fn search(&self, query: ResourceQuery) -> Result<Vec<Offer>> {
+    //     // Implementation details...
+    //     todo!()
+    // }
     
     /// Gets current market statistics.
     ///
@@ -904,43 +781,16 @@ impl Market {
         todo!()
     }
     
-    /// Reserves resources from an offer.
-    ///
-    /// # Arguments
-    ///
-    /// * `offer_id` - The ID of the offer to accept
-    /// * `duration` - How long to reserve the resources
-    ///
-    /// # Returns
-    ///
-    /// Returns a `Reservation` with access details.
-    ///
-    /// # Examples
-    ///
-    /// ```rust
-    /// # use qudag_exchange::{Market, OfferId};
-    /// # use std::time::Duration;
-    /// # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-    /// # let market = Market::test_market();
-    /// # let offer_id = OfferId::from("offer_123");
-    /// let reservation = market.reserve_resources(
-    ///     &offer_id,
-    ///     Duration::from_secs(3600)  // 1 hour
-    /// ).await?;
-    ///
-    /// println!("Reservation ID: {}", reservation.id);
-    /// println!("Access endpoint: {}", reservation.access_endpoint);
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub async fn reserve_resources(
-        &self,
-        offer_id: &OfferId,
-        duration: std::time::Duration,
-    ) -> Result<Reservation> {
-        // Implementation details...
-        todo!()
-    }
+    // TODO: Implement when OfferId and Reservation types are available
+    // /// Reserves resources from an offer.
+    // pub async fn reserve_resources(
+    //     &self,
+    //     offer_id: &OfferId,
+    //     duration: std::time::Duration,
+    // ) -> Result<Reservation> {
+    //     // Implementation details...
+    //     todo!()
+    // }
 }
 
 /// Market statistics and metrics.

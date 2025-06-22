@@ -5,6 +5,8 @@ authors = ["QuDAG Exchange Team"]
 edition = "2021"
 license = "MIT"
 
+[workspace]
+
 [[bin]]
 name = "qudag-exchange"
 path = "src/main.rs"

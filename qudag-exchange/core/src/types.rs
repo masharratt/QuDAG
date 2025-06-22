@@ -96,6 +96,11 @@ impl Timestamp {
         self.0
     }
     
+    /// Get the timestamp value (alias for millis)
+    pub const fn value(&self) -> u64 {
+        self.0
+    }
+    
     #[cfg(feature = "std")]
     /// Get current timestamp
     pub fn now() -> Self {

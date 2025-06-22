@@ -12,7 +12,8 @@ use std::collections::BTreeMap;
 use serde::{Serialize, Deserialize};
 use crate::{
     account::{Account, AccountId, Balance},
-    types::rUv,
+    types::{rUv, Timestamp},
+    fee_model::{AgentStatus, FeeModel},
     Error, Result,
 };
 
@@ -27,11 +28,23 @@ pub struct Ledger {
     #[serde(skip)]
     accounts: dashmap::DashMap<AccountId, Account>,
     
+    /// Agent status tracking for fee calculation
+    #[cfg(not(feature = "std"))]
+    agent_statuses: BTreeMap<AccountId, AgentStatus>,
+    
+    #[cfg(feature = "std")]
+    #[serde(skip)]
+    agent_statuses: dashmap::DashMap<AccountId, AgentStatus>,
+    
     /// Total supply of rUv in circulation
     total_supply: rUv,
     
     /// Configuration for the ledger
     config: LedgerConfig,
+    
+    /// Fee model for calculating transaction fees
+    #[serde(skip)]
+    fee_model: Option<FeeModel>,
 }
 
 /// Ledger configuration
@@ -70,9 +83,26 @@ impl Ledger {
             accounts: BTreeMap::new(),
             #[cfg(feature = "std")]
             accounts: dashmap::DashMap::new(),
+            #[cfg(not(feature = "std"))]
+            agent_statuses: BTreeMap::new(),
+            #[cfg(feature = "std")]
+            agent_statuses: dashmap::DashMap::new(),
             total_supply: rUv::ZERO,
             config,
+            fee_model: None,
         }
+    }
+    
+    /// Create ledger with fee model
+    pub fn with_fee_model(config: LedgerConfig, fee_model: FeeModel) -> Self {
+        let mut ledger = Self::with_config(config);
+        ledger.fee_model = Some(fee_model);
+        ledger
+    }
+    
+    /// Set fee model
+    pub fn set_fee_model(&mut self, fee_model: FeeModel) {
+        self.fee_model = Some(fee_model);
     }
     
     /// Get the total supply of rUv
@@ -164,6 +194,139 @@ impl Ledger {
         // Update total supply
         self.total_supply = self.total_supply.saturating_sub(amount);
         Ok(())
+    }
+    
+    /// Create agent status for an account
+    pub fn create_agent_status(&mut self, account: &AccountId, verified: bool, first_tx_time: Timestamp) -> Result<()> {
+        let status = if verified {
+            AgentStatus::new_verified(first_tx_time, vec![]) // Empty proof for now
+        } else {
+            AgentStatus::new_unverified(first_tx_time)
+        };
+        
+        #[cfg(not(feature = "std"))]
+        {
+            self.agent_statuses.insert(account.clone(), status);
+        }
+        
+        #[cfg(feature = "std")]
+        {
+            self.agent_statuses.insert(account.clone(), status);
+        }
+        
+        Ok(())
+    }
+    
+    /// Get agent status
+    pub fn get_agent_status(&self, account: &AccountId) -> Result<AgentStatus> {
+        #[cfg(not(feature = "std"))]
+        {
+            self.agent_statuses.get(account)
+                .cloned()
+                .ok_or_else(|| Error::Other("Agent status not found".into()))
+        }
+        
+        #[cfg(feature = "std")]
+        {
+            self.agent_statuses.get(account)
+                .map(|entry| entry.clone())
+                .ok_or_else(|| Error::Other("Agent status not found".into()))
+        }
+    }
+    
+    /// Update agent monthly usage
+    pub fn update_agent_usage(&mut self, account: &AccountId, monthly_usage: u64) -> Result<()> {
+        #[cfg(not(feature = "std"))]
+        {
+            if let Some(status) = self.agent_statuses.get_mut(account) {
+                status.update_usage(monthly_usage);
+                Ok(())
+            } else {
+                Err(Error::Other("Agent status not found".into()))
+            }
+        }
+        
+        #[cfg(feature = "std")]
+        {
+            if let Some(mut status_ref) = self.agent_statuses.get_mut(account) {
+                status_ref.update_usage(monthly_usage);
+                Ok(())
+            } else {
+                Err(Error::Other("Agent status not found".into()))
+            }
+        }
+    }
+    
+    /// Verify an agent
+    pub fn verify_agent(&mut self, account: &AccountId, proof: Vec<u8>) -> Result<()> {
+        #[cfg(not(feature = "std"))]
+        {
+            if let Some(status) = self.agent_statuses.get_mut(account) {
+                status.verify(proof);
+                Ok(())
+            } else {
+                Err(Error::Other("Agent status not found".into()))
+            }
+        }
+        
+        #[cfg(feature = "std")]
+        {
+            if let Some(mut status_ref) = self.agent_statuses.get_mut(account) {
+                status_ref.verify(proof);
+                Ok(())
+            } else {
+                Err(Error::Other("Agent status not found".into()))
+            }
+        }
+    }
+    
+    /// Calculate fee for a transaction
+    pub fn calculate_fee(&self, account: &AccountId, amount: rUv, current_time: Timestamp) -> Result<rUv> {
+        let fee_model = self.fee_model.as_ref()
+            .ok_or_else(|| Error::Other("Fee model not set".into()))?;
+        
+        let agent_status = self.get_agent_status(account)?;
+        fee_model.calculate_fee_amount(amount, &agent_status, current_time)
+    }
+    
+    /// Transfer with automatic fee calculation
+    pub fn transfer_with_fee(
+        &mut self,
+        from: &AccountId,
+        to: &AccountId,
+        amount: rUv,
+        current_time: Timestamp,
+    ) -> Result<rUv> {
+        if from == to {
+            return Err(Error::InvalidTransaction("Cannot transfer to self".into()));
+        }
+        
+        if amount.is_zero() {
+            return Err(Error::InvalidTransaction("Cannot transfer zero amount".into()));
+        }
+        
+        // Calculate fee
+        let fee = self.calculate_fee(from, amount, current_time)?;
+        let total_cost = amount.checked_add(fee)
+            .ok_or_else(|| Error::Other("Transaction cost overflow".into()))?;
+        
+        // Check if sender can afford total cost
+        let sender_balance = self.get_balance(from)?;
+        if sender_balance < total_cost {
+            return Err(Error::insufficient_balance(
+                from.as_str(),
+                total_cost.amount(),
+                sender_balance.amount()
+            ));
+        }
+        
+        // Perform the transfer (amount + fee from sender, amount to recipient, fee burned)
+        self.transfer(from, to, amount)?;
+        if !fee.is_zero() {
+            self.burn(from, fee)?;
+        }
+        
+        Ok(fee)
     }
     
     /// Transfer rUv between accounts atomically

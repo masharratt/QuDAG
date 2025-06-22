@@ -31,6 +31,9 @@ pub mod metering;
 pub mod consensus;
 pub mod state;
 pub mod types;
+pub mod fee_model;
+pub mod immutable;
+pub mod config;
 
 // Re-exports
 pub use error::{Error, Result};
@@ -41,6 +44,9 @@ pub use metering::{ResourceMeter, OperationCost};
 pub use consensus::ConsensusAdapter;
 pub use state::LedgerState;
 pub use types::rUv;
+pub use fee_model::{FeeModel, FeeModelParams, AgentStatus, FeeCalculator};
+pub use immutable::{ImmutableDeployment, ImmutableConfig, ImmutableStatus, LockableConfig, ImmutableSignature};
+pub use config::{ExchangeConfig, ExchangeConfigBuilder, NetworkConfig, SecurityConfig, ConfigSummary};
 
 /// Core version string
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");
