@@ -1,9 +1,9 @@
 [package]
 name = "qudag-exchange-cli"
-version.workspace = true
-authors.workspace = true
-edition.workspace = true
-license.workspace = true
+version = "0.1.0"
+authors = ["QuDAG Exchange Team"]
+edition = "2021"
+license = "MIT"
 
 [[bin]]
 name = "qudag-exchange"
@@ -12,16 +12,16 @@ path = "src/main.rs"
 [dependencies]
 # QuDAG dependencies
 qudag-exchange-core = { path = "../core" }
-qudag-vault = { workspace = true }
+qudag-vault = { path = "../../core/vault" }
 
 # CLI dependencies
-clap = { workspace = true }
-tokio = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-anyhow = { workspace = true }
-tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
+clap = { version = "4.5", features = ["derive"] }
+tokio = { version = "1.40", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+anyhow = "1.0"
+tracing = "0.1"
+tracing-subscriber = "0.3"
 
 # Additional CLI dependencies
 colored = "2.1"

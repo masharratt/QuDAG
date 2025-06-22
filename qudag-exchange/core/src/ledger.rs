@@ -1,275 +1,292 @@
-//! Main ledger for QuDAG Exchange state management
+//! Ledger management for QuDAG Exchange
+//!
+//! Provides the core ledger functionality for tracking account balances
+//! and executing transfers with atomic guarantees
 
-use dashmap::DashMap;
-use parking_lot::RwLock;
-use serde::{Deserialize, Serialize};
-use std::sync::Arc;
+#[cfg(not(feature = "std"))]
+use alloc::{collections::BTreeMap, vec::Vec, string::String};
 
-use crate::error::{Error, Result};
-use crate::resource::{ResourceContribution, ResourceMeter};
-use crate::ruv::RuvAmount;
-use crate::transaction::{Transaction, TransactionType};
-use crate::wallet::{Wallet, WalletManager};
+#[cfg(feature = "std")]
+use std::collections::BTreeMap;
 
-/// Ledger state for the QuDAG Exchange
-#[derive(Clone)]
+use serde::{Serialize, Deserialize};
+use crate::{
+    account::{Account, AccountId, Balance},
+    types::rUv,
+    Error, Result,
+};
+
+/// The main ledger structure that maintains all account states
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Ledger {
-    /// Wallet manager
-    wallets: Arc<RwLock<WalletManager>>,
+    /// Map of account IDs to accounts
+    #[cfg(not(feature = "std"))]
+    accounts: BTreeMap<AccountId, Account>,
     
-    /// Transaction pool (pending transactions)
-    tx_pool: Arc<DashMap<String, Transaction>>,
+    #[cfg(feature = "std")]
+    #[serde(skip)]
+    accounts: dashmap::DashMap<AccountId, Account>,
     
-    /// Confirmed transactions
-    confirmed_txs: Arc<DashMap<String, Transaction>>,
+    /// Total supply of rUv in circulation
+    total_supply: rUv,
     
-    /// Resource metering service
-    resource_meter: Arc<RwLock<ResourceMeter>>,
+    /// Configuration for the ledger
+    config: LedgerConfig,
+}
+
+/// Ledger configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LedgerConfig {
+    /// Minimum balance required to keep an account active
+    pub min_balance: rUv,
     
-    /// Current epoch
-    epoch: Arc<RwLock<u64>>,
+    /// Maximum total supply allowed
+    pub max_supply: rUv,
     
-    /// Total rUv supply
-    total_supply: Arc<RwLock<RuvAmount>>,
+    /// Allow negative balances (for special accounts)
+    pub allow_negative: bool,
+}
+
+impl Default for LedgerConfig {
+    fn default() -> Self {
+        Self {
+            min_balance: rUv::ZERO,
+            max_supply: rUv::new(u64::MAX),
+            allow_negative: false,
+        }
+    }
 }
 
 impl Ledger {
-    /// Create a new ledger
+    /// Create a new empty ledger
     pub fn new() -> Self {
+        Self::with_config(LedgerConfig::default())
+    }
+    
+    /// Create a new ledger with custom configuration
+    pub fn with_config(config: LedgerConfig) -> Self {
         Self {
-            wallets: Arc::new(RwLock::new(WalletManager::new())),
-            tx_pool: Arc::new(DashMap::new()),
-            confirmed_txs: Arc::new(DashMap::new()),
-            resource_meter: Arc::new(RwLock::new(ResourceMeter::new())),
-            epoch: Arc::new(RwLock::new(0)),
-            total_supply: Arc::new(RwLock::new(RuvAmount::default())),
+            #[cfg(not(feature = "std"))]
+            accounts: BTreeMap::new(),
+            #[cfg(feature = "std")]
+            accounts: dashmap::DashMap::new(),
+            total_supply: rUv::ZERO,
+            config,
         }
     }
-
-    /// Create or get a wallet
-    pub fn get_or_create_wallet(&self, address: String, vault_backed: bool) -> Wallet {
-        let mut wallets = self.wallets.write();
-        if let Some(wallet) = wallets.get_wallet(&address) {
-            wallet.clone()
-        } else {
-            wallets.create_wallet(address, vault_backed).clone()
-        }
+    
+    /// Get the total supply of rUv
+    pub fn total_supply(&self) -> rUv {
+        self.total_supply
     }
-
-    /// Get wallet balance
-    pub fn get_balance(&self, address: &str) -> Option<RuvAmount> {
-        let wallets = self.wallets.read();
-        wallets.get_wallet(address).map(|w| w.balance.clone())
+    
+    /// Get the number of accounts
+    pub fn account_count(&self) -> usize {
+        self.accounts.len()
     }
-
-    /// Submit a transaction to the pool
-    pub fn submit_transaction(&self, mut tx: Transaction) -> Result<String> {
-        // Verify transaction
-        tx.verify()?;
-
-        // Check if transaction already exists
-        if self.tx_pool.contains_key(&tx.id) || self.confirmed_txs.contains_key(&tx.id) {
-            return Err(Error::InvalidTransaction {
-                reason: "Transaction already exists".to_string(),
-            });
+    
+    /// Create a new account with zero balance
+    pub fn create_account(&mut self, id: AccountId) -> Result<()> {
+        #[cfg(not(feature = "std"))]
+        {
+            if self.accounts.contains_key(&id) {
+                return Err(Error::Other("Account already exists".into()));
+            }
+            self.accounts.insert(id.clone(), Account::new(id));
         }
-
-        // For transfers, check sender balance
-        if let TransactionType::Transfer { from, amount, .. } = &tx.tx_type {
-            let wallets = self.wallets.read();
-            if let Some(sender) = wallets.get_wallet(from) {
-                if !sender.can_afford(amount, &tx.fee)? {
-                    return Err(Error::InsufficientBalance {
-                        required: (amount.as_ruv() + tx.fee.as_ruv()) as u128,
-                        available: sender.balance().as_ruv() as u128,
-                    });
-                }
-            } else {
-                return Err(Error::Wallet(format!("Sender wallet not found: {}", from)));
+        
+        #[cfg(feature = "std")]
+        {
+            if self.accounts.contains_key(&id) {
+                return Err(Error::Other("Account already exists".into()));
             }
+            self.accounts.insert(id.clone(), Account::new(id));
         }
-
-        let tx_id = tx.id.clone();
-        self.tx_pool.insert(tx_id.clone(), tx);
-        Ok(tx_id)
-    }
-
-    /// Process a transaction from the pool
-    pub fn process_transaction(&self, tx_id: &str) -> Result<()> {
-        // Remove from pool
-        let tx = self.tx_pool.remove(tx_id)
-            .ok_or_else(|| Error::InvalidTransaction {
-                reason: "Transaction not found in pool".to_string(),
-            })?
-            .1;
-
-        // Process based on type
-        match &tx.tx_type {
-            TransactionType::Transfer { .. } => {
-                self.process_transfer(&tx)?;
-            }
-            TransactionType::Mint { to, contribution } => {
-                self.process_mint(to, contribution)?;
-            }
-            TransactionType::Burn { from, amount } => {
-                self.process_burn(from, amount, &tx.fee)?;
-            }
-            TransactionType::FeeDistribution { .. } => {
-                self.process_fee_distribution(&tx)?;
-            }
-            TransactionType::Execute { .. } => {
-                // Contract execution not implemented yet
-                return Err(Error::Other("Contract execution not implemented".to_string()));
-            }
-        }
-
-        // Add to confirmed transactions
-        self.confirmed_txs.insert(tx.id.clone(), tx);
         
         Ok(())
     }
-
-    /// Process a transfer transaction
-    fn process_transfer(&self, tx: &Transaction) -> Result<()> {
-        let mut wallets = self.wallets.write();
-        wallets.process_transaction(tx)
+    
+    /// Get an account by ID (immutable)
+    pub fn get_account(&self, id: &AccountId) -> Result<Account> {
+        #[cfg(not(feature = "std"))]
+        {
+            self.accounts.get(id)
+                .cloned()
+                .ok_or_else(|| Error::AccountNotFound(id.as_str().into()))
+        }
+        
+        #[cfg(feature = "std")]
+        {
+            self.accounts.get(id)
+                .map(|entry| entry.clone())
+                .ok_or_else(|| Error::AccountNotFound(id.as_str().into()))
+        }
     }
-
-    /// Process a mint transaction
-    fn process_mint(&self, to: &str, contribution: &ResourceContribution) -> Result<()> {
-        // Verify contribution
-        if !contribution.verified {
-            return Err(Error::InvalidTransaction {
-                reason: "Contribution not verified".to_string(),
-            });
+    
+    /// Get account balance
+    pub fn get_balance(&self, id: &AccountId) -> Result<Balance> {
+        self.get_account(id).map(|acc| acc.balance)
+    }
+    
+    /// Credit an account (mint new rUv)
+    pub fn mint(&mut self, account: &AccountId, amount: rUv) -> Result<()> {
+        // Check if minting would exceed max supply
+        let new_supply = self.total_supply.checked_add(amount)
+            .ok_or_else(|| Error::Other("Supply overflow".into()))?;
+        
+        if new_supply > self.config.max_supply {
+            return Err(Error::resource_limit_exceeded(
+                "total_supply",
+                self.config.max_supply.amount(),
+                new_supply.amount()
+            ));
         }
-
-        // Update wallet balance
-        let mut wallets = self.wallets.write();
-        if let Some(wallet) = wallets.get_wallet_mut(to) {
-            wallet.balance = wallet.balance.checked_add(contribution.total_value())?;
-        } else {
-            // Create wallet if it doesn't exist
-            let mut wallet = Wallet::new(to.to_string());
-            wallet.balance = contribution.total_value().clone();
-            wallets.create_wallet(to.to_string(), false);
-        }
-
+        
+        // Update account
+        self.update_account(account, |acc| {
+            acc.credit(amount)?;
+            Ok(())
+        })?;
+        
         // Update total supply
-        let mut total_supply = self.total_supply.write();
-        *total_supply = total_supply.checked_add(contribution.total_value())?;
-
+        self.total_supply = new_supply;
         Ok(())
     }
-
-    /// Process a burn transaction
-    fn process_burn(&self, from: &str, amount: &RuvAmount, fee: &RuvAmount) -> Result<()> {
-        let mut wallets = self.wallets.write();
+    
+    /// Burn rUv from an account (reduce supply)
+    pub fn burn(&mut self, account: &AccountId, amount: rUv) -> Result<()> {
+        // Update account
+        self.update_account(account, |acc| {
+            acc.debit(amount)?;
+            Ok(())
+        })?;
         
-        if let Some(wallet) = wallets.get_wallet_mut(from) {
-            let total = amount.checked_add(fee)?;
-            wallet.balance = wallet.balance.checked_sub(&total)?;
-        } else {
-            return Err(Error::Wallet(format!("Wallet not found: {}", from)));
-        }
-
-        // Update total supply (decrease by burn amount, not fee)
-        let mut total_supply = self.total_supply.write();
-        *total_supply = total_supply.checked_sub(amount)?;
-
+        // Update total supply
+        self.total_supply = self.total_supply.saturating_sub(amount);
         Ok(())
     }
-
-    /// Process fee distribution
-    fn process_fee_distribution(&self, tx: &Transaction) -> Result<()> {
-        if let TransactionType::FeeDistribution { amount, recipients } = &tx.tx_type {
-            let mut wallets = self.wallets.write();
-            
-            for (addr, share) in recipients {
-                let share_amount = (amount.as_ruv() * (*share as u64)) / 100;
-                let ruv_share = RuvAmount::from_ruv(share_amount);
-                
-                if let Some(wallet) = wallets.get_wallet_mut(addr) {
-                    wallet.balance = wallet.balance.checked_add(&ruv_share)?;
-                } else {
-                    // Create wallet if it doesn't exist
-                    let mut wallet = Wallet::new(addr.clone());
-                    wallet.balance = ruv_share;
-                    wallets.create_wallet(addr.clone(), false);
-                }
-            }
-        }
-        
-        Ok(())
-    }
-
-    /// Start tracking a resource contribution
-    pub fn start_resource_contribution(&self, agent_id: String) {
-        let mut meter = self.resource_meter.write();
-        meter.start_contribution(agent_id);
-    }
-
-    /// Record a resource metric
-    pub fn record_resource_metric(
-        &self, 
-        agent_id: &str, 
-        metric: crate::resource::ResourceMetrics
+    
+    /// Transfer rUv between accounts atomically
+    pub fn transfer(
+        &mut self,
+        from: &AccountId,
+        to: &AccountId,
+        amount: rUv,
     ) -> Result<()> {
-        let mut meter = self.resource_meter.write();
-        meter.record_metric(agent_id, metric)
-    }
-
-    /// Finalize a resource contribution and create mint transaction
-    pub fn finalize_resource_contribution(&self, agent_id: &str) -> Result<Option<String>> {
-        let mut meter = self.resource_meter.write();
+        if from == to {
+            return Err(Error::InvalidTransaction("Cannot transfer to self".into()));
+        }
         
-        if let Some(contribution) = meter.finalize_contribution(agent_id) {
-            if contribution.total_value().is_zero() {
-                return Ok(None);
+        if amount.is_zero() {
+            return Err(Error::InvalidTransaction("Cannot transfer zero amount".into()));
+        }
+        
+        // For no_std, we need to handle this differently
+        #[cfg(not(feature = "std"))]
+        {
+            // First check if both accounts exist
+            if !self.accounts.contains_key(from) {
+                return Err(Error::AccountNotFound(from.as_str().into()));
             }
-
-            // Create mint transaction
-            let tx = Transaction::new(
-                TransactionType::Mint {
-                    to: agent_id.to_string(),
-                    contribution,
-                },
-                RuvAmount::from_ruv(0), // No fee for minting
-            );
-
-            let tx_id = self.submit_transaction(tx)?;
-            Ok(Some(tx_id))
-        } else {
-            Ok(None)
+            if !self.accounts.contains_key(to) {
+                return Err(Error::AccountNotFound(to.as_str().into()));
+            }
+            
+            // Clone accounts for atomic update
+            let mut from_account = self.accounts.get(from).unwrap().clone();
+            let mut to_account = self.accounts.get(to).unwrap().clone();
+            
+            // Perform transfer
+            from_account.debit(amount)?;
+            to_account.credit(amount)?;
+            
+            // Update both accounts atomically
+            self.accounts.insert(from.clone(), from_account);
+            self.accounts.insert(to.clone(), to_account);
+        }
+        
+        #[cfg(feature = "std")]
+        {
+            // Get both accounts (this locks them)
+            let mut from_ref = self.accounts.get_mut(from)
+                .ok_or_else(|| Error::AccountNotFound(from.as_str().into()))?;
+            let mut to_ref = self.accounts.get_mut(to)
+                .ok_or_else(|| Error::AccountNotFound(to.as_str().into()))?;
+            
+            // Perform the transfer
+            from_ref.debit(amount)?;
+            to_ref.credit(amount)?;
+        }
+        
+        Ok(())
+    }
+    
+    /// Update an account with a closure
+    fn update_account<F>(&mut self, id: &AccountId, f: F) -> Result<()>
+    where
+        F: FnOnce(&mut Account) -> Result<()>,
+    {
+        #[cfg(not(feature = "std"))]
+        {
+            let mut account = self.accounts.get(id)
+                .ok_or_else(|| Error::AccountNotFound(id.as_str().into()))?
+                .clone();
+            f(&mut account)?;
+            self.accounts.insert(id.clone(), account);
+        }
+        
+        #[cfg(feature = "std")]
+        {
+            let mut account_ref = self.accounts.get_mut(id)
+                .ok_or_else(|| Error::AccountNotFound(id.as_str().into()))?;
+            f(&mut account_ref)?;
+        }
+        
+        Ok(())
+    }
+    
+    /// Get all account IDs
+    pub fn account_ids(&self) -> Vec<AccountId> {
+        #[cfg(not(feature = "std"))]
+        {
+            self.accounts.keys().cloned().collect()
+        }
+        
+        #[cfg(feature = "std")]
+        {
+            self.accounts.iter()
+                .map(|entry| entry.key().clone())
+                .collect()
         }
     }
-
-    /// Get current epoch
-    pub fn current_epoch(&self) -> u64 {
-        *self.epoch.read()
-    }
-
-    /// Advance to next epoch
-    pub fn advance_epoch(&self) {
-        let mut epoch = self.epoch.write();
-        *epoch += 1;
-    }
-
-    /// Get total supply
-    pub fn total_supply(&self) -> RuvAmount {
-        self.total_supply.read().clone()
-    }
-
-    /// Get transaction pool size
-    pub fn tx_pool_size(&self) -> usize {
-        self.tx_pool.len()
-    }
-
-    /// Get a transaction by ID
-    pub fn get_transaction(&self, tx_id: &str) -> Option<Transaction> {
-        self.confirmed_txs.get(tx_id)
-            .map(|entry| entry.value().clone())
-            .or_else(|| self.tx_pool.get(tx_id).map(|entry| entry.value().clone()))
+    
+    /// Check invariants (for testing and validation)
+    pub fn check_invariants(&self) -> Result<()> {
+        // Calculate total balance across all accounts
+        let mut total_balance = rUv::ZERO;
+        
+        #[cfg(not(feature = "std"))]
+        let accounts_iter = self.accounts.values();
+        
+        #[cfg(feature = "std")]
+        let accounts_iter = self.accounts.iter().map(|entry| entry.value());
+        
+        for account in accounts_iter {
+            total_balance = total_balance.checked_add(account.balance)
+                .ok_or_else(|| Error::StateCorruption("Balance overflow in invariant check".into()))?;
+        }
+        
+        // Total balance should equal total supply
+        if total_balance != self.total_supply {
+            return Err(Error::StateCorruption(
+                format!("Total balance {} != total supply {}", 
+                    total_balance.amount(), 
+                    self.total_supply.amount()
+                ).into()
+            ));
+        }
+        
+        Ok(())
     }
 }
 
@@ -279,82 +296,109 @@ impl Default for Ledger {
     }
 }
 
-/// Ledger statistics
-#[derive(Clone, Debug, Serialize, Deserialize)]
-pub struct LedgerStats {
-    /// Current epoch
-    pub epoch: u64,
-    /// Total supply
-    pub total_supply: u64,
-    /// Number of wallets
-    pub wallet_count: usize,
-    /// Pending transactions
-    pub pending_txs: usize,
-    /// Confirmed transactions
-    pub confirmed_txs: usize,
-}
-
-impl Ledger {
-    /// Get ledger statistics
-    pub fn stats(&self) -> LedgerStats {
-        let wallets = self.wallets.read();
-        
-        LedgerStats {
-            epoch: self.current_epoch(),
-            total_supply: self.total_supply().as_ruv(),
-            wallet_count: wallets.wallets.len(),
-            pending_txs: self.tx_pool.len(),
-            confirmed_txs: self.confirmed_txs.len(),
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::resource::ResourceMetrics;
-
+    
     #[test]
     fn test_ledger_creation() {
         let ledger = Ledger::new();
-        assert_eq!(ledger.current_epoch(), 0);
-        assert!(ledger.total_supply().is_zero());
+        assert_eq!(ledger.total_supply(), rUv::ZERO);
+        assert_eq!(ledger.account_count(), 0);
     }
-
+    
     #[test]
-    fn test_wallet_creation() {
-        let ledger = Ledger::new();
-        let wallet = ledger.get_or_create_wallet("alice".to_string(), false);
-        assert_eq!(wallet.address, "alice");
-        assert!(wallet.balance.is_zero());
+    fn test_account_creation() {
+        let mut ledger = Ledger::new();
+        let alice = AccountId::new("alice");
+        
+        ledger.create_account(alice.clone()).unwrap();
+        assert_eq!(ledger.account_count(), 1);
+        
+        // Cannot create duplicate
+        assert!(ledger.create_account(alice.clone()).is_err());
     }
-
+    
     #[test]
-    fn test_resource_contribution_flow() {
-        let ledger = Ledger::new();
+    fn test_mint_and_burn() {
+        let mut ledger = Ledger::new();
+        let alice = AccountId::new("alice");
         
-        // Start contribution
-        ledger.start_resource_contribution("agent1".to_string());
+        ledger.create_account(alice.clone()).unwrap();
         
-        // Record metrics
-        let metric = ResourceMetrics {
-            resource_type: crate::resource::ResourceType::Cpu,
-            amount: 100.0,
-            duration: 3600,
-            quality_score: 1.0,
-            timestamp: 0,
-        };
+        // Mint
+        ledger.mint(&alice, rUv::new(1000)).unwrap();
+        assert_eq!(ledger.get_balance(&alice).unwrap(), rUv::new(1000));
+        assert_eq!(ledger.total_supply(), rUv::new(1000));
         
-        ledger.record_resource_metric("agent1", metric).unwrap();
+        // Burn
+        ledger.burn(&alice, rUv::new(300)).unwrap();
+        assert_eq!(ledger.get_balance(&alice).unwrap(), rUv::new(700));
+        assert_eq!(ledger.total_supply(), rUv::new(700));
         
-        // Finalize and mint
-        let tx_id = ledger.finalize_resource_contribution("agent1").unwrap().unwrap();
+        // Cannot burn more than balance
+        assert!(ledger.burn(&alice, rUv::new(1000)).is_err());
+    }
+    
+    #[test]
+    fn test_transfer() {
+        let mut ledger = Ledger::new();
+        let alice = AccountId::new("alice");
+        let bob = AccountId::new("bob");
         
-        // Process the mint transaction
-        ledger.process_transaction(&tx_id).unwrap();
+        ledger.create_account(alice.clone()).unwrap();
+        ledger.create_account(bob.clone()).unwrap();
         
-        // Check balance
-        let balance = ledger.get_balance("agent1").unwrap();
-        assert_eq!(balance.as_ruv(), 10); // 100 * 1 * 1.0 * 0.1 = 10 rUv
+        // Mint to alice
+        ledger.mint(&alice, rUv::new(1000)).unwrap();
+        
+        // Transfer
+        ledger.transfer(&alice, &bob, rUv::new(300)).unwrap();
+        assert_eq!(ledger.get_balance(&alice).unwrap(), rUv::new(700));
+        assert_eq!(ledger.get_balance(&bob).unwrap(), rUv::new(300));
+        
+        // Total supply unchanged
+        assert_eq!(ledger.total_supply(), rUv::new(1000));
+        
+        // Cannot transfer more than balance
+        assert!(ledger.transfer(&alice, &bob, rUv::new(1000)).is_err());
+        
+        // Cannot transfer to self
+        assert!(ledger.transfer(&alice, &alice, rUv::new(100)).is_err());
+        
+        // Cannot transfer zero
+        assert!(ledger.transfer(&alice, &bob, rUv::ZERO).is_err());
+    }
+    
+    #[test]
+    fn test_invariants() {
+        let mut ledger = Ledger::new();
+        let alice = AccountId::new("alice");
+        let bob = AccountId::new("bob");
+        let charlie = AccountId::new("charlie");
+        
+        ledger.create_account(alice.clone()).unwrap();
+        ledger.create_account(bob.clone()).unwrap();
+        ledger.create_account(charlie.clone()).unwrap();
+        
+        // Initial state
+        ledger.check_invariants().unwrap();
+        
+        // After minting
+        ledger.mint(&alice, rUv::new(1000)).unwrap();
+        ledger.mint(&bob, rUv::new(500)).unwrap();
+        ledger.check_invariants().unwrap();
+        
+        // After transfers
+        ledger.transfer(&alice, &bob, rUv::new(200)).unwrap();
+        ledger.transfer(&bob, &charlie, rUv::new(100)).unwrap();
+        ledger.check_invariants().unwrap();
+        
+        // After burning
+        ledger.burn(&alice, rUv::new(300)).unwrap();
+        ledger.check_invariants().unwrap();
+        
+        // Verify final state
+        assert_eq!(ledger.total_supply(), rUv::new(1200)); // 1500 - 300
     }
 }

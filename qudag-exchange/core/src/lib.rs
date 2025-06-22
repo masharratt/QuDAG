@@ -1,30 +1,62 @@
-//! QuDAG Exchange Core - Resource Utilization Voucher (rUv) System
+//! QuDAG Exchange Core Library
+//! 
+//! This crate provides the core functionality for the QuDAG Exchange system:
+//! - rUv (Resource Utilization Voucher) token ledger
+//! - Resource metering and cost calculations
+//! - Transaction processing with quantum-resistant signatures
+//! - Consensus integration with QR-Avalanche DAG
+//! - Secure key management through QuDAG Vault
 //!
-//! This module provides the core functionality for the QuDAG Exchange protocol,
-//! including the rUv ledger, resource metering, and consensus integration.
+//! The library is designed to be no_std compatible for WASM deployment.
 
-#![forbid(unsafe_code)]
+#![cfg_attr(not(feature = "std"), no_std)]
+#![deny(unsafe_code)]
 #![warn(missing_docs)]
 
+#[cfg(not(feature = "std"))]
+extern crate alloc;
+
+#[cfg(not(feature = "std"))]
+use alloc::{string::String, vec::Vec, collections::BTreeMap};
+
+#[cfg(feature = "std")]
+use std::{string::String, vec::Vec, collections::BTreeMap};
+
+// Public modules
 pub mod error;
 pub mod ledger;
-pub mod resource;
-pub mod ruv;
+pub mod account;
 pub mod transaction;
-pub mod wallet;
+pub mod metering;
+pub mod consensus;
+pub mod state;
+pub mod types;
 
+// Re-exports
 pub use error::{Error, Result};
 pub use ledger::Ledger;
-pub use resource::{ResourceContribution, ResourceMetrics, ResourceType};
-pub use ruv::{Ruv, RuvAmount};
-pub use transaction::{Transaction, TransactionType};
-pub use wallet::Wallet;
+pub use account::{Account, AccountId, Balance};
+pub use transaction::{Transaction, TransactionId, TransactionStatus};
+pub use metering::{ResourceMeter, OperationCost};
+pub use consensus::ConsensusAdapter;
+pub use state::LedgerState;
+pub use types::rUv;
 
-/// Version of the QuDAG Exchange protocol
-pub const PROTOCOL_VERSION: &str = "0.1.0";
+/// Core version string
+pub const VERSION: &str = env!("CARGO_PKG_VERSION");
 
-/// Minimum rUv amount for transactions
-pub const MIN_RUV_AMOUNT: u64 = 1;
+/// Get the version of the QuDAG Exchange Core library
+pub fn version() -> &'static str {
+    VERSION
+}
 
-/// Maximum rUv supply (21 billion units with 8 decimal places)
-pub const MAX_RUV_SUPPLY: u128 = 21_000_000_000_00000000;
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_version() {
+        assert!(!version().is_empty());
+        assert!(version().contains('.'));
+    }
+}
