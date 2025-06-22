@@ -5,11 +5,13 @@ use serde_json::Value;
 use std::collections::HashMap;
 
 pub mod dag;
+pub mod exchange;
 pub mod network;
 pub mod system;
 pub mod vault;
 
 pub use dag::DagStateResource;
+pub use exchange::ExchangeResource;
 pub use network::NetworkPeersResource;
 pub use system::SystemStatusResource;
 pub use vault::VaultEntriesResource;
@@ -38,6 +40,7 @@ impl ResourceRegistry {
         registry.register("dag", Arc::new(DagStateResource::new()));
         registry.register("network", Arc::new(NetworkPeersResource::new()));
         registry.register("system", Arc::new(SystemStatusResource::new()));
+        registry.register("exchange", Arc::new(ExchangeResource::new()));
 
         registry
     }
@@ -73,6 +76,8 @@ impl ResourceRegistry {
             "dag"
         } else if uri_str.starts_with("network://") {
             "network"
+        } else if uri_str.starts_with("exchange://") {
+            "exchange"
         } else if uri_str.starts_with("crypto://") {
             "crypto"
         } else {
@@ -100,6 +105,8 @@ impl ResourceRegistry {
             "dag"
         } else if uri_str.starts_with("network://") {
             "network"
+        } else if uri_str.starts_with("exchange://") {
+            "exchange"
         } else if uri_str.starts_with("crypto://") {
             "crypto"
         } else {

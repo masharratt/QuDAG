@@ -8,6 +8,7 @@ use std::sync::Arc;
 pub mod config;
 pub mod crypto;
 pub mod dag;
+pub mod exchange;
 pub mod network;
 pub mod system;
 pub mod vault;
@@ -15,6 +16,7 @@ pub mod vault;
 pub use config::ConfigTool;
 pub use crypto::CryptoTool;
 pub use dag::DagTool;
+pub use exchange::ExchangeTool;
 pub use network::NetworkTool;
 pub use system::SystemTool;
 pub use vault::VaultTool;
@@ -43,6 +45,7 @@ impl ToolRegistry {
         let crypto_tool = Arc::new(CryptoTool::new());
         let system_tool = Arc::new(SystemTool::new());
         let config_tool = Arc::new(ConfigTool::new());
+        let exchange_tool = Arc::new(ExchangeTool::new());
 
         tracing::info!("Registering vault tool: {}", vault_tool.name());
         registry.register(vault_tool.name(), vault_tool.clone());
@@ -61,6 +64,9 @@ impl ToolRegistry {
 
         tracing::info!("Registering config tool: {}", config_tool.name());
         registry.register(config_tool.name(), config_tool.clone());
+
+        tracing::info!("Registering exchange tool: {}", exchange_tool.name());
+        registry.register(exchange_tool.name(), exchange_tool.clone());
 
         tracing::info!("Tool registry created with {} tools", registry.tools.len());
         registry
