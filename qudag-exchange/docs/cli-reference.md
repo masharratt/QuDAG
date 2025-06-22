@@ -1,821 +1,668 @@
-# QuDAG Exchange CLI Command Reference
+# QuDAG Exchange CLI Reference
 
-## Overview
+Complete command reference for the QuDAG Exchange CLI, covering all aspects of rUv token management, fee configuration, immutable deployment, and agent verification.
 
-The QuDAG Exchange CLI (`qudag-exchange-cli`) provides command-line access to all exchange functionality. Commands are organized into logical groups for ease of use.
+## Table of Contents
 
-## Global Options
+- [Core Commands](#core-commands)
+- [Account Management](#account-management)
+- [Token Operations](#token-operations)
+- [Fee Model Management](#fee-model-management)
+- [Immutable Deployment](#immutable-deployment)
+- [Agent Verification](#agent-verification)
+- [Network Status](#network-status)
+- [Examples and Workflows](#examples-and-workflows)
 
-These options can be used with any command:
+## Core Commands
 
-```bash
---config <path>     # Path to config file (default: ~/.qudag/config.toml)
---verbose, -v       # Enable verbose output
---quiet, -q         # Suppress non-error output
---json              # Output in JSON format
---network <name>    # Network to connect to (mainnet, testnet, local)
---no-color         # Disable colored output
-```
-
-## Account Commands
-
-### create-account
-
-Create a new account with quantum-resistant keys.
+All exchange commands are accessible through the main QuDAG CLI:
 
 ```bash
-qudag-exchange-cli create-account --name <name> [options]
-
-Options:
-  --name <name>              # Account name (required)
-  --password <password>      # Vault password (prompted if not provided)
-  --key-type <type>          # Key algorithm: ml-dsa, ml-kem (default: ml-dsa)
-  --derivation-path <path>   # HD derivation path (default: m/44'/0'/0'/0/0)
-  --backup <path>            # Backup file path
-
-Examples:
-  # Create account with prompt for password
-  qudag-exchange-cli create-account --name alice
-  
-  # Create with specific key type
-  qudag-exchange-cli create-account --name bob --key-type ml-kem
-  
-  # Create with backup
-  qudag-exchange-cli create-account --name carol --backup carol-backup.json
+qudag exchange <COMMAND> [OPTIONS]
 ```
 
-### list-accounts
+### Available Commands
 
-List all local accounts.
+| Command | Description | Status |
+|---------|-------------|--------|
+| `create-account` | Create a new exchange account | ✅ Implemented |
+| `balance` | Check account balance | ✅ Implemented |
+| `transfer` | Transfer rUv tokens between accounts | ✅ Implemented |
+| `mint` | Mint new rUv tokens | ✅ Implemented |
+| `burn` | Burn rUv tokens | ✅ Implemented |
+| `accounts` | List all accounts | ✅ Implemented |
+| `supply` | Show total rUv supply | ✅ Implemented |
+| `status` | Show exchange network status | ✅ Implemented |
+| `deploy-immutable` | Deploy exchange in immutable mode | ✅ Implemented |
+| `configure-fees` | Configure dynamic fee model parameters | ✅ Implemented |
+| `fee-status` | Show current fee model status and examples | ✅ Implemented |
+| `immutable-status` | Show immutable deployment status | ✅ Implemented |
+| `verify-agent` | Verify agent for reduced fees | ✅ Implemented |
+| `update-usage` | Update agent usage statistics | ✅ Implemented |
+| `calculate-fee` | Calculate fee for a transaction | ✅ Implemented |
+
+## Account Management
+
+### Create Account
+
+Create a new exchange account for rUv token operations.
 
 ```bash
-qudag-exchange-cli list-accounts [options]
-
-Options:
-  --show-keys        # Display public keys
-  --show-balances    # Fetch and display balances
-
-Example:
-  qudag-exchange-cli list-accounts --show-balances
+qudag exchange create-account --name <NAME>
 ```
 
-### delete-account
+**Options:**
+- `--name <NAME>`: Account name or identifier (required)
 
-Delete an account (requires confirmation).
+**Example:**
+```bash
+# Create accounts for trading
+qudag exchange create-account --name alice
+qudag exchange create-account --name bob
+qudag exchange create-account --name production_agent
+```
+
+### Check Balance
+
+Check the rUv token balance for a specific account.
 
 ```bash
-qudag-exchange-cli delete-account --name <name> [options]
-
-Options:
-  --name <name>      # Account name (required)
-  --force            # Skip confirmation prompt
-  --backup <path>    # Create backup before deletion
-
-Example:
-  qudag-exchange-cli delete-account --name alice --backup alice-final.json
+qudag exchange balance --account <ACCOUNT>
 ```
 
-## Balance Commands
+**Options:**
+- `--account <ACCOUNT>`: Account ID to check (required)
 
-### balance
+**Example:**
+```bash
+# Check account balances
+qudag exchange balance --account alice
+qudag exchange balance --account bob
+```
 
-Check rUv token balance for an account.
+### List Accounts
+
+List all accounts with optional formatting.
 
 ```bash
-qudag-exchange-cli balance [options]
-
-Options:
-  --account <name>   # Account name (default: active account)
-  --address <addr>   # Check balance for address
-  --all              # Show all account balances
-
-Examples:
-  # Check current account balance
-  qudag-exchange-cli balance
-  
-  # Check specific account
-  qudag-exchange-cli balance --account alice
-  
-  # Check address balance
-  qudag-exchange-cli balance --address qd1a2b3c4d5e6f...
+qudag exchange accounts [--format <FORMAT>]
 ```
 
-### history
+**Options:**
+- `--format <FORMAT>`: Output format (text, json) [default: text]
 
-View transaction history.
+**Example:**
+```bash
+# List accounts in different formats
+qudag exchange accounts
+qudag exchange accounts --format json
+```
+
+## Token Operations
+
+### Transfer Tokens
+
+Transfer rUv tokens between accounts with automatic fee calculation.
 
 ```bash
-qudag-exchange-cli history [options]
-
-Options:
-  --account <name>   # Account name
-  --limit <n>        # Number of transactions (default: 20)
-  --offset <n>       # Skip first n transactions
-  --type <type>      # Filter by type: sent, received, all
-  --after <date>     # Transactions after date
-  --before <date>    # Transactions before date
-
-Example:
-  qudag-exchange-cli history --account alice --limit 50 --type sent
+qudag exchange transfer --from <FROM> --to <TO> --amount <AMOUNT> [--memo <MEMO>]
 ```
 
-## Transaction Commands
+**Options:**
+- `--from <FROM>`: Source account (required)
+- `--to <TO>`: Destination account (required)
+- `--amount <AMOUNT>`: Amount to transfer in rUv (required)
+- `--memo <MEMO>`: Optional transaction memo
 
-### transfer
-
-Transfer rUv tokens between accounts.
-
+**Example:**
 ```bash
-qudag-exchange-cli transfer [options]
-
-Options:
-  --from <account>   # Sender account (default: active)
-  --to <address>     # Recipient address or name
-  --amount <n>       # Amount to transfer
-  --memo <text>      # Transaction memo
-  --fee <n>          # Transaction fee (default: auto)
-  --password <pass>  # Vault password
-
-Examples:
-  # Simple transfer
-  qudag-exchange-cli transfer --to bob --amount 100
-  
-  # Transfer with memo
-  qudag-exchange-cli transfer --to alice --amount 50 --memo "Payment for services"
-  
-  # Transfer with custom fee
-  qudag-exchange-cli transfer --to qd1abc... --amount 1000 --fee 0.1
-```
-
-### sign
-
-Sign a message or transaction.
-
-```bash
-qudag-exchange-cli sign [options]
-
-Options:
-  --account <name>   # Signing account
-  --message <text>   # Message to sign
-  --file <path>      # File to sign
-  --output <path>    # Output signature file
-
-Example:
-  qudag-exchange-cli sign --account alice --message "Hello, QuDAG!" --output sig.json
-```
-
-### verify
-
-Verify a signature.
-
-```bash
-qudag-exchange-cli verify [options]
-
-Options:
-  --signature <sig>  # Signature to verify
-  --message <text>   # Original message
-  --file <path>      # File containing message
-  --signer <addr>    # Expected signer address
-
-Example:
-  qudag-exchange-cli verify --signature sig.json --message "Hello, QuDAG!"
-```
-
-## Key Management Commands
-
-### key generate
-
-Generate new quantum-resistant keys.
-
-```bash
-qudag-exchange-cli key generate [options]
-
-Options:
-  --account <name>   # Account name
-  --type <type>      # Key type: signing, encryption, both
-  --algorithm <alg>  # Algorithm: ml-dsa, ml-kem, hqc
-  --password <pass>  # Vault password
-
-Examples:
-  # Generate signing keys
-  qudag-exchange-cli key generate --account alice --type signing
-  
-  # Generate ML-KEM encryption keys
-  qudag-exchange-cli key generate --account bob --type encryption --algorithm ml-kem
-```
-
-### key list
-
-List keys for an account.
-
-```bash
-qudag-exchange-cli key list [options]
-
-Options:
-  --account <name>   # Account name
-  --show-private     # Show private keys (dangerous!)
-  --type <type>      # Filter by type
-
-Example:
-  qudag-exchange-cli key list --account alice
-```
-
-### key export
-
-Export public keys.
-
-```bash
-qudag-exchange-cli key export [options]
-
-Options:
-  --account <name>   # Account name
-  --key-id <id>      # Specific key ID
-  --format <fmt>     # Format: pem, jwk, raw
-  --output <path>    # Output file
-
-Example:
-  qudag-exchange-cli key export --account alice --format pem --output alice-pub.pem
-```
-
-### key import
-
-Import keys from file.
-
-```bash
-qudag-exchange-cli key import [options]
-
-Options:
-  --account <name>   # Account name
-  --file <path>      # Key file to import
-  --format <fmt>     # Format: pem, jwk, raw
-  --type <type>      # Key type if not specified
-
-Example:
-  qudag-exchange-cli key import --account alice --file key.pem
-```
-
-## Node Commands
-
-### node start
-
-Start a QuDAG Exchange node.
-
-```bash
-qudag-exchange-cli node start [options]
-
-Options:
-  --account <name>   # Node operator account
-  --port <port>      # P2P port (default: 8080)
-  --rpc-port <port>  # RPC port (default: 9090)
-  --bootstrap <addr> # Bootstrap peer addresses
-  --data-dir <path>  # Data directory
-  --resources <spec> # Resources to offer
-
-Examples:
-  # Start basic node
-  qudag-exchange-cli node start --account alice
-  
-  # Start with resource offering
-  qudag-exchange-cli node start \
-    --account alice \
-    --port 8080 \
-    --resources "cpu=4,memory=16GB,storage=1TB"
-  
-  # Start with bootstrap peers
-  qudag-exchange-cli node start \
-    --bootstrap "/ip4/1.2.3.4/tcp/8080/p2p/Qm..."
-```
-
-### node stop
-
-Stop a running node.
-
-```bash
-qudag-exchange-cli node stop [options]
-
-Options:
-  --graceful         # Wait for pending operations
-  --timeout <secs>   # Shutdown timeout
-
-Example:
-  qudag-exchange-cli node stop --graceful --timeout 30
-```
-
-### node status
-
-Check node status.
-
-```bash
-qudag-exchange-cli node status [options]
-
-Options:
-  --detailed         # Show detailed metrics
-  --resources        # Show resource usage
-
-Example:
-  qudag-exchange-cli node status --detailed
-```
-
-## Network Commands
-
-### peer list
-
-List connected peers.
-
-```bash
-qudag-exchange-cli peer list [options]
-
-Options:
-  --verbose          # Show peer details
-  --sort <by>        # Sort by: latency, uptime, reputation
-
-Example:
-  qudag-exchange-cli peer list --verbose --sort latency
-```
-
-### peer connect
-
-Connect to a specific peer.
-
-```bash
-qudag-exchange-cli peer connect <address> [options]
-
-Options:
-  --persist          # Add to persistent peer list
-
-Example:
-  qudag-exchange-cli peer connect /ip4/1.2.3.4/tcp/8080/p2p/QmPeer...
-```
-
-### peer disconnect
-
-Disconnect from a peer.
-
-```bash
-qudag-exchange-cli peer disconnect <peer-id> [options]
-
-Options:
-  --ban              # Ban peer from reconnecting
-  --reason <text>    # Disconnection reason
-
-Example:
-  qudag-exchange-cli peer disconnect QmPeer... --reason "Misbehavior"
-```
-
-### network stats
-
-Display network statistics.
-
-```bash
-qudag-exchange-cli network stats [options]
-
-Options:
-  --interval <secs>  # Update interval for live stats
-  --export <path>    # Export stats to file
-
-Example:
-  qudag-exchange-cli network stats --interval 5
-```
-
-## Resource Commands
-
-### offer create
-
-Create a resource offer.
-
-```bash
-qudag-exchange-cli offer create [options]
-
-Options:
-  --type <type>      # Resource type: compute, storage, bandwidth
-  --specs <spec>     # Resource specifications
-  --price <price>    # Price in rUv per unit
-  --duration <time>  # Offer duration
-  --auto-renew       # Auto-renew offer
-
-Examples:
-  # Offer compute resources
-  qudag-exchange-cli offer create \
-    --type compute \
-    --specs "cpu=8,memory=32GB,gpu=1xRTX4090" \
-    --price "50 rUv/hour" \
-    --duration 24h
-  
-  # Offer storage
-  qudag-exchange-cli offer create \
-    --type storage \
-    --specs "capacity=10TB,redundancy=3,bandwidth=1Gbps" \
-    --price "10 rUv/TB/day"
-```
-
-### offer list
-
-List available resource offers.
-
-```bash
-qudag-exchange-cli offer list [options]
-
-Options:
-  --type <type>      # Filter by resource type
-  --max-price <n>    # Maximum price filter
-  --min-specs <spec> # Minimum specifications
-  --provider <addr>  # Filter by provider
-
-Example:
-  qudag-exchange-cli offer list --type compute --max-price 100
-```
-
-### offer accept
-
-Accept a resource offer.
-
-```bash
-qudag-exchange-cli offer accept <offer-id> [options]
-
-Options:
-  --duration <time>  # Reservation duration
-  --auto-renew       # Enable auto-renewal
-  --start <time>     # Start time (default: now)
-
-Example:
-  qudag-exchange-cli offer accept offer_123abc --duration 4h
-```
-
-### resources monitor
-
-Monitor resource usage.
-
-```bash
-qudag-exchange-cli resources monitor [options]
-
-Options:
-  --account <name>   # Monitor specific account
-  --interval <secs>  # Update interval
-  --alerts           # Enable usage alerts
-
-Example:
-  qudag-exchange-cli resources monitor --interval 10 --alerts
-```
-
-## Provider Commands
-
-### provider register
-
-Register as a resource provider.
-
-```bash
-qudag-exchange-cli provider register [options]
-
-Options:
-  --type <types>     # Resource types to provide
-  --specs <spec>     # Hardware specifications
-  --location <loc>   # Geographic location
-  --sla <level>      # SLA commitment level
-
-Example:
-  qudag-exchange-cli provider register \
-    --type "compute,storage" \
-    --specs "cpu=64,memory=256GB,storage=100TB" \
-    --location "US-EAST" \
-    --sla "99.9"
-```
-
-### provider set-price
-
-Set resource pricing.
-
-```bash
-qudag-exchange-cli provider set-price [options]
-
-Options:
-  --resource <type>  # Resource type
-  --price <price>    # Price per unit
-  --discount <spec>  # Volume discounts
-
-Example:
-  qudag-exchange-cli provider set-price \
-    --resource compute \
-    --price "100 rUv/hour" \
-    --discount "10%@100hours,20%@1000hours"
-```
-
-### provider stats
-
-View provider statistics.
-
-```bash
-qudag-exchange-cli provider stats [options]
-
-Options:
-  --period <time>    # Time period
-  --export <path>    # Export stats
-
-Example:
-  qudag-exchange-cli provider stats --period 30d
-```
-
-## Market Commands
-
-### market search
-
-Search for resources.
-
-```bash
-qudag-exchange-cli market search [options]
-
-Options:
-  --resource <type>  # Resource type
-  --specs <spec>     # Required specifications
-  --max-price <n>    # Maximum price
-  --location <loc>   # Preferred location
-
-Example:
-  qudag-exchange-cli market search \
-    --resource compute \
-    --specs "gpu>=2,memory>=40GB" \
-    --max-price 200
-```
-
-### market reserve
-
-Reserve resources.
-
-```bash
-qudag-exchange-cli market reserve [options]
-
-Options:
-  --provider <addr>  # Provider address
-  --resource <type>  # Resource type
-  --amount <n>       # Amount to reserve
-  --duration <time>  # Reservation period
-
-Example:
-  qudag-exchange-cli market reserve \
-    --provider qd1provider... \
-    --resource compute \
-    --amount 4 \
-    --duration 8h
-```
-
-## Vault Commands
-
-### vault create
-
-Create a new vault.
-
-```bash
-qudag-exchange-cli vault create [options]
-
-Options:
-  --name <name>      # Vault name
-  --password <pass>  # Master password
-  --kdf-rounds <n>   # Key derivation rounds
-
-Example:
-  qudag-exchange-cli vault create --name main-vault
-```
-
-### vault unlock
-
-Unlock a vault.
-
-```bash
-qudag-exchange-cli vault unlock [options]
-
-Options:
-  --name <name>      # Vault name
-  --password <pass>  # Master password
-  --duration <time>  # Auto-lock duration
-
-Example:
-  qudag-exchange-cli vault unlock --name main-vault --duration 30m
-```
-
-### vault backup
-
-Backup vault data.
-
-```bash
-qudag-exchange-cli vault backup [options]
-
-Options:
-  --vault <name>     # Vault name
-  --output <path>    # Backup file path
-  --encrypt          # Encrypt backup
-
-Example:
-  qudag-exchange-cli vault backup --vault main-vault --output backup.enc --encrypt
-```
-
-## Configuration Commands
-
-### config get
-
-Get configuration values.
-
-```bash
-qudag-exchange-cli config get <key> [options]
-
-Example:
-  qudag-exchange-cli config get network.bootstrap_peers
-```
-
-### config set
-
-Set configuration values.
-
-```bash
-qudag-exchange-cli config set <key> <value> [options]
-
-Example:
-  qudag-exchange-cli config set api.port 3000
-```
-
-### config show
-
-Display full configuration.
-
-```bash
-qudag-exchange-cli config show [options]
-
-Options:
-  --defaults         # Show default values
-  --format <fmt>     # Output format: toml, json, yaml
-
-Example:
-  qudag-exchange-cli config show --format json
-```
-
-## Maintenance Commands
-
-### maintenance compact
-
-Compact database storage.
-
-```bash
-qudag-exchange-cli maintenance compact [options]
-
-Options:
-  --target <size>    # Target size reduction
-  --analyze          # Analyze before compacting
-
-Example:
-  qudag-exchange-cli maintenance compact --analyze
-```
-
-### maintenance prune
-
-Prune old data.
-
-```bash
-qudag-exchange-cli maintenance prune [options]
-
-Options:
-  --before <date>    # Prune data before date
-  --keep-recent <n>  # Keep recent n blocks
-  --dry-run          # Show what would be pruned
-
-Example:
-  qudag-exchange-cli maintenance prune --before 2024-01-01 --dry-run
-```
-
-## Debug Commands
-
-### debug info
-
-Display debug information.
-
-```bash
-qudag-exchange-cli debug info [options]
-
-Options:
-  --system           # Include system info
-  --network          # Include network info
-  --performance      # Include performance metrics
-
-Example:
-  qudag-exchange-cli debug info --system --network
-```
-
-### debug export
-
-Export debug data.
-
-```bash
-qudag-exchange-cli debug export [options]
-
-Options:
-  --output <path>    # Export file path
-  --include <types>  # Data types to include
-  --compress         # Compress output
-
-Example:
-  qudag-exchange-cli debug export --output debug.tar.gz --compress
-```
-
-## Environment Variables
-
-The CLI respects these environment variables:
-
-```bash
-QUDAG_HOME          # QuDAG home directory (default: ~/.qudag)
-QUDAG_CONFIG        # Config file path
-QUDAG_NETWORK       # Default network
-QUDAG_LOG_LEVEL     # Log level: trace, debug, info, warn, error
-QUDAG_NO_COLOR      # Disable colored output
-QUDAG_VAULT_PASS    # Vault password (use with caution!)
-```
-
-## Configuration File
-
-Default configuration file location: `~/.qudag/config.toml`
-
-```toml
-[account]
-default = "alice"
-
-[network]
-name = "mainnet"
-bootstrap_peers = [
-  "/ip4/1.2.3.4/tcp/8080/p2p/Qm...",
-  "/ip4/5.6.7.8/tcp/8080/p2p/Qm..."
-]
-
-[api]
-host = "127.0.0.1"
-port = 3000
-
-[node]
-data_dir = "~/.qudag/data"
-max_peers = 50
-listen_addresses = ["/ip4/0.0.0.0/tcp/8080"]
-
-[resources]
-cpu_limit = 4
-memory_limit = "16GB"
-storage_limit = "1TB"
-
-[logging]
-level = "info"
-file = "~/.qudag/logs/node.log"
-```
-
-## Exit Codes
-
-- `0`: Success
-- `1`: General error
-- `2`: Configuration error
-- `3`: Network error
-- `4`: Insufficient balance
-- `5`: Authentication error
-- `6`: Validation error
-- `7`: Resource unavailable
-
-## Examples
-
-### Complete Workflow Example
-
-```bash
-# 1. Create account
-qudag-exchange-cli create-account --name alice
-
-# 2. Start node
-qudag-exchange-cli node start --account alice
-
-# 3. Check balance
-qudag-exchange-cli balance --account alice
-
-# 4. Offer resources
-qudag-exchange-cli offer create \
-  --type compute \
-  --specs "cpu=8,memory=32GB" \
-  --price "50 rUv/hour"
-
-# 5. Earn rUv tokens
-# (Automatically credited as resources are used)
-
-# 6. Transfer tokens
-qudag-exchange-cli transfer \
+# Basic transfer
+qudag exchange transfer --from alice --to bob --amount 1000
+
+# Transfer with memo
+qudag exchange transfer \
+  --from alice \
   --to bob \
-  --amount 100 \
-  --memo "Test transfer"
-
-# 7. Monitor node
-qudag-exchange-cli node status --detailed
+  --amount 5000 \
+  --memo "Resource payment for compute job #123"
 ```
 
-## Getting Help
+### Mint Tokens
+
+Mint new rUv tokens to a specific account.
 
 ```bash
-# General help
-qudag-exchange-cli --help
-
-# Command-specific help
-qudag-exchange-cli transfer --help
-
-# View manual page
-man qudag-exchange-cli
-
-# Online documentation
-https://docs.qudag.io/cli
+qudag exchange mint --account <ACCOUNT> --amount <AMOUNT>
 ```
+
+**Options:**
+- `--account <ACCOUNT>`: Target account for minting (required)
+- `--amount <AMOUNT>`: Amount to mint in rUv (required)
+
+**Example:**
+```bash
+# Mint tokens for new participants
+qudag exchange mint --account alice --amount 10000
+qudag exchange mint --account bob --amount 5000
+```
+
+### Burn Tokens
+
+Burn rUv tokens from a specific account.
+
+```bash
+qudag exchange burn --account <ACCOUNT> --amount <AMOUNT>
+```
+
+**Options:**
+- `--account <ACCOUNT>`: Source account for burning (required)
+- `--amount <AMOUNT>`: Amount to burn in rUv (required)
+
+**Example:**
+```bash
+# Burn excess tokens
+qudag exchange burn --account alice --amount 1000
+```
+
+### Supply Information
+
+Show total rUv supply and distribution information.
+
+```bash
+qudag exchange supply
+```
+
+**Example Output:**
+```
+💰 rUv Token Supply
+├── Total Supply: 1,000,000 rUv
+├── Circulating: 750,000 rUv
+├── Locked/Staked: 200,000 rUv
+└── Available for Mint: 50,000 rUv
+```
+
+## Fee Model Management
+
+### Configure Fee Parameters
+
+Configure the dynamic tiered fee model parameters.
+
+```bash
+qudag exchange configure-fees [OPTIONS]
+```
+
+**Options:**
+- `--f-min <RATE>`: Minimum fee rate (0.1% = 0.001)
+- `--f-max <RATE>`: Maximum fee rate for unverified (1.0% = 0.01)
+- `--f-min-verified <RATE>`: Minimum fee rate for verified (0.25% = 0.0025)
+- `--f-max-verified <RATE>`: Maximum fee rate for verified (0.50% = 0.005)
+- `--time-constant-days <DAYS>`: Time constant in days (default 90 days = 3 months)
+- `--usage-threshold <AMOUNT>`: Usage threshold in rUv (default 10000)
+
+**Examples:**
+```bash
+# Configure basic fee parameters
+qudag exchange configure-fees \
+  --f-min 0.001 \
+  --f-max 0.01
+
+# Full configuration for production
+qudag exchange configure-fees \
+  --f-min 0.002 \
+  --f-max 0.012 \
+  --f-min-verified 0.003 \
+  --f-max-verified 0.006 \
+  --time-constant-days 90 \
+  --usage-threshold 15000
+
+# Conservative fee structure
+qudag exchange configure-fees \
+  --f-min 0.001 \
+  --f-max 0.005 \
+  --f-min-verified 0.002 \
+  --f-max-verified 0.003
+```
+
+### Fee Status and Examples
+
+Show current fee model status with optional examples.
+
+```bash
+qudag exchange fee-status [--examples] [--format <FORMAT>]
+```
+
+**Options:**
+- `--examples`: Show fee examples for different agent types
+- `--format <FORMAT>`: Output format (text, json) [default: text]
+
+**Example:**
+```bash
+# Basic fee status
+qudag exchange fee-status
+
+# Show detailed examples
+qudag exchange fee-status --examples
+
+# JSON output for integration
+qudag exchange fee-status --format json
+```
+
+### Calculate Fee
+
+Calculate the fee for a specific transaction.
+
+```bash
+qudag exchange calculate-fee --account <ACCOUNT> --amount <AMOUNT>
+```
+
+**Options:**
+- `--account <ACCOUNT>`: Account ID for fee calculation (required)
+- `--amount <AMOUNT>`: Transaction amount in rUv (required)
+
+**Example:**
+```bash
+# Calculate fees for different scenarios
+qudag exchange calculate-fee --account alice --amount 1000
+qudag exchange calculate-fee --account verified_agent --amount 10000
+qudag exchange calculate-fee --account high_volume_trader --amount 100000
+```
+
+## Immutable Deployment
+
+### Deploy Immutable Mode
+
+Deploy the exchange in immutable mode with quantum-resistant locking.
+
+```bash
+qudag exchange deploy-immutable [--key-path <PATH>] [--grace-period <HOURS>]
+```
+
+**Options:**
+- `--key-path <PATH>`: Path to signing key for immutable deployment
+- `--grace-period <HOURS>`: Grace period in hours before immutable mode takes effect [default: 24]
+
+**Examples:**
+```bash
+# Deploy with default 24-hour grace period
+qudag exchange deploy-immutable
+
+# Deploy with 1-hour grace period for testing
+qudag exchange deploy-immutable --grace-period 1
+
+# Deploy with custom signing key
+qudag exchange deploy-immutable \
+  --key-path /secure/keys/immutable_deploy.key \
+  --grace-period 48
+```
+
+### Immutable Status
+
+Show the current immutable deployment status.
+
+```bash
+qudag exchange immutable-status [--format <FORMAT>]
+```
+
+**Options:**
+- `--format <FORMAT>`: Output format (text, json) [default: text]
+
+**Example:**
+```bash
+# Basic status
+qudag exchange immutable-status
+
+# JSON status for monitoring
+qudag exchange immutable-status --format json
+```
+
+**Example Output:**
+```json
+{
+  "enabled": true,
+  "locked": true,
+  "enforced": false,
+  "in_grace_period": true,
+  "locked_at": "2025-06-22T15:30:00Z",
+  "grace_period_seconds": 3600,
+  "config_hash": "blake3:a1b2c3d4e5f6..."
+}
+```
+
+## Agent Verification
+
+### Verify Agent
+
+Verify an agent for reduced fees using cryptographic proof.
+
+```bash
+qudag exchange verify-agent --account <ACCOUNT> --proof-path <PATH>
+```
+
+**Options:**
+- `--account <ACCOUNT>`: Account ID to verify (required)
+- `--proof-path <PATH>`: Path to verification proof file (required)
+
+**Proof File Format:**
+```json
+{
+  "agent_id": "alice",
+  "verification_type": "kyc_document",
+  "proof_hash": "blake3:verification_data_hash",
+  "timestamp": "2025-06-22T15:30:00Z",
+  "signature": "ml_dsa_signature_bytes",
+  "metadata": {
+    "issuer": "QuDAG Verification Authority",
+    "expires": "2026-06-22T15:30:00Z"
+  }
+}
+```
+
+**Example:**
+```bash
+# Verify agent with proof file
+qudag exchange verify-agent \
+  --account alice \
+  --proof-path verification_proofs/alice_kyc.json
+
+# Verify production agent
+qudag exchange verify-agent \
+  --account production_agent_001 \
+  --proof-path proofs/enterprise_verification.json
+```
+
+### Update Usage Statistics
+
+Update an agent's monthly usage statistics for fee calculation.
+
+```bash
+qudag exchange update-usage --account <ACCOUNT> --usage <USAGE>
+```
+
+**Options:**
+- `--account <ACCOUNT>`: Account ID (required)
+- `--usage <USAGE>`: Monthly usage in rUv (required)
+
+**Example:**
+```bash
+# Update usage for fee calculation
+qudag exchange update-usage --account alice --usage 15000
+qudag exchange update-usage --account high_volume_agent --usage 75000
+
+# Reset usage (new period)
+qudag exchange update-usage --account bob --usage 0
+```
+
+## Network Status
+
+### Exchange Status
+
+Show comprehensive exchange network status.
+
+```bash
+qudag exchange status
+```
+
+**Example Output:**
+```
+🏦 QuDAG Exchange Status
+├── Network: QuDAG Mainnet
+├── Chain ID: 1
+├── Total Accounts: 1,247
+├── Active Agents: 892
+├── Verified Agents: 234 (26.2%)
+├── 24h Volume: 847,291 rUv
+├── 24h Transactions: 15,443
+├── Average Fee Rate: 0.342%
+├── Network Health: ✅ Healthy
+└── Last Block: #2,847,392 (2 seconds ago)
+
+💱 Fee Model Status
+├── Enabled: ✅ Yes
+├── F_min: 0.1% (0.001)
+├── F_max: 1.0% (0.010)
+├── F_min_verified: 0.25% (0.0025)
+├── F_max_verified: 0.50% (0.005)
+├── Time constant: 90 days
+└── Usage threshold: 10,000 rUv/month
+
+🔒 Immutable Deployment
+├── Enabled: ✅ Yes
+├── Locked: ✅ Yes
+├── Enforced: ✅ Yes
+├── Locked at: 2025-06-20T10:30:00Z
+├── Grace period: 24 hours (completed)
+└── Config hash: blake3:a1b2c3d4e5f6...
+```
+
+## Examples and Workflows
+
+### Complete Setup Workflow
+
+```bash
+# 1. Create accounts
+qudag exchange create-account --name alice
+qudag exchange create-account --name bob
+
+# 2. Mint initial tokens
+qudag exchange mint --account alice --amount 10000
+qudag exchange mint --account bob --amount 5000
+
+# 3. Configure fee model
+qudag exchange configure-fees \
+  --f-min 0.001 \
+  --f-max 0.008 \
+  --f-min-verified 0.002 \
+  --f-max-verified 0.004
+
+# 4. Verify agents
+qudag exchange verify-agent \
+  --account alice \
+  --proof-path alice_verification.json
+
+# 5. Update usage statistics
+qudag exchange update-usage --account alice --usage 20000
+
+# 6. Test transfers
+qudag exchange transfer --from alice --to bob --amount 1000
+
+# 7. Check results
+qudag exchange balance --account alice
+qudag exchange balance --account bob
+qudag exchange fee-status --examples
+```
+
+### Production Deployment Workflow
+
+```bash
+# 1. Configure production fee parameters
+qudag exchange configure-fees \
+  --f-min 0.002 \
+  --f-max 0.010 \
+  --f-min-verified 0.003 \
+  --f-max-verified 0.005 \
+  --time-constant-days 90 \
+  --usage-threshold 15000
+
+# 2. Verify configuration
+qudag exchange fee-status --examples
+
+# 3. Deploy in immutable mode with 48-hour grace period
+qudag exchange deploy-immutable --grace-period 48
+
+# 4. Monitor deployment status
+qudag exchange immutable-status
+
+# 5. Wait for grace period to complete
+# (Configuration becomes permanently locked)
+
+# 6. Verify final status
+qudag exchange status
+```
+
+### Agent Verification Workflow
+
+```bash
+# 1. Create verification proof file
+cat > agent_verification.json << EOF
+{
+  "agent_id": "production_agent",
+  "verification_type": "enterprise_kyc",
+  "proof_hash": "blake3:enterprise_verification_hash",
+  "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+  "signature": "ml_dsa_signature_bytes",
+  "metadata": {
+    "issuer": "Enterprise Verification Authority",
+    "level": "premium",
+    "expires": "2026-06-22T15:30:00Z"
+  }
+}
+EOF
+
+# 2. Verify the agent
+qudag exchange verify-agent \
+  --account production_agent \
+  --proof-path agent_verification.json
+
+# 3. Update usage statistics for better rates
+qudag exchange update-usage \
+  --account production_agent \
+  --usage 50000
+
+# 4. Calculate fees to see benefits
+qudag exchange calculate-fee \
+  --account production_agent \
+  --amount 10000
+
+# 5. Compare with unverified agent
+qudag exchange calculate-fee \
+  --account unverified_agent \
+  --amount 10000
+```
+
+### High-Volume Trading Setup
+
+```bash
+# 1. Create high-volume trader account
+qudag exchange create-account --name hft_trader_001
+
+# 2. Mint substantial tokens
+qudag exchange mint --account hft_trader_001 --amount 1000000
+
+# 3. Verify agent for reduced fees
+qudag exchange verify-agent \
+  --account hft_trader_001 \
+  --proof-path hft_verification.json
+
+# 4. Set high usage for optimal rates
+qudag exchange update-usage \
+  --account hft_trader_001 \
+  --usage 100000
+
+# 5. Test fee calculations at different volumes
+qudag exchange calculate-fee --account hft_trader_001 --amount 1000
+qudag exchange calculate-fee --account hft_trader_001 --amount 10000
+qudag exchange calculate-fee --account hft_trader_001 --amount 100000
+
+# 6. Monitor status
+qudag exchange status
+```
+
+## Error Handling
+
+### Common Error Scenarios
+
+**Insufficient Balance:**
+```bash
+$ qudag exchange transfer --from alice --to bob --amount 999999
+Error: Insufficient balance. Account 'alice' has 5000 rUv, requested 999999 rUv
+```
+
+**Invalid Account:**
+```bash
+$ qudag exchange balance --account nonexistent
+Error: Account 'nonexistent' not found
+```
+
+**Immutable Configuration:**
+```bash
+$ qudag exchange configure-fees --f-min 0.002
+Error: Cannot modify configuration: system is immutably locked
+```
+
+**Invalid Fee Parameters:**
+```bash
+$ qudag exchange configure-fees --f-min 1.5
+Error: f_min must be between 0 and 1 (150% is invalid)
+```
+
+### Best Practices
+
+1. **Always check balances before transfers**
+2. **Verify fee calculations for large transactions**
+3. **Use immutable deployment for production systems**
+4. **Regularly update usage statistics for optimal fees**
+5. **Keep verification proofs secure and backed up**
+6. **Monitor exchange status for network health**
+7. **Use JSON output for programmatic integration**
+
+## Integration Examples
+
+### Shell Script Integration
+
+```bash
+#!/bin/bash
+# Simple trading bot example
+
+ACCOUNT="trading_bot_001"
+MIN_BALANCE=1000
+
+# Check balance
+BALANCE=$(qudag exchange balance --account $ACCOUNT --format json | jq -r '.balance')
+
+if [ "$BALANCE" -lt "$MIN_BALANCE" ]; then
+    echo "Low balance: $BALANCE rUv"
+    # Mint more tokens or alert
+    qudag exchange mint --account $ACCOUNT --amount 5000
+fi
+
+# Execute trade
+qudag exchange transfer \
+  --from $ACCOUNT \
+  --to market_maker \
+  --amount 100 \
+  --memo "Automated trade $(date)"
+```
+
+### Python Integration
+
+```python
+import json
+import subprocess
+
+def get_exchange_status():
+    """Get exchange status as Python dict."""
+    result = subprocess.run([
+        'qudag', 'exchange', 'status', '--format', 'json'
+    ], capture_output=True, text=True)
+    
+    return json.loads(result.stdout)
+
+def calculate_fee(account, amount):
+    """Calculate fee for a transaction."""
+    result = subprocess.run([
+        'qudag', 'exchange', 'calculate-fee',
+        '--account', account,
+        '--amount', str(amount),
+        '--format', 'json'
+    ], capture_output=True, text=True)
+    
+    return json.loads(result.stdout)
+
+# Example usage
+status = get_exchange_status()
+fee_info = calculate_fee('alice', 1000)
+print(f"Network health: {status['network_health']}")
+print(f"Fee for 1000 rUv: {fee_info['fee_amount']} rUv")
+```
+
+This comprehensive CLI reference provides everything needed to effectively use the QuDAG Exchange system for quantum-resistant resource trading.
