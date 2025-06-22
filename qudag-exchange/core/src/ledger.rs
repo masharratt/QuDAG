@@ -269,9 +269,9 @@ impl Ledger {
         let accounts_iter = self.accounts.values();
         
         #[cfg(feature = "std")]
-        let accounts_iter = self.accounts.iter().map(|entry| entry.value());
+        let accounts: Vec<_> = self.accounts.iter().map(|entry| entry.value().clone()).collect();
         
-        for account in accounts_iter {
+        for account in accounts.iter() {
             total_balance = total_balance.checked_add(account.balance)
                 .ok_or_else(|| Error::StateCorruption("Balance overflow in invariant check".into()))?;
         }

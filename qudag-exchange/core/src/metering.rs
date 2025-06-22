@@ -16,7 +16,7 @@ use crate::{
 };
 
 /// Types of operations that can be metered
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum OperationType {
     /// Basic transfer between accounts
     Transfer,
@@ -303,7 +303,7 @@ impl ResourceMeter {
         let total_bytes = base_size + memo_size;
         
         // Convert to KB (round up)
-        (total_bytes + 1023) / 1024
+        ((total_bytes + 1023) / 1024) as u64
     }
 }
 

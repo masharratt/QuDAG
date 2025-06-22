@@ -259,21 +259,19 @@ impl Transaction {
     
     /// Sign the transaction using QuDAG crypto
     #[cfg(feature = "std")]
-    pub fn sign(&mut self, private_key: &[u8], public_key: &[u8]) -> Result<()> {
-        use qudag_crypto::signature::SignatureScheme;
-        
+    pub fn sign(&mut self, keypair: &qudag_crypto::MlDsaKeyPair) -> Result<()> {
         let message = self.to_bytes()?;
         
-        // Create ML-DSA signature scheme
-        let scheme = qudag_crypto::ml_dsa::MlDsa87::new();
-        
         // Sign the message
-        let signature = scheme.sign(private_key, &message)
+        let signature = keypair.sign(&message, &mut rand::thread_rng())
             .map_err(|e| Error::Other(format!("Signing failed: {:?}", e)))?;
+        
+        let public_key = keypair.to_public_key()
+            .map_err(|e| Error::Other(format!("Public key extraction failed: {:?}", e)))?;
         
         self.signature = Some(TransactionSignature {
             algorithm: "ML-DSA-87".to_string(),
-            public_key: public_key.to_vec(),
+            public_key: public_key.as_bytes().to_vec(),
             signature,
         });
         
@@ -283,19 +281,20 @@ impl Transaction {
     /// Verify the transaction signature
     #[cfg(feature = "std")]
     pub fn verify_signature(&self) -> Result<bool> {
-        use qudag_crypto::signature::SignatureScheme;
-        
         let sig_data = self.signature.as_ref()
             .ok_or_else(|| Error::Other("No signature present".into()))?;
         
         let message = self.to_bytes()?;
         
-        // Create ML-DSA signature scheme
-        let scheme = qudag_crypto::ml_dsa::MlDsa87::new();
+        // Create public key from bytes
+        let public_key = qudag_crypto::MlDsaPublicKey::from_bytes(&sig_data.public_key)
+            .map_err(|e| Error::Other(format!("Invalid public key: {:?}", e)))?;
         
         // Verify the signature
-        scheme.verify(&sig_data.public_key, &message, &sig_data.signature)
-            .map_err(|_| Error::SignatureVerificationFailed)
+        match public_key.verify(&message, &sig_data.signature) {
+            Ok(()) => Ok(true),
+            Err(_) => Ok(false),
+        }
     }
     
     /// Get current timestamp (platform-specific)

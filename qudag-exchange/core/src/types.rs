@@ -11,7 +11,7 @@ use serde::{Serialize, Deserialize};
 /// 
 /// Each rUv represents a unit of computational/storage capability within the system.
 /// Users spend rUv to perform operations like transactions, data storage, or computations.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default, Serialize, Deserialize)]
 pub struct rUv(pub u64);
 
 impl rUv {
