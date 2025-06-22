@@ -1,0 +1,12 @@
+[package]
+name = "qudag-exchange"
+version = "0.1.0"
+authors = ["QuDAG Exchange Team"]
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/qudag/qudag-exchange"
+
+[dependencies]
+# Re-export main modules
+qudag-exchange-core = { path = "core" }
+qudag-exchange-cli = { path = "cli" }

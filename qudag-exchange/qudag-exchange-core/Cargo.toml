@@ -1,0 +1,64 @@
+[package]
+name = "qudag-exchange-core"
+version = "0.1.0"
+edition = "2021"
+authors = ["QuDAG Team <team@qudag.com>"]
+description = "Core library for QuDAG Exchange - rUv ledger and resource metering"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/qudag/qudag-exchange"
+keywords = ["qudag", "ruv", "ledger", "resource-metering", "quantum-resistant"]
+categories = ["cryptography", "no-std"]
+
+[dependencies]
+# Core dependencies - no_std compatible
+serde = { version = "1.0", default-features = false, features = ["derive", "alloc"] }
+blake3 = { version = "1.5", default-features = false }
+bincode = { version = "1.3", default-features = false }
+
+# QuDAG ecosystem dependencies
+qudag-crypto = { path = "../../../core/crypto", default-features = false }
+qudag-dag = { path = "../../../core/dag", default-features = false }
+vault-core = { path = "../../../core/vault", default-features = false }
+
+# Optional std dependencies
+dashmap = { version = "6.1", optional = true }
+parking_lot = { version = "0.12", optional = true }
+tokio = { version = "1.42", features = ["sync"], optional = true }
+thiserror = { version = "2.0", optional = true }
+
+# WASM-specific dependencies
+getrandom = { version = "0.2", features = ["js"], optional = true }
+wasm-bindgen = { version = "0.2", optional = true }
+
+[dev-dependencies]
+# Testing dependencies
+quickcheck = "1.0"
+proptest = "1.4"
+criterion = "0.5"
+tokio = { version = "1.42", features = ["full", "test-util"] }
+rand = "0.8"
+
+[features]
+default = ["std"]
+std = [
+    "serde/std",
+    "blake3/std",
+    "bincode/std",
+    "qudag-crypto/std",
+    "qudag-dag/std",
+    "vault-core/std",
+    "dashmap",
+    "parking_lot",
+    "tokio",
+    "thiserror"
+]
+wasm = ["getrandom", "wasm-bindgen"]
+test-utils = []
+
+[lib]
+name = "qudag_exchange_core"
+path = "src/lib.rs"
+
+[[bench]]
+name = "ruv_ledger"
+harness = false
