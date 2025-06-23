@@ -1,6 +1,6 @@
-# QuDAG Testnet Deployment on Fly.io
+# QuDAG Exchange Testnet Deployment Guide
 
-This guide provides comprehensive instructions for deploying a 4-node QuDAG testnet across multiple regions on Fly.io.
+This guide provides comprehensive instructions for deploying QuDAG testnet with full Exchange functionality, including quantum-resistant rUv token operations, dynamic fee models, and immutable deployment capabilities.
 
 ## Table of Contents
 
@@ -16,20 +16,33 @@ This guide provides comprehensive instructions for deploying a 4-node QuDAG test
 10. [Cost Breakdown](#cost-breakdown)
 11. [Maintenance](#maintenance)
 
-## Overview
+## 🎯 Overview
 
-The QuDAG testnet consists of 4 validator nodes distributed across global regions:
-- **Node 1**: Toronto (yyz) - Bootstrap node
-- **Node 2**: Amsterdam (ams) 
-- **Node 3**: Singapore (sin)
-- **Node 4**: San Francisco (sjc)
+The QuDAG Exchange testnet deployment supports:
 
-Each node runs the full QuDAG protocol with:
-- P2P networking using libp2p
-- Dark domain registration system
-- DAG-based consensus
-- Persistent storage
-- Metrics and monitoring
+- **rUv Token System**: Quantum-resistant Resource Utilization Vouchers
+- **Dynamic Fee Model**: Tiered fees with verified agent benefits (0.1%-1.0% unverified, 0.25%-0.5% verified)
+- **Immutable Deployment**: Optional post-initialization configuration locking
+- **Multi-Region Distribution**: Resilient network across multiple geographic regions
+- **Quantum-Resistant Security**: ML-DSA-87 signatures throughout
+
+### Node Architecture
+
+| Node Type | Location | Storage | Functions |
+|-----------|----------|---------|-----------|
+| Bootstrap | Toronto (yyz) | 26GB | Genesis, Exchange init, Full operations |
+| Exchange Full | Montreal (yul) | 24GB | Complete Exchange, Agent verification |
+| Validator | Chicago (ord) | 19GB | Transaction validation, Consensus |
+| Light | New York (ewr) | 15GB | Client operations, Query relay |
+
+Each node runs the complete QuDAG protocol with:
+- **P2P networking** using libp2p with quantum-resistant encryption
+- **rUv Token Exchange** with dynamic fee calculations
+- **Dark domain registration** system with quantum fingerprints
+- **QR-Avalanche consensus** with ML-DSA-87 signatures
+- **Immutable deployment** capabilities for production security
+- **Persistent storage** for DAG and Exchange data
+- **Comprehensive monitoring** with Exchange-specific metrics
 
 ## Prerequisites
 
@@ -87,24 +100,63 @@ Each node runs the full QuDAG protocol with:
 - **8080**: RPC API endpoint
 - **9090**: Prometheus metrics
 
+## 🚀 Deployment Options
+
+### 1. Fly.io Deployment (Recommended)
+
+**Features:**
+- 4-node distributed testnet with Exchange functionality
+- Built-in private networking (6PN) for quantum-secure communication
+- Persistent storage for DAG and Exchange data
+- Automatic scaling and monitoring
+- Cost: ~$45/month for full Exchange setup
+
+### 2. Docker Compose Deployment
+
+**Features:**
+- Local development and testing with Exchange
+- Complete rUv token functionality
+- Isolated network environment
+- Easy debugging and monitoring
+
+### 3. Kubernetes Deployment
+
+**Features:**
+- Production-ready orchestration
+- Exchange auto-scaling capabilities
+- High availability configuration
+- Enterprise monitoring integration
+
 ## Quick Start
+
+### Fly.io Exchange Deployment
 
 ```bash
 # 1. Clone and navigate to deployment directory
 cd /workspaces/QuDAG/docs/testnet_deployment
 
-# 2. Copy and configure environment
-cp .env.example .env
-# Edit .env with your values
+# 2. Deploy Exchange-enabled testnet
+./deploy-exchange-testnet-flyio.sh deploy
 
-# 3. Setup secrets and keys
-./scripts/setup-secrets.sh
+# 3. Verify Exchange functionality
+./deploy-exchange-testnet-flyio.sh verify
 
-# 4. Deploy the testnet
-./scripts/deployment.sh
+# 4. Check deployment information
+./deploy-exchange-testnet-flyio.sh info
+```
 
-# 5. Monitor deployment
-./scripts/monitor-nodes.sh -c
+### Local Exchange Testing
+
+```bash
+# 1. Build with Exchange support
+cargo build --release --features "exchange"
+
+# 2. Test Exchange CLI
+./target/release/qudag exchange --help
+
+# 3. Run local Exchange operations
+./target/release/qudag exchange create-account --name alice
+./target/release/qudag exchange balance --account alice
 ```
 
 ## Detailed Deployment Guide

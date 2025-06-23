@@ -1,9 +1,14 @@
 [package]
 name = "qudag-exchange-cli"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["QuDAG Exchange Team"]
 edition = "2021"
 license = "MIT"
+description = "Command-line interface for QuDAG Exchange with rUv token operations"
+documentation = "https://docs.rs/qudag-exchange-cli"
+repository = "https://github.com/ruvnet/QuDAG"
+keywords = ["qudag", "exchange", "cli", "tokens", "blockchain"]
+categories = ["command-line-utilities", "cryptography"]
 
 [workspace]
 

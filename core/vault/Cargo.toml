@@ -1,11 +1,11 @@
 [package]
 name = "qudag-vault-core"
-version = "0.2.1"
-edition = "2021"
-authors = ["QuDAG Team <team@qudag.com>", "rUv <ruv@ruv.net>"]
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
 description = "Quantum-resistant password vault library with post-quantum cryptography"
-license = "MIT"
-repository = "https://github.com/ruvnet/QuDAG"
+license.workspace = true
+repository.workspace = true
 homepage = "https://github.com/ruvnet/QuDAG/tree/main/core/vault"
 documentation = "https://docs.rs/qudag-vault"
 readme = "README.md"
@@ -15,8 +15,8 @@ rust-version = "1.75"
 
 [dependencies]
 # QuDAG dependencies for integration
-qudag-crypto = { version = "0.3.0", path = "../crypto" }
-qudag-dag = { version = "0.3.0", path = "../dag" }
+qudag-crypto = { version = "0.4.0", path = "../crypto" }
+qudag-dag = { version = "0.4.0", path = "../dag" }
 
 # Cryptography
 aes-gcm = "0.10"

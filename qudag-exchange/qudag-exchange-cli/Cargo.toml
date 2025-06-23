@@ -1,11 +1,14 @@
 [package]
-name = "qudag-exchange-cli"
-version = "0.1.0"
+name = "qudag-exchange-standalone-cli"
+version = "0.2.0"
 edition = "2021"
 authors = ["QuDAG Exchange Development Team"]
 license = "MIT OR Apache-2.0"
 repository = "https://github.com/ruvnet/QuDAG"
-description = "Command-line interface for QuDAG Exchange"
+description = "Standalone command-line interface for QuDAG Exchange with rUv tokens"
+documentation = "https://docs.rs/qudag-exchange-standalone-cli"
+keywords = ["qudag", "exchange", "cli", "tokens", "standalone"]
+categories = ["command-line-utilities", "cryptography"]
 
 [[bin]]
 name = "qudag-exchange-cli"

@@ -1,9 +1,14 @@
 [package]
 name = "qudag-exchange-core"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["QuDAG Exchange Team"]
 edition = "2021"
 license = "MIT"
+description = "Core QuDAG Exchange library with quantum-resistant rUv token system"
+documentation = "https://docs.rs/qudag-exchange-core"
+repository = "https://github.com/ruvnet/QuDAG"
+keywords = ["qudag", "exchange", "quantum", "tokens", "blockchain"]
+categories = ["cryptography", "finance"]
 
 [dependencies]
 # QuDAG dependencies
