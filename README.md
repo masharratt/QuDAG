@@ -188,7 +188,7 @@ QuDAG has a live testnet deployed across 4 global regions, demonstrating the pla
 
 | Node | Location | IP Address | Status | Features |
 |------|----------|------------|--------|----------|
-| **node1** | Toronto (yyz) | [109.105.222.156](http://109.105.222.156/health) | ✅ Healthy | Bootstrap node, Enhanced P2P |
+| **node1** | Toronto (yyz) | [109.105.222.156](http://109.105.222.156/health) | ✅ Healthy | Bootstrap, MCP Server, Enhanced P2P |
 | **node2** | Amsterdam (ams) | [149.248.199.86](http://149.248.199.86/health) | ✅ Healthy | Full node, 4 peers connected |
 | **node3** | Singapore (sin) | [149.248.218.16](http://149.248.218.16/health) | ✅ Healthy | Full node, 4 peers connected |
 | **node4** | San Francisco (sjc) | [137.66.62.149](http://137.66.62.149/health) | ✅ Healthy | Full node, 4 peers connected |
@@ -200,6 +200,7 @@ QuDAG has a live testnet deployed across 4 global regions, demonstrating the pla
 - **Real-time Metrics**: Prometheus-compatible metrics at `/metrics` endpoint
 - **Health Monitoring**: JSON health status at `/health` endpoint
 - **Global Distribution**: Low-latency coverage across North America, Europe, and Asia
+- **MCP Server**: Model Context Protocol server on node1 (port 3333)
 
 ### Accessing the Testnet
 
@@ -212,6 +213,9 @@ curl http://109.105.222.156/metrics
 
 # Connect your QuDAG node to testnet
 qudag start --bootstrap-peers /ip4/109.105.222.156/tcp/4001
+
+# Access MCP server for AI integration
+curl http://109.105.222.156:3333/mcp | jq
 ```
 
 ### Testnet Verification
