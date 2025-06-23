@@ -26,10 +26,10 @@ pub mod prelude {
     };
 
     pub use crate::dag::{Consensus, Dag, Node, QRAvalanche, Vertex, VertexId};
-    
+
     pub use crate::exchange::{
-        rUv, AccountId, ExchangeConfig, ExchangeConfigBuilder, Transaction,
-        BusinessPlanConfig, FeeRouter, PayoutConfig,
+        rUv, AccountId, BusinessPlanConfig, ExchangeConfig, ExchangeConfigBuilder, FeeRouter,
+        PayoutConfig, Transaction,
     };
 
     pub use crate::network::{peer::Peer, NetworkManager};

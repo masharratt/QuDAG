@@ -7,7 +7,7 @@ kill_signal = "SIGINT"
 kill_timeout = "5s"
 
 [build]
-  dockerfile = "../Dockerfile"
+  dockerfile = "../Dockerfile.mcp"
 
 [build.args]
   NODE_TYPE = "bootstrap"
@@ -22,6 +22,7 @@ kill_timeout = "5s"
   QUDAG_P2P_PORT = "4001"
   QUDAG_RPC_PORT = "8080"
   QUDAG_METRICS_PORT = "9090"
+  QUDAG_MCP_PORT = "3333"
   QUDAG_CONFIG_PATH = "/data/qudag/config.toml"
   # Bootstrap node specific
   QUDAG_BOOTSTRAP_MODE = "true"
@@ -98,6 +99,27 @@ kill_timeout = "5s"
     timeout = "5s"
     grace_period = "10s"
 
+# MCP Server endpoint
+[[services]]
+  internal_port = 3333
+  protocol = "tcp"
+  processes = ["app"]
+  
+  [[services.ports]]
+    port = 3333
+    handlers = ["http"]
+  
+  [[services.http_checks]]
+    interval = "30s"
+    timeout = "10s"
+    grace_period = "45s"
+    method = "GET"
+    path = "/mcp/info"
+    protocol = "http"
+    restart_limit = 3
+    [services.http_checks.headers]
+      X-Node-Type = "mcp-enabled"
+
 [metrics]
   port = 9090
   path = "/metrics"
@@ -112,21 +134,7 @@ kill_timeout = "5s"
   source = "qudag_data_node1"
   destination = "/data/qudag"
 
-[processes]
-  app = """
-    set -e
-    echo "Starting QuDAG Bootstrap Node (Toronto)..."
-    
-    # Copy configuration
-    cp /app/configs/node1.toml /data/qudag/config.toml
-    
-    # Ensure directories exist
-    mkdir -p /data/qudag/tls
-    mkdir -p /data/qudag/db
-    
-    # Start the node
-    exec /app/qudag-node --config /data/qudag/config.toml
-  """
+# Docker ENTRYPOINT handles process execution
 
 [[statics]]
   guest_path = "/app/configs/node1.toml"

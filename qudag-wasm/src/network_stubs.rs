@@ -1,10 +1,10 @@
 //! Network stub implementations for WASM
-//! 
+//!
 //! These are placeholder implementations for network functionality
 //! when building for WASM targets where real networking isn't available.
 
-use wasm_bindgen::prelude::*;
 use serde::{Deserialize, Serialize};
+use wasm_bindgen::prelude::*;
 
 /// Stub implementation of network node for WASM
 #[wasm_bindgen]
@@ -23,23 +23,25 @@ impl NetworkNode {
             port,
         }
     }
-    
+
     /// Get node ID
     #[wasm_bindgen(js_name = "getNodeId")]
     pub fn get_node_id(&self) -> String {
         self.node_id.clone()
     }
-    
+
     /// Start the node (no-op in WASM)
     pub async fn start(&self) -> Result<(), JsError> {
         web_sys::console::log_1(&format!("Network node {} started (stub)", self.node_id).into());
         Ok(())
     }
-    
+
     /// Connect to peer (no-op in WASM)
     #[wasm_bindgen(js_name = "connectToPeer")]
     pub async fn connect_to_peer(&self, _peer_address: &str) -> Result<(), JsError> {
-        Err(JsError::new("P2P networking not available in WASM. Use WebRTC or WebSocket proxy."))
+        Err(JsError::new(
+            "P2P networking not available in WASM. Use WebRTC or WebSocket proxy.",
+        ))
     }
 }
 
@@ -59,12 +61,12 @@ impl PeerInfo {
     pub fn get_peer_id(&self) -> String {
         self.peer_id.clone()
     }
-    
+
     /// Get peer address
     pub fn get_address(&self) -> String {
         self.address.clone()
     }
-    
+
     /// Get reputation score
     pub fn get_reputation(&self) -> f64 {
         self.reputation
@@ -88,21 +90,21 @@ impl NetworkManager {
             websocket_url: None,
         }
     }
-    
+
     /// Enable WebRTC for browser P2P
     #[wasm_bindgen(js_name = "enableWebRTC")]
     pub fn enable_webrtc(&mut self) {
         self.is_webrtc_enabled = true;
         web_sys::console::log_1(&"WebRTC enabled for P2P communication".into());
     }
-    
+
     /// Set WebSocket proxy URL
     #[wasm_bindgen(js_name = "setWebSocketProxy")]
     pub fn set_websocket_proxy(&mut self, url: String) {
         self.websocket_url = Some(url);
         web_sys::console::log_1(&format!("WebSocket proxy set to: {}", url).into());
     }
-    
+
     /// Get network stats (stub data)
     #[wasm_bindgen(js_name = "getNetworkStats")]
     pub fn get_network_stats(&self) -> Result<JsValue, JsError> {
@@ -115,7 +117,7 @@ impl NetworkManager {
             "websocket_proxy": self.websocket_url,
             "note": "Network features require WebRTC or WebSocket proxy in WASM"
         });
-        
+
         Ok(serde_wasm_bindgen::to_value(&stats)?)
     }
 }
@@ -133,27 +135,33 @@ impl OnionRouter {
     pub fn new(layers: u8) -> Self {
         Self { layers }
     }
-    
+
     /// Create onion message (returns mock encrypted data)
     #[wasm_bindgen(js_name = "createOnionMessage")]
-    pub fn create_onion_message(&self, message: &str, _path: Vec<String>) -> Result<Vec<u8>, JsError> {
+    pub fn create_onion_message(
+        &self,
+        message: &str,
+        _path: Vec<String>,
+    ) -> Result<Vec<u8>, JsError> {
         // In real implementation, this would create layered encryption
         // For WASM stub, just return a mock encrypted message
         let mock_encrypted = format!("ONION[{}]:{}", self.layers, message);
         Ok(mock_encrypted.as_bytes().to_vec())
     }
-    
+
     /// Decrypt onion layer (stub)
     #[wasm_bindgen(js_name = "decryptLayer")]
     pub fn decrypt_layer(&self, _data: &[u8]) -> Result<Vec<u8>, JsError> {
-        Err(JsError::new("Onion routing requires full network stack. Use server relay in WASM."))
+        Err(JsError::new(
+            "Onion routing requires full network stack. Use server relay in WASM.",
+        ))
     }
 }
 
 /// Export network-related types and functions for internal use
 pub mod internal {
     use super::*;
-    
+
     /// Create a mock peer for testing
     pub fn create_mock_peer(id: &str) -> PeerInfo {
         PeerInfo {
@@ -162,7 +170,7 @@ pub mod internal {
             reputation: 1.0,
         }
     }
-    
+
     /// Check if WebRTC is available in the browser
     pub fn is_webrtc_available() -> bool {
         // Check if RTCPeerConnection is available

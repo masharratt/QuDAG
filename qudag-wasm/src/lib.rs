@@ -4,12 +4,12 @@
 //! enabling browser and Node.js applications to interact with the
 //! quantum-resistant DAG network.
 
-use wasm_bindgen::prelude::*;
 use serde::{Deserialize, Serialize};
+use wasm_bindgen::prelude::*;
 
-// Core modules  
-pub mod utils;
+// Core modules
 pub mod error;
+pub mod utils;
 
 // WASM crypto implementation
 #[cfg(target_arch = "wasm32")]
@@ -70,7 +70,7 @@ pub fn init() {
     // Set panic hook for better error messages in the browser
     #[cfg(feature = "console_error_panic_hook")]
     console_error_panic_hook::set_once();
-    
+
     // Log initialization
     #[cfg(target_arch = "wasm32")]
     web_sys::console::log_1(&"QuDAG WASM initialized".into());
@@ -96,28 +96,28 @@ impl QuDAGClient {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
         let features = vec!["crypto".to_string()];
-        
+
         #[cfg(feature = "dag")]
         let features = {
             let mut f = features;
             f.push("dag".to_string());
             f
         };
-        
+
         #[cfg(feature = "full")]
         let features = {
             let mut f = features;
             f.push("full".to_string());
             f
         };
-        
+
         #[cfg(feature = "vault")]
         let features = {
             let mut f = features;
             f.push("vault".to_string());
             f
         };
-        
+
         Self {
             config: ClientConfig {
                 network_port: 8000,
@@ -127,12 +127,12 @@ impl QuDAGClient {
             },
         }
     }
-    
+
     /// Create a new QuDAG client with custom configuration
     #[wasm_bindgen(js_name = "newWithConfig")]
     pub fn new_with_config(config: JsValue) -> Result<QuDAGClient, JsError> {
         let mut config: ClientConfig = serde_wasm_bindgen::from_value(config)?;
-        
+
         // Update features based on compile-time flags
         let features = vec!["crypto".to_string()];
         #[cfg(feature = "dag")]
@@ -153,23 +153,23 @@ impl QuDAGClient {
             f.push("vault".to_string());
             f
         };
-        
+
         config.features = features;
         Ok(Self { config })
     }
-    
+
     /// Get the current configuration
     #[wasm_bindgen(js_name = "getConfig")]
     pub fn get_config(&self) -> Result<JsValue, JsError> {
         Ok(serde_wasm_bindgen::to_value(&self.config)?)
     }
-    
+
     /// Get library version
     #[wasm_bindgen(js_name = "getVersion")]
     pub fn get_version() -> String {
         String::from(env!("CARGO_PKG_VERSION"))
     }
-    
+
     /// Check if a feature is enabled
     #[wasm_bindgen(js_name = "hasFeature")]
     pub fn has_feature(feature: &str) -> bool {
@@ -183,7 +183,7 @@ impl QuDAGClient {
             _ => false,
         }
     }
-    
+
     /// Get list of enabled features
     #[wasm_bindgen(js_name = "getFeatures")]
     pub fn get_features(&self) -> Vec<String> {
@@ -205,12 +205,12 @@ impl QuDAGError {
     pub fn new(message: String, code: String) -> Self {
         Self { message, code }
     }
-    
+
     /// Get error message
     pub fn message(&self) -> String {
         self.message.clone()
     }
-    
+
     /// Get error code
     pub fn code(&self) -> String {
         self.code.clone()
@@ -247,12 +247,12 @@ impl InitStatus {
     pub fn is_initialized(&self) -> bool {
         self.initialized
     }
-    
+
     /// Get enabled features
     pub fn features(&self) -> Vec<String> {
         self.features.clone()
     }
-    
+
     /// Get version
     pub fn version(&self) -> String {
         self.version.clone()
@@ -263,35 +263,35 @@ impl InitStatus {
 #[wasm_bindgen(js_name = "getInitStatus")]
 pub fn get_init_status() -> InitStatus {
     let features = vec!["crypto".to_string()];
-    
+
     #[cfg(feature = "dag")]
     let features = {
         let mut f = features;
         f.push("dag".to_string());
         f
     };
-    
+
     #[cfg(feature = "full")]
     let features = {
         let mut f = features;
         f.push("full".to_string());
         f
     };
-    
+
     #[cfg(feature = "vault")]
     let features = {
         let mut f = features;
         f.push("vault".to_string());
         f
     };
-    
+
     #[cfg(target_arch = "wasm32")]
     let features = {
         let mut f = features;
         f.push("wasm".to_string());
         f
     };
-    
+
     InitStatus {
         initialized: true,
         features,

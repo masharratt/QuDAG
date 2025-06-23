@@ -7,13 +7,13 @@ use wasm_bindgen::JsError;
 pub enum WasmError {
     #[error("Crypto error: {0}")]
     CryptoError(String),
-    
+
     #[error("Invalid input: {0}")]
     InvalidInput(String),
-    
+
     #[error("Operation failed: {0}")]
     OperationFailed(String),
-    
+
     #[error("Not implemented: {0}")]
     NotImplemented(String),
 }

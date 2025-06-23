@@ -48,7 +48,9 @@ fn test_timing_resistance() {
     let keypair = MlDsaKeyPair::generate(&mut rng).expect("Signature key generation failed");
     let message = b"Test message";
     let signature = keypair.sign(message, &mut rng).expect("Signing failed");
-    let public_key = keypair.to_public_key().expect("Public key conversion failed");
+    let public_key = keypair
+        .to_public_key()
+        .expect("Public key conversion failed");
     let _ = public_key
         .verify(message, &signature)
         .expect("Verification failed");

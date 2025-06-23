@@ -3,9 +3,9 @@
 //! Provides comprehensive error handling for all core operations
 
 #[cfg(not(feature = "std"))]
-use alloc::{string::String, format};
+use alloc::{format, string::String};
 
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 
 /// Core error type for QuDAG Exchange operations
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -19,16 +19,16 @@ pub enum Error {
         /// Available amount
         available: u64,
     },
-    
+
     /// Account not found
     AccountNotFound(String),
-    
+
     /// Transaction validation failed
     InvalidTransaction(String),
-    
+
     /// Signature verification failed
     SignatureVerificationFailed,
-    
+
     /// Resource limit exceeded
     ResourceLimitExceeded {
         /// Type of resource
@@ -38,22 +38,22 @@ pub enum Error {
         /// Requested amount
         requested: u64,
     },
-    
+
     /// Consensus error
     ConsensusError(String),
-    
+
     /// State corruption detected
     StateCorruption(String),
-    
+
     /// Vault operation failed
     VaultError(String),
-    
+
     /// Serialization/deserialization error
     SerializationError(String),
-    
+
     /// Operation not supported
     NotSupported(String),
-    
+
     /// Generic error with message
     Other(String),
 }
@@ -67,7 +67,7 @@ impl Error {
             available,
         }
     }
-    
+
     /// Create a resource limit exceeded error
     pub fn resource_limit_exceeded(
         resource_type: impl Into<String>,
@@ -86,16 +86,30 @@ impl Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::InsufficientBalance { account, required, available } => {
-                write!(f, "Insufficient balance for account {}: required {}, available {}", 
-                    account, required, available)
+            Self::InsufficientBalance {
+                account,
+                required,
+                available,
+            } => {
+                write!(
+                    f,
+                    "Insufficient balance for account {}: required {}, available {}",
+                    account, required, available
+                )
             }
             Self::AccountNotFound(id) => write!(f, "Account not found: {}", id),
             Self::InvalidTransaction(msg) => write!(f, "Invalid transaction: {}", msg),
             Self::SignatureVerificationFailed => write!(f, "Signature verification failed"),
-            Self::ResourceLimitExceeded { resource_type, limit, requested } => {
-                write!(f, "Resource limit exceeded for {}: limit {}, requested {}",
-                    resource_type, limit, requested)
+            Self::ResourceLimitExceeded {
+                resource_type,
+                limit,
+                requested,
+            } => {
+                write!(
+                    f,
+                    "Resource limit exceeded for {}: limit {}, requested {}",
+                    resource_type, limit, requested
+                )
             }
             Self::ConsensusError(msg) => write!(f, "Consensus error: {}", msg),
             Self::StateCorruption(msg) => write!(f, "State corruption: {}", msg),
@@ -123,12 +137,16 @@ pub type Result<T> = core::result::Result<T, Error>;
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_error_creation() {
         let err = Error::insufficient_balance("alice", 100, 50);
         match err {
-            Error::InsufficientBalance { account, required, available } => {
+            Error::InsufficientBalance {
+                account,
+                required,
+                available,
+            } => {
                 assert_eq!(account, "alice");
                 assert_eq!(required, 100);
                 assert_eq!(available, 50);
@@ -136,7 +154,7 @@ mod tests {
             _ => panic!("Wrong error type"),
         }
     }
-    
+
     #[test]
     fn test_error_serialization() {
         let err = Error::AccountNotFound("bob".to_string());

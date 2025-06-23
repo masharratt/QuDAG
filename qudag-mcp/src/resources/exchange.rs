@@ -23,7 +23,9 @@ impl ExchangeResource {
         Self {
             uri: "exchange://".to_string(),
             name: "QuDAG Exchange".to_string(),
-            description: "Access to QuDAG Exchange account balances, transactions, and network status".to_string(),
+            description:
+                "Access to QuDAG Exchange account balances, transactions, and network status"
+                    .to_string(),
         }
     }
 }
@@ -63,30 +65,20 @@ impl McpResource for ExchangeResource {
 
     async fn read(&self, uri: &ResourceURI) -> Result<Vec<ResourceContent>> {
         let uri_str = uri.as_str();
-        
+
         if !uri_str.starts_with("exchange://") {
             return Err(Error::resource("exchange", "Invalid exchange URI"));
         }
 
         // Parse the path component
         let path = uri_str.strip_prefix("exchange://").unwrap_or("");
-        
+
         let content = match path {
-            "accounts" | "accounts/" => {
-                self.get_accounts_list().await?
-            }
-            "balances" | "balances/" => {
-                self.get_all_balances().await?
-            }
-            "transactions" | "transactions/" => {
-                self.get_recent_transactions().await?
-            }
-            "supply" | "supply/" => {
-                self.get_supply_info().await?
-            }
-            "status" | "status/" => {
-                self.get_network_status().await?
-            }
+            "accounts" | "accounts/" => self.get_accounts_list().await?,
+            "balances" | "balances/" => self.get_all_balances().await?,
+            "transactions" | "transactions/" => self.get_recent_transactions().await?,
+            "supply" | "supply/" => self.get_supply_info().await?,
+            "status" | "status/" => self.get_network_status().await?,
             path if path.starts_with("accounts/") => {
                 let account_id = path.strip_prefix("accounts/").unwrap();
                 self.get_account_info(account_id).await?
@@ -95,11 +87,12 @@ impl McpResource for ExchangeResource {
                 let account_id = path.strip_prefix("balances/").unwrap();
                 self.get_account_balance(account_id).await?
             }
-            "" => {
-                self.get_exchange_overview().await?
-            }
+            "" => self.get_exchange_overview().await?,
             _ => {
-                return Err(Error::resource("exchange", "Unknown exchange resource path"));
+                return Err(Error::resource(
+                    "exchange",
+                    "Unknown exchange resource path",
+                ));
             }
         };
 
@@ -144,7 +137,7 @@ impl ExchangeResource {
             "byzantine_tolerance": "f < n/3",
             "available_endpoints": [
                 "exchange://accounts",
-                "exchange://balances", 
+                "exchange://balances",
                 "exchange://transactions",
                 "exchange://supply",
                 "exchange://status"
@@ -168,7 +161,7 @@ impl ExchangeResource {
                     "status": "active"
                 },
                 {
-                    "account_id": "bob", 
+                    "account_id": "bob",
                     "balance": 500,
                     "created_at": "2024-01-01T00:00:00Z",
                     "last_activity": chrono::Utc::now().to_rfc3339(),
@@ -224,7 +217,7 @@ impl ExchangeResource {
                 },
                 {
                     "account_id": "bob",
-                    "balance": 500, 
+                    "balance": 500,
                     "unit": "rUv"
                 }
             ],
@@ -265,7 +258,7 @@ impl ExchangeResource {
                     "id": "tx_001",
                     "type": "transfer",
                     "from": "alice",
-                    "to": "bob", 
+                    "to": "bob",
                     "amount": 150,
                     "unit": "rUv",
                     "timestamp": chrono::Utc::now().to_rfc3339(),
@@ -288,7 +281,7 @@ impl ExchangeResource {
                 },
                 {
                     "id": "mint_002",
-                    "type": "mint", 
+                    "type": "mint",
                     "to": "bob",
                     "amount": 500,
                     "unit": "rUv",
