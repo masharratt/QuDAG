@@ -13,10 +13,10 @@ use toml;
 pub enum ConfigError {
     #[error("Failed to read configuration file: {0}")]
     ReadError(#[from] std::io::Error),
-    
+
     #[error("Failed to parse configuration: {0}")]
     ParseError(#[from] toml::de::Error),
-    
+
     #[error("Invalid configuration: {0}")]
     InvalidConfig(String),
 }
@@ -125,13 +125,13 @@ impl OptimizationConfig {
     pub fn from_file<P: AsRef<Path>>(path: P) -> Result<Self, ConfigError> {
         let contents = std::fs::read_to_string(path)?;
         let mut config: Self = toml::from_str(&contents)?;
-        
+
         // Apply environment variable overrides
         config.apply_env_overrides();
-        
+
         Ok(config)
     }
-    
+
     /// Load default configuration
     pub fn default() -> Self {
         Self {
@@ -185,14 +185,14 @@ impl OptimizationConfig {
             },
         }
     }
-    
+
     /// Apply environment variable overrides
     fn apply_env_overrides(&mut self) {
         // Global
         if let Ok(val) = env::var("QUDAG_ENABLE_OPTIMIZATIONS") {
             self.global.enable_optimizations = val.parse().unwrap_or(true);
         }
-        
+
         // Network - Message Chunking
         if let Ok(val) = env::var("QUDAG_NETWORK_MESSAGE_CHUNKING_ENABLED") {
             self.network.message_chunking.enabled = val.parse().unwrap_or(true);
@@ -202,7 +202,7 @@ impl OptimizationConfig {
                 self.network.message_chunking.max_chunk_size = size;
             }
         }
-        
+
         // DAG - Validation Cache
         if let Ok(val) = env::var("QUDAG_DAG_VALIDATION_CACHE_ENABLED") {
             self.dag.validation_cache.enabled = val.parse().unwrap_or(true);
@@ -212,7 +212,7 @@ impl OptimizationConfig {
                 self.dag.validation_cache.max_entries = entries;
             }
         }
-        
+
         // Swarm - Async Coordination
         if let Ok(val) = env::var("QUDAG_SWARM_ASYNC_COORDINATION_ENABLED") {
             self.swarm.async_coordination.enabled = val.parse().unwrap_or(true);
@@ -223,13 +223,13 @@ impl OptimizationConfig {
             }
         }
     }
-    
+
     /// Check if a specific optimization is enabled
     pub fn is_enabled(&self, optimization: &str) -> bool {
         if !self.global.enable_optimizations {
             return false;
         }
-        
+
         match optimization {
             "message_chunking" => self.network.message_chunking.enabled,
             "adaptive_batching" => self.network.adaptive_batching.enabled,
@@ -244,7 +244,7 @@ impl OptimizationConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[test]
     fn test_default_config() {
         let config = OptimizationConfig::default();
@@ -252,7 +252,7 @@ mod tests {
         assert!(config.network.message_chunking.enabled);
         assert_eq!(config.network.message_chunking.max_chunk_size, 65536);
     }
-    
+
     #[test]
     fn test_is_enabled() {
         let config = OptimizationConfig::default();

@@ -11,6 +11,15 @@ use tokio::signal;
 use tokio::sync::RwLock;
 use tracing::{error, info};
 use tracing_subscriber::fmt::format::FmtSpan;
+use axum::{
+    routing::{get},
+    Router,
+    Json,
+    http::StatusCode,
+};
+use serde::{Deserialize, Serialize};
+use std::net::SocketAddr;
+use tower_http::cors::CorsLayer;
 
 // Import the CLI module for peer management
 // (CLI module is available as crate root)
@@ -22,6 +31,52 @@ pub struct NodeConfig {
     pub network_port: u16,
     pub max_peers: usize,
     pub initial_peers: Vec<String>,
+    pub http_port: Option<u16>,
+}
+
+// Health and status response structures
+#[derive(Serialize)]
+struct HealthResponse {
+    status: String,
+    version: String,
+    timestamp: u64,
+    p2p_status: String,
+    dag_status: String,
+}
+
+#[derive(Serialize)]
+struct MetricsResponse {
+    // Basic metrics
+    node_uptime_seconds: u64,
+    peer_count: usize,
+    dag_vertex_count: usize,
+    messages_processed: u64,
+    
+    // Network metrics
+    network_bytes_in: u64,
+    network_bytes_out: u64,
+    
+    // P2P metrics
+    p2p_connections_active: usize,
+    p2p_connections_total: u64,
+}
+
+#[derive(Serialize)]
+struct StatusResponse {
+    node_id: String,
+    version: String,
+    network_port: u16,
+    http_port: u16,
+    peers: Vec<String>,
+    dag_info: DagInfo,
+    uptime: u64,
+}
+
+#[derive(Serialize)]
+struct DagInfo {
+    vertex_count: usize,
+    tips_count: usize,
+    last_update: u64,
 }
 
 #[derive(Parser)]
@@ -477,6 +532,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     network_port: port,
                     max_peers: 50,
                     initial_peers: peers,
+                    http_port: Some(8080), // Default HTTP port
                 };
 
                 // Start the real node
@@ -558,6 +614,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                 network_port: port,
                 max_peers: 50,
                 initial_peers: peer,
+                http_port: Some(8080), // Default HTTP port
             };
 
             // Start the real node runner
@@ -1081,8 +1138,64 @@ async fn run_node(node_config: NodeConfig) -> Result<(), Box<dyn std::error::Err
 
     let p2p_handle = Arc::new(p2p_handle);
 
+    // Set up metrics tracking
+    let node_start_time = std::time::Instant::now();
+    let messages_processed = Arc::new(RwLock::new(0u64));
+    let messages_counter = Arc::clone(&messages_processed);
+    
+    // Start HTTP server if configured
+    let http_handle = if let Some(http_port) = node_config.http_port {
+        let http_addr = SocketAddr::from(([0, 0, 0, 0], http_port));
+        
+        // Clone shared state for HTTP handlers
+        let http_dag = Arc::clone(&dag);
+        let http_p2p = Arc::clone(&p2p_handle);
+        let http_messages = Arc::clone(&messages_processed);
+        let http_start_time = node_start_time.clone();
+        
+        // Build HTTP router
+        let app = Router::new()
+            .route("/health", get({
+                let dag = Arc::clone(&http_dag);
+                let p2p = Arc::clone(&http_p2p);
+                move || health_handler(dag, p2p)
+            }))
+            .route("/metrics", get({
+                let dag = Arc::clone(&http_dag);
+                let p2p = Arc::clone(&http_p2p);
+                let messages = Arc::clone(&http_messages);
+                let start_time = http_start_time.clone();
+                move || metrics_handler(dag, p2p, messages, start_time)
+            }))
+            .route("/api/v1/status", get({
+                let dag = Arc::clone(&http_dag);
+                let p2p = Arc::clone(&http_p2p);
+                let start_time = http_start_time.clone();
+                let port = node_config.network_port;
+                let http_port = http_port;
+                move || status_handler(dag, p2p, start_time, port, http_port)
+            }))
+            .layer(CorsLayer::permissive());
+        
+        let http_server = async move {
+            info!("Starting HTTP API server on {}", http_addr);
+            let listener = tokio::net::TcpListener::bind(http_addr).await
+                .map_err(|e| format!("Failed to bind HTTP server: {}", e))?;
+            axum::serve(listener, app).await
+                .map_err(|e| format!("HTTP server error: {}", e))?;
+            Ok::<(), Box<dyn std::error::Error>>(())
+        };
+        
+        Some(tokio::spawn(http_server))
+    } else {
+        None
+    };
+    
     println!("✓ QuDAG node started successfully");
-    println!("  P2P networking: Active");
+    println!("  P2P networking: Active on port {}", node_config.network_port);
+    if let Some(http_port) = node_config.http_port {
+        println!("  HTTP API: Active on port {}", http_port);
+    }
     println!("  DAG consensus: Active");
     println!("  Dark resolver: Active");
     println!();
@@ -1164,6 +1277,9 @@ async fn run_node(node_config: NodeConfig) -> Result<(), Box<dyn std::error::Err
 
                         if let Err(e) = dag_lock.submit_message(message).await {
                             error!("Failed to submit message to DAG: {}", e);
+                        } else {
+                            // Increment messages processed counter
+                            *messages_counter.write().await += 1;
                         }
                     }
                     qudag_network::P2PEvent::PeerConnected(peer_id) => {
@@ -1205,6 +1321,103 @@ async fn run_node(node_config: NodeConfig) -> Result<(), Box<dyn std::error::Err
 
     info!("Node event loop stopped");
     Ok(())
+}
+
+// HTTP Handler functions
+async fn health_handler(
+    dag: Arc<RwLock<Dag>>,
+    p2p: Arc<qudag_network::P2PHandle>,
+) -> Json<HealthResponse> {
+    let dag_lock = dag.read().await;
+    let vertices_guard = dag_lock.vertices.read().await;
+    let vertex_count = vertices_guard.len();
+    drop(vertices_guard);
+    drop(dag_lock);
+    
+    let peer_count = p2p.peer_count().await;
+    
+    Json(HealthResponse {
+        status: "healthy".to_string(),
+        version: env!("CARGO_PKG_VERSION").to_string(),
+        timestamp: std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_secs(),
+        p2p_status: if peer_count > 0 { "connected" } else { "listening" }.to_string(),
+        dag_status: format!("{} vertices", vertex_count),
+    })
+}
+
+async fn metrics_handler(
+    dag: Arc<RwLock<Dag>>,
+    p2p: Arc<qudag_network::P2PHandle>,
+    messages_processed: Arc<RwLock<u64>>,
+    start_time: std::time::Instant,
+) -> String {
+    let dag_lock = dag.read().await;
+    let vertices_guard = dag_lock.vertices.read().await;
+    let vertex_count = vertices_guard.len();
+    drop(vertices_guard);
+    drop(dag_lock);
+    
+    let peer_count = p2p.peer_count().await;
+    let messages = *messages_processed.read().await;
+    let uptime = start_time.elapsed().as_secs();
+    
+    // Format as Prometheus metrics
+    format!(
+        "# HELP node_uptime_seconds Node uptime in seconds\n\
+         # TYPE node_uptime_seconds counter\n\
+         node_uptime_seconds {}\n\
+         \n\
+         # HELP peer_count Number of connected peers\n\
+         # TYPE peer_count gauge\n\
+         peer_count {}\n\
+         \n\
+         # HELP dag_vertex_count Number of vertices in DAG\n\
+         # TYPE dag_vertex_count gauge\n\
+         dag_vertex_count {}\n\
+         \n\
+         # HELP messages_processed_total Total messages processed\n\
+         # TYPE messages_processed_total counter\n\
+         messages_processed_total {}\n",
+        uptime, peer_count, vertex_count, messages
+    )
+}
+
+async fn status_handler(
+    dag: Arc<RwLock<Dag>>,
+    p2p: Arc<qudag_network::P2PHandle>,
+    start_time: std::time::Instant,
+    network_port: u16,
+    http_port: u16,
+) -> Json<StatusResponse> {
+    let dag_lock = dag.read().await;
+    let vertices_guard = dag_lock.vertices.read().await;
+    let vertex_count = vertices_guard.len();
+    drop(vertices_guard);
+    drop(dag_lock);
+    
+    let peer_count = p2p.peer_count().await;
+    let peers = p2p.connected_peers().await;
+    let uptime = start_time.elapsed().as_secs();
+    
+    Json(StatusResponse {
+        node_id: p2p.local_peer_id().await.to_string(),
+        version: env!("CARGO_PKG_VERSION").to_string(),
+        network_port,
+        http_port,
+        peers: peers.into_iter().map(|p| p.to_string()).collect(),
+        dag_info: DagInfo {
+            vertex_count,
+            tips_count: 0, // TODO: implement tips tracking
+            last_update: std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap()
+                .as_secs(),
+        },
+        uptime,
+    })
 }
 
 /// Stop a running node via RPC or process signal

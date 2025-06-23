@@ -18,29 +18,29 @@ use std::time::Instant;
 #[cfg(test)]
 pub fn run_all_tests() -> TestReport {
     println!("Running QuDAG Vault Test Suite...\n");
-    
+
     let start = Instant::now();
     let mut report = TestReport::new();
-    
+
     // Run unit tests
     println!("Running unit tests...");
     report.unit_tests = run_unit_tests();
-    
+
     // Run integration tests
     println!("Running integration tests...");
     report.integration_tests = run_integration_tests();
-    
+
     // Run security tests
     println!("Running security tests...");
     report.security_tests = run_security_tests();
-    
+
     // Run CLI tests
     println!("Running CLI tests...");
     report.cli_tests = run_cli_tests();
-    
+
     report.total_duration = start.elapsed();
     report.generate_summary();
-    
+
     report
 }
 
@@ -82,15 +82,21 @@ impl TestReport {
             summary: String::new(),
         }
     }
-    
+
     fn generate_summary(&mut self) {
-        let total_tests = self.unit_tests.total + self.integration_tests.total + 
-                         self.security_tests.total + self.cli_tests.total;
-        let total_passed = self.unit_tests.passed + self.integration_tests.passed + 
-                          self.security_tests.passed + self.cli_tests.passed;
-        let total_failed = self.unit_tests.failed + self.integration_tests.failed + 
-                          self.security_tests.failed + self.cli_tests.failed;
-        
+        let total_tests = self.unit_tests.total
+            + self.integration_tests.total
+            + self.security_tests.total
+            + self.cli_tests.total;
+        let total_passed = self.unit_tests.passed
+            + self.integration_tests.passed
+            + self.security_tests.passed
+            + self.cli_tests.passed;
+        let total_failed = self.unit_tests.failed
+            + self.integration_tests.failed
+            + self.security_tests.failed
+            + self.cli_tests.failed;
+
         self.summary = format!(
             r#"
 QuDAG Vault Test Report
@@ -121,26 +127,36 @@ Coverage Areas:
 Issues Found:
 "#,
             total_tests,
-            total_passed, (total_passed as f64 / total_tests as f64) * 100.0,
-            total_failed, (total_failed as f64 / total_tests as f64) * 100.0,
+            total_passed,
+            (total_passed as f64 / total_tests as f64) * 100.0,
+            total_failed,
+            (total_failed as f64 / total_tests as f64) * 100.0,
             self.total_duration.as_secs_f64(),
-            self.unit_tests.total, self.unit_tests.passed, self.unit_tests.failed, 
+            self.unit_tests.total,
+            self.unit_tests.passed,
+            self.unit_tests.failed,
             self.unit_tests.duration.as_secs_f64(),
-            self.integration_tests.total, self.integration_tests.passed, 
-            self.integration_tests.failed, self.integration_tests.duration.as_secs_f64(),
-            self.security_tests.total, self.security_tests.passed, 
-            self.security_tests.failed, self.security_tests.duration.as_secs_f64(),
-            self.cli_tests.total, self.cli_tests.passed, self.cli_tests.failed, 
+            self.integration_tests.total,
+            self.integration_tests.passed,
+            self.integration_tests.failed,
+            self.integration_tests.duration.as_secs_f64(),
+            self.security_tests.total,
+            self.security_tests.passed,
+            self.security_tests.failed,
+            self.security_tests.duration.as_secs_f64(),
+            self.cli_tests.total,
+            self.cli_tests.passed,
+            self.cli_tests.failed,
             self.cli_tests.duration.as_secs_f64(),
         );
-        
+
         // Add failures to summary
         let mut all_failures = vec![];
         all_failures.extend(&self.unit_tests.failures);
         all_failures.extend(&self.integration_tests.failures);
         all_failures.extend(&self.security_tests.failures);
         all_failures.extend(&self.cli_tests.failures);
-        
+
         if all_failures.is_empty() {
             self.summary.push_str("None - All tests passed!\n");
         } else {

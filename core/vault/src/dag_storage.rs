@@ -1,12 +1,15 @@
-//! DAG-based storage for vault secrets with optional QuDAG integration.
+//! DAG-based storage for vault secrets with QuDAG integration.
 
-// For initial standalone publishing, we'll use String as VertexId
+#[cfg(feature = "qudag-integration")]
+use qudag_dag::VertexId;
+
+#[cfg(not(feature = "qudag-integration"))]
 /// Simple vertex ID for standalone mode
 pub type VertexId = String;
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet, VecDeque};
 use tracing::{debug, info, trace};
-use chrono::{DateTime, Utc};
 
 use crate::{
     crypto::VaultCrypto,
@@ -58,12 +61,12 @@ impl VaultDag {
         let root_id = VertexId::new();
         let now = Utc::now();
         info!("Created new vault DAG with root ID: {:?}", root_id);
-        
+
         let mut created_at_map = HashMap::new();
         let mut updated_at_map = HashMap::new();
         created_at_map.insert(root_id.clone(), now);
         updated_at_map.insert(root_id.clone(), now);
-        
+
         Self {
             root_id,
             secrets: HashMap::new(),
@@ -93,7 +96,7 @@ impl VaultDag {
         // Encrypt the secret
         let serialized = bincode::serialize(&secret)?;
         let encrypted_data = crypto.encrypt(&serialized)?;
-        
+
         let encrypted_secret = EncryptedSecret {
             encrypted_data,
             metadata: secret.metadata.clone(),
@@ -123,15 +126,16 @@ impl VaultDag {
 
         // Store label before moving secret
         let label = secret.label.clone();
-        
+
         // Update maps
         let now = Utc::now();
         self.secrets.insert(vertex_id.clone(), encrypted_secret);
         self.label_index.insert(secret.label, vertex_id.clone());
-        self.parent_map.insert(vertex_id.clone(), parent_ids.clone());
+        self.parent_map
+            .insert(vertex_id.clone(), parent_ids.clone());
         self.created_at_map.insert(vertex_id.clone(), now);
         self.updated_at_map.insert(vertex_id.clone(), now);
-        
+
         // Update child maps and parent timestamps
         for parent_id in &parent_ids {
             self.child_map
@@ -159,7 +163,7 @@ impl VaultDag {
 
         let serialized = bincode::serialize(&category)?;
         let encrypted_data = crypto.encrypt(&serialized)?;
-        
+
         let encrypted_secret = EncryptedSecret {
             encrypted_data,
             metadata: category.metadata,
@@ -169,20 +173,21 @@ impl VaultDag {
         let vertex_id = VertexId::new();
         let now = Utc::now();
         self.secrets.insert(vertex_id.clone(), encrypted_secret);
-        self.label_index.insert(label.to_string(), vertex_id.clone());
+        self.label_index
+            .insert(label.to_string(), vertex_id.clone());
         self.created_at_map.insert(vertex_id.clone(), now);
         self.updated_at_map.insert(vertex_id.clone(), now);
-        
+
         // Categories attach to root by default
         let mut parents = HashSet::new();
         parents.insert(self.root_id.clone());
         self.parent_map.insert(vertex_id.clone(), parents);
-        
+
         self.child_map
             .entry(self.root_id.clone())
             .or_insert_with(HashSet::new)
             .insert(vertex_id.clone());
-        
+
         // Update root timestamp
         self.updated_at_map.insert(self.root_id.clone(), now);
 
@@ -191,11 +196,7 @@ impl VaultDag {
     }
 
     /// Get a secret by its label.
-    pub fn get_secret(
-        &self,
-        label: &str,
-        crypto: &VaultCrypto,
-    ) -> VaultResult<SecretEntry> {
+    pub fn get_secret(&self, label: &str, crypto: &VaultCrypto) -> VaultResult<SecretEntry> {
         let vertex_id = self
             .label_index
             .get(label)
@@ -208,7 +209,7 @@ impl VaultDag {
 
         let decrypted = crypto.decrypt(&encrypted.encrypted_data)?;
         let secret: SecretEntry = bincode::deserialize(&decrypted)?;
-        
+
         // Update access time
         trace!("Retrieved secret '{}'", label);
         Ok(secret)
@@ -262,7 +263,7 @@ impl VaultDag {
         // Encrypt the updated secret
         let serialized = bincode::serialize(&new_secret)?;
         let encrypted_data = crypto.encrypt(&serialized)?;
-        
+
         let encrypted_secret = EncryptedSecret {
             encrypted_data,
             metadata: new_secret.metadata.clone(),
@@ -270,7 +271,7 @@ impl VaultDag {
         };
 
         self.secrets.insert(vertex_id.clone(), encrypted_secret);
-        
+
         // Update label index if label changed
         if label != &new_secret.label {
             self.label_index.remove(label);
@@ -294,7 +295,7 @@ impl VaultDag {
         self.label_index.remove(label);
         self.created_at_map.remove(&vertex_id);
         self.updated_at_map.remove(&vertex_id);
-        
+
         // Remove from parent-child relationships
         if let Some(parents) = self.parent_map.remove(&vertex_id) {
             for parent_id in parents {
@@ -329,14 +330,14 @@ impl VaultDag {
     pub fn find_descendants(&self, id: &VertexId) -> VaultResult<HashSet<VertexId>> {
         let mut descendants = HashSet::new();
         let mut queue = VecDeque::new();
-        
+
         if let Some(children) = self.child_map.get(id) {
             queue.extend(children.iter().cloned());
         } else {
             // It's valid for a node to have no children
             return Ok(descendants);
         }
-        
+
         while let Some(node_id) = queue.pop_front() {
             if descendants.insert(node_id.clone()) {
                 if let Some(children) = self.child_map.get(&node_id) {
@@ -344,23 +345,23 @@ impl VaultDag {
                 }
             }
         }
-        
+
         trace!("Found {} descendants for node", descendants.len());
         Ok(descendants)
     }
-    
+
     /// Find all ancestors of a node.
     pub fn find_ancestors(&self, id: &VertexId) -> VaultResult<HashSet<VertexId>> {
         let mut ancestors = HashSet::new();
         let mut queue = VecDeque::new();
-        
+
         if let Some(parents) = self.parent_map.get(id) {
             queue.extend(parents.iter().cloned());
         } else {
             // It's valid for a node to have no parents (except root)
             return Ok(ancestors);
         }
-        
+
         while let Some(node_id) = queue.pop_front() {
             if ancestors.insert(node_id.clone()) {
                 if let Some(parents) = self.parent_map.get(&node_id) {
@@ -368,26 +369,26 @@ impl VaultDag {
                 }
             }
         }
-        
+
         trace!("Found {} ancestors for node", ancestors.len());
         Ok(ancestors)
     }
-    
+
     /// Check if adding an edge would create a cycle.
     pub fn would_create_cycle(&self, from: &VertexId, to: &VertexId) -> VaultResult<bool> {
         // Check if 'to' is an ancestor of 'from'
         if from == to {
             return Ok(true);
         }
-        
+
         let ancestors = self.find_ancestors(from)?;
         Ok(ancestors.contains(to))
     }
-    
+
     /// List all nodes at a specific depth from root.
     pub fn list_at_depth(&self, depth: usize) -> Vec<VertexId> {
         let mut current_level = vec![self.root_id.clone()];
-        
+
         for _ in 0..depth {
             let mut next_level = Vec::new();
             for node_id in current_level {
@@ -396,40 +397,38 @@ impl VaultDag {
                 }
             }
             current_level = next_level;
-            
+
             if current_level.is_empty() {
                 break;
             }
         }
-        
+
         debug!("Found {} nodes at depth {}", current_level.len(), depth);
         current_level
     }
-    
+
     /// Get the creation timestamp of a node.
     pub fn get_created_at(&self, id: &VertexId) -> Option<&DateTime<Utc>> {
         self.created_at_map.get(id)
     }
-    
+
     /// Get the last update timestamp of a node.
     pub fn get_updated_at(&self, id: &VertexId) -> Option<&DateTime<Utc>> {
         self.updated_at_map.get(id)
     }
-    
+
     /// Get the total number of nodes including root.
     pub fn node_count(&self) -> usize {
         self.secrets.len() + 1 // +1 for root
     }
-    
+
     /// Get all labeled nodes with their metadata.
     pub fn labeled_nodes(&self) -> Vec<(String, DateTime<Utc>, DateTime<Utc>)> {
         self.label_index
             .iter()
             .filter_map(|(label, id)| {
                 match (self.created_at_map.get(id), self.updated_at_map.get(id)) {
-                    (Some(created), Some(updated)) => {
-                        Some((label.clone(), *created, *updated))
-                    }
+                    (Some(created), Some(updated)) => Some((label.clone(), *created, *updated)),
                     _ => None,
                 }
             })
@@ -462,17 +461,23 @@ impl VaultDag {
 
     /// Deserialize a vault DAG from storage.
     pub fn deserialize(data: SerializedVaultDag) -> VaultResult<Self> {
-        // Convert hex string to bytes for VertexId
-        let root_bytes = hex::decode(&data.root_id)
-            .map_err(|_| VaultError::InvalidFormat("Invalid root ID".to_string()))?;
-        let root_id = VertexId::from_bytes(root_bytes);
+        // Convert hex string to VertexId
+        #[cfg(feature = "qudag-integration")]
+        let root_id = {
+            let root_bytes = hex::decode(&data.root_id)
+                .map_err(|_| VaultError::InvalidFormat("Invalid root ID".to_string()))?;
+            VertexId::from_bytes(root_bytes)
+        };
+
+        #[cfg(not(feature = "qudag-integration"))]
+        let root_id = data.root_id;
 
         let now = Utc::now();
         let mut created_at_map = HashMap::new();
         let mut updated_at_map = HashMap::new();
         created_at_map.insert(root_id.clone(), now);
         updated_at_map.insert(root_id.clone(), now);
-        
+
         let mut dag = Self {
             root_id,
             secrets: HashMap::new(),
@@ -484,10 +489,17 @@ impl VaultDag {
         };
 
         for vertex in data.vertices {
-            let vertex_bytes = hex::decode(&vertex.id)
-                .map_err(|_| VaultError::InvalidFormat("Invalid vertex ID".to_string()))?;
-            let vertex_id = VertexId::from_bytes(vertex_bytes);
+            #[cfg(feature = "qudag-integration")]
+            let vertex_id = {
+                let vertex_bytes = hex::decode(&vertex.id)
+                    .map_err(|_| VaultError::InvalidFormat("Invalid vertex ID".to_string()))?;
+                VertexId::from_bytes(vertex_bytes)
+            };
 
+            #[cfg(not(feature = "qudag-integration"))]
+            let vertex_id = vertex.id;
+
+            #[cfg(feature = "qudag-integration")]
             let parent_ids: HashSet<VertexId> = vertex
                 .parents
                 .iter()
@@ -495,10 +507,15 @@ impl VaultDag {
                 .map(VertexId::from_bytes)
                 .collect();
 
-            dag.secrets.insert(vertex_id.clone(), vertex.encrypted_secret.clone());
-            dag.label_index.insert(vertex.encrypted_secret.label.clone(), vertex_id.clone());
+            #[cfg(not(feature = "qudag-integration"))]
+            let parent_ids: HashSet<VertexId> = vertex.parents.iter().cloned().collect();
+
+            dag.secrets
+                .insert(vertex_id.clone(), vertex.encrypted_secret.clone());
+            dag.label_index
+                .insert(vertex.encrypted_secret.label.clone(), vertex_id.clone());
             dag.parent_map.insert(vertex_id.clone(), parent_ids.clone());
-            
+
             // Add timestamps for deserialized nodes (using current time since we don't persist them)
             dag.created_at_map.insert(vertex_id.clone(), now);
             dag.updated_at_map.insert(vertex_id.clone(), now);
@@ -537,15 +554,15 @@ mod tests {
     fn test_add_and_get_secret() {
         let mut dag = VaultDag::new();
         let crypto = VaultCrypto::new().unwrap();
-        
+
         let secret = SecretEntry::new(
             "test/secret".to_string(),
             "user".to_string(),
             "password".to_string(),
         );
-        
+
         dag.add_secret(secret.clone(), &crypto, vec![]).unwrap();
-        
+
         let retrieved = dag.get_secret("test/secret", &crypto).unwrap();
         assert_eq!(retrieved.label, secret.label);
         assert_eq!(retrieved.username, secret.username);
@@ -555,7 +572,7 @@ mod tests {
     fn test_list_secrets() {
         let mut dag = VaultDag::new();
         let crypto = VaultCrypto::new().unwrap();
-        
+
         // Add secrets
         for i in 1..=3 {
             let secret = SecretEntry::new(
@@ -565,7 +582,7 @@ mod tests {
             );
             dag.add_secret(secret, &crypto, vec![]).unwrap();
         }
-        
+
         let secrets = dag.list_secrets(None).unwrap();
         assert_eq!(secrets.len(), 3);
         assert!(secrets.contains(&"secret1".to_string()));
@@ -577,40 +594,48 @@ mod tests {
     fn test_dag_operations() {
         let mut dag = VaultDag::new();
         let crypto = VaultCrypto::new().unwrap();
-        
+
         // Add category
         let category_id = dag.create_category("work", &crypto).unwrap();
-        
+
         // Add secrets under category
-        let secret1 = SecretEntry::new("email".to_string(), "user1".to_string(), "pass1".to_string());
+        let secret1 = SecretEntry::new(
+            "email".to_string(),
+            "user1".to_string(),
+            "pass1".to_string(),
+        );
         let secret2 = SecretEntry::new("vpn".to_string(), "user2".to_string(), "pass2".to_string());
-        
-        let id1 = dag.add_secret(secret1, &crypto, vec!["work".to_string()]).unwrap();
-        let id2 = dag.add_secret(secret2, &crypto, vec!["work".to_string()]).unwrap();
-        
+
+        let id1 = dag
+            .add_secret(secret1, &crypto, vec!["work".to_string()])
+            .unwrap();
+        let id2 = dag
+            .add_secret(secret2, &crypto, vec!["work".to_string()])
+            .unwrap();
+
         // Test descendants
         let descendants = dag.find_descendants(&category_id).unwrap();
         assert_eq!(descendants.len(), 2);
         assert!(descendants.contains(&id1));
         assert!(descendants.contains(&id2));
-        
+
         // Test ancestors (should include category and root)
         let ancestors = dag.find_ancestors(&id1).unwrap();
         assert_eq!(ancestors.len(), 2); // category + root
         assert!(ancestors.contains(&category_id));
         assert!(ancestors.contains(&dag.root_id));
-        
+
         // Test cycle detection
         assert!(dag.would_create_cycle(&id1, &category_id).unwrap()); // Would create cycle
         assert!(!dag.would_create_cycle(&category_id, &id1).unwrap()); // Would not create cycle
-        
+
         // Test depth listing
         let depth_0 = dag.list_at_depth(0);
         assert_eq!(depth_0.len(), 1); // Only root
-        
+
         let depth_1 = dag.list_at_depth(1);
         assert!(depth_1.contains(&category_id));
-        
+
         let depth_2 = dag.list_at_depth(2);
         assert_eq!(depth_2.len(), 2);
         assert!(depth_2.contains(&id1));
@@ -621,14 +646,14 @@ mod tests {
     fn test_timestamps() {
         let mut dag = VaultDag::new();
         let crypto = VaultCrypto::new().unwrap();
-        
+
         let secret = SecretEntry::new("test".to_string(), "user".to_string(), "pass".to_string());
         let id = dag.add_secret(secret, &crypto, vec![]).unwrap();
-        
+
         // Check timestamps exist
         assert!(dag.get_created_at(&id).is_some());
         assert!(dag.get_updated_at(&id).is_some());
-        
+
         // Check labeled nodes include timestamps
         let labeled = dag.labeled_nodes();
         assert_eq!(labeled.len(), 1);

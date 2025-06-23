@@ -114,7 +114,7 @@ use tracing::{debug, info, warn};
 use crate::routing::Router;
 // Optimization features disabled for initial release
 // use crate::optimized::message_chunking::{MessageChunker, ChunkerConfig, ChunkedMessage};
-use crate::types::{NetworkMessage, MessagePriority};
+use crate::types::{MessagePriority, NetworkMessage};
 
 /// Configuration for the P2P network node
 #[derive(Debug, Clone)]
@@ -1104,27 +1104,28 @@ impl P2PNode {
         request: QuDagRequest,
     ) -> Result<QuDagResponse, Box<dyn Error + Send + Sync>> {
         let request_id = request.request_id.clone();
-        
+
         // Check if message needs chunking
         let network_message = NetworkMessage {
             id: request.request_id.clone(),
-            source: vec![0], // Placeholder source
+            source: vec![0],      // Placeholder source
             destination: vec![0], // Placeholder destination
             payload: request.payload.clone(),
             priority: MessagePriority::Normal,
             ttl: Duration::from_secs(60),
         };
-        
+
         // Chunking disabled for initial release - send message directly
         // let chunks = self.message_chunker.chunk_message(&network_message).await
         //     .map_err(|e| format!("Chunking error: {:?}", e))?;
-        
+
         // Send message directly without chunking
         let request = QuDagRequest {
             request_id: request_id.clone(),
-            payload: bincode::serialize(&network_message).map_err(|e| format!("Serialization error: {}", e))?,
+            payload: bincode::serialize(&network_message)
+                .map_err(|e| format!("Serialization error: {}", e))?,
         };
-        
+
         // Setup response handling
         let (tx, rx) = oneshot::channel();
         self.pending_requests.insert(request_id.clone(), tx);

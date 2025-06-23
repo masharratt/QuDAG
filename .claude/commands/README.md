@@ -1,22 +1,137 @@
-# QuDAG Command System Guide
+# QuDAG Command Reference Directory
 
-This directory contains command prompts for Claude Code to execute specific development workflows in the QuDAG project. Each command is designed to automate common tasks while maintaining our strict TDD methodology and security standards.
+This directory contains command references optimized for QuDAG quantum-resistant distributed ledger development. Each subdirectory focuses on specific aspects of the QuDAG ecosystem.
 
-## How to Use Commands
-
-Commands are invoked by referencing their markdown file (without the .md extension) in your conversation with Claude Code:
+## Directory Structure
 
 ```
-Execute the tdd-cycle command for the crypto module
+.claude/commands/
+├── README.md              # This file - overview and quick reference
+├── build/                 # Build system commands
+│   ├── cargo.txt         # Rust/Cargo build commands
+│   ├── wasm-pack.txt     # WebAssembly packaging
+│   └── npm.txt           # Node.js package management
+├── crypto/               # Cryptographic operations
+│   ├── ml-dsa.txt        # ML-DSA (FIPS 204) signature operations
+│   ├── ml-kem.txt        # ML-KEM (FIPS 203) key encapsulation
+│   └── hqc.txt           # HQC code-based cryptography
+├── network/              # Network and P2P operations
+│   ├── peers.txt         # Peer discovery and management
+│   ├── routing.txt       # Network routing commands
+│   └── gossip.txt        # Gossip protocol operations
+├── dag/                  # DAG consensus and validation
+│   ├── consensus.txt     # Consensus mechanism commands
+│   ├── validation.txt    # Transaction validation
+│   └── finality.txt      # Finality confirmation
+├── dark/                 # Dark domain system
+│   ├── addressing.txt    # Dark addressing schemes
+│   ├── domains.txt       # Domain management
+│   └── fingerprints.txt  # Identity fingerprinting
+├── vault/                # Vault operations
+│   ├── passwords.txt     # Password management
+│   ├── secrets.txt       # Secret storage
+│   └── backup.txt        # Backup and recovery
+├── test/                 # Testing commands
+│   ├── security.txt      # Security testing
+│   ├── performance.txt   # Performance benchmarks
+│   ├── integration.txt   # Integration tests
+│   └── crypto-timing.txt # Cryptographic timing tests
+├── deploy/               # Deployment operations
+│   ├── publishing.txt    # Crate publishing
+│   ├── releases.txt      # Release management
+│   └── testnet.txt       # Testnet deployment
+└── dev/                  # Development utilities
+    ├── debugging.txt     # Debugging tools
+    ├── profiling.txt     # Performance profiling
+    └── monitoring.txt    # System monitoring
 ```
 
-or
+## QuDAG Optimization Approach
 
-```
-Run the security-audit command
+This command structure is designed around QuDAG's core principles:
+
+### 1. **Quantum-Resistant Security**
+- Commands prioritize post-quantum cryptographic operations
+- All security commands assume quantum threat models
+- Emphasis on ML-DSA, ML-KEM, and HQC implementations
+
+### 2. **DAG-Based Consensus**
+- Commands support parallel transaction processing
+- Focus on asynchronous finality mechanisms
+- Optimized for high-throughput distributed operations
+
+### 3. **Dark Domain Integration**
+- Specialized commands for privacy-preserving operations
+- Support for anonymous addressing and domain management
+- Identity protection through cryptographic fingerprinting
+
+### 4. **Cross-Platform Support**
+- Native Rust commands for core operations
+- WebAssembly commands for browser integration
+- Node.js commands for JavaScript ecosystems
+
+## Quick Reference
+
+### Most Common Operations
+
+```bash
+# Build the entire project
+cargo build --release
+
+# Run security tests
+cargo test security_tests
+
+# Start testnet deployment
+./scripts/deploy-testnet.sh
+
+# Generate ML-DSA keypair
+cargo run --bin keygen -- --algorithm ml-dsa
+
+# Validate DAG structure
+cargo run --bin dag-validator
 ```
 
-## Available Commands
+### Development Workflow
+
+1. **Setup**: Use `build/` commands to configure development environment
+2. **Security**: Reference `crypto/` commands for cryptographic operations
+3. **Testing**: Apply `test/` commands for comprehensive validation
+4. **Deployment**: Execute `deploy/` commands for release management
+
+### Integration Points
+
+- **Claude-Flow**: All commands integrate with `./claude-flow` orchestration
+- **Memory System**: Commands store results in persistent memory
+- **Batch Operations**: Commands support parallel execution patterns
+- **SPARC Modes**: Commands align with SPARC development methodologies
+
+## Usage Guidelines
+
+1. **Command Files**: Each `.txt` file contains specific commands for that category
+2. **Context Awareness**: Commands include QuDAG-specific parameters and flags
+3. **Security First**: All commands prioritize security and quantum resistance
+4. **Performance Optimized**: Commands focus on high-throughput operations
+5. **Developer Experience**: Commands are optimized for Claude Code integration
+
+## Integration with Claude-Flow
+
+These commands are designed to work seamlessly with the Claude-Flow orchestration system:
+
+```bash
+# Use specific command category
+./claude-flow sparc run coder "Implement ML-DSA signing using crypto/ml-dsa.txt commands"
+
+# Coordinate multiple categories
+./claude-flow swarm "Deploy QuDAG testnet" --strategy development --mode hierarchical
+```
+
+---
+
+**Note**: This directory structure will be populated by specialized agents, each focusing on their domain expertise within the QuDAG ecosystem.
+
+## Legacy Commands and Advanced Workflows
+
+The following sections contain the existing command system for reference:
 
 ### Primary Development Commands
 

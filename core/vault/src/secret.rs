@@ -107,7 +107,7 @@ impl SecretEntry {
     ) -> Self {
         let mut metadata = SecretMetadata::default();
         metadata.tags = tags;
-        
+
         Self {
             label,
             username,
@@ -135,7 +135,10 @@ impl SecretEntry {
         let query_lower = query.to_lowercase();
         self.label.to_lowercase().contains(&query_lower)
             || self.username.to_lowercase().contains(&query_lower)
-            || self.url.as_ref().map_or(false, |u| u.to_lowercase().contains(&query_lower))
+            || self
+                .url
+                .as_ref()
+                .map_or(false, |u| u.to_lowercase().contains(&query_lower))
             || self.tags().any(|t| t.to_lowercase().contains(&query_lower))
     }
 
@@ -167,7 +170,7 @@ mod tests {
             "user@example.com".to_string(),
             "password123".to_string(),
         );
-        
+
         assert_eq!(secret.label, "email/work");
         assert_eq!(secret.username, "user@example.com");
         assert_eq!(secret.password.as_str(), "password123");
@@ -184,7 +187,7 @@ mod tests {
             None,
             vec!["work".to_string(), "email".to_string()],
         );
-        
+
         assert!(secret.matches("email"));
         assert!(secret.matches("WORK"));
         assert!(secret.matches("example.com"));

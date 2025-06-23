@@ -7,6 +7,9 @@ members = [
     "core/protocol",
     "core/vault",
     "tools/cli",
+    "qudag-mcp",
+    "qudag-wasm",
+    "qudag-exchange",
 ]
 resolver = "2"
 
@@ -38,7 +41,7 @@ hex = "0.4"
 sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "sqlite"] }
 
 [workspace.package]
-version = "0.2.0"
+version = "0.4.3"
 edition = "2021"
 authors = ["rUv <https://github.com/ruvnet>"]
 repository = "https://github.com/ruvnet/QuDAG"

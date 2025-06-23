@@ -1,0 +1,45 @@
+{
+  "mcpServers": {
+    "qudag": {
+      "command": "qudag",
+      "args": [
+        "mcp",
+        "start",
+        "--transport",
+        "stdio"
+      ],
+      "alwaysAllow": [
+        "qudag_exchange",
+        "vault",
+        "crypto",
+        "config",
+        "dag",
+        "network",
+        "system"
+      ],
+      "timeout": 600
+    },
+    "supabase": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@supabase/mcp-server-supabase@latest",
+        "--access-token",
+        "${env:SUPABASE_ACCESS_TOKEN}"
+      ],
+      "alwaysAllow": [
+        "list_tables",
+        "execute_sql",
+        "listTables",
+        "list_projects",
+        "list_organizations",
+        "get_organization",
+        "apply_migration",
+        "get_project",
+        "execute_query",
+        "generate_typescript_types",
+        "listProjects"
+      ]
+    }
+  }
+}

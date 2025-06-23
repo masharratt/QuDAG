@@ -46,7 +46,7 @@ pub struct KdfContext {
 /// Derive a vault key from a password using Argon2id.
 pub fn derive_key(password: &Password) -> VaultResult<([u8; VAULT_KEY_SIZE], KdfContext)> {
     let salt = SaltString::generate(&mut OsRng);
-    
+
     let params = Params::new(
         ARGON2_MEMORY,
         ARGON2_ITERATIONS,
@@ -54,29 +54,32 @@ pub fn derive_key(password: &Password) -> VaultResult<([u8; VAULT_KEY_SIZE], Kdf
         Some(VAULT_KEY_SIZE),
     )
     .map_err(|e| VaultError::KeyDerivation(format!("Invalid Argon2 params: {}", e)))?;
-    
+
     let argon2 = Argon2::new(
         argon2::Algorithm::Argon2id,
         argon2::Version::V0x13,
         params.clone(),
     );
-    
+
     let password_hash = argon2
         .hash_password(password.as_str().as_bytes(), &salt)
         .map_err(|e| VaultError::KeyDerivation(format!("Failed to hash password: {}", e)))?;
-    
+
     let hash_bytes = password_hash
         .hash
         .ok_or_else(|| VaultError::KeyDerivation("No hash output".to_string()))?;
-    
+
     let mut key = [0u8; VAULT_KEY_SIZE];
     key.copy_from_slice(&hash_bytes.as_bytes()[..VAULT_KEY_SIZE]);
-    
+
     let context = KdfContext {
         salt: salt.to_string(),
-        params: format!("m={},t={},p={}", ARGON2_MEMORY, ARGON2_ITERATIONS, ARGON2_PARALLELISM),
+        params: format!(
+            "m={},t={},p={}",
+            ARGON2_MEMORY, ARGON2_ITERATIONS, ARGON2_PARALLELISM
+        ),
     };
-    
+
     Ok((key, context))
 }
 
@@ -87,7 +90,7 @@ pub fn derive_key_with_context(
 ) -> VaultResult<[u8; VAULT_KEY_SIZE]> {
     let salt = SaltString::from_b64(&context.salt)
         .map_err(|e| VaultError::KeyDerivation(format!("Invalid salt: {}", e)))?;
-    
+
     // Parse params from string format "m=65536,t=3,p=4"
     let params = Params::new(
         ARGON2_MEMORY,
@@ -96,28 +99,24 @@ pub fn derive_key_with_context(
         Some(VAULT_KEY_SIZE),
     )
     .map_err(|e| VaultError::KeyDerivation(format!("Invalid params: {}", e)))?;
-    
-    let argon2 = Argon2::new(
-        argon2::Algorithm::Argon2id,
-        argon2::Version::V0x13,
-        params,
-    );
-    
+
+    let argon2 = Argon2::new(argon2::Algorithm::Argon2id, argon2::Version::V0x13, params);
+
     // We don't need to create a dummy hash for verification
     // Just re-derive the key with the same parameters
-    
+
     // Re-derive the key
     let hash_output = argon2
         .hash_password(password.as_str().as_bytes(), &salt)
         .map_err(|e| VaultError::KeyDerivation(format!("Failed to hash password: {}", e)))?;
-    
+
     let hash_bytes = hash_output
         .hash
         .ok_or_else(|| VaultError::KeyDerivation("No hash output".to_string()))?;
-    
+
     let mut key = [0u8; VAULT_KEY_SIZE];
     key.copy_from_slice(&hash_bytes.as_bytes()[..VAULT_KEY_SIZE]);
-    
+
     Ok(key)
 }
 
@@ -129,7 +128,7 @@ pub fn encrypt_vault_key(
     let (derived_key, context) = derive_key(password)?;
     let crypto = VaultCrypto::from_key(derived_key);
     let encrypted = crypto.encrypt(vault_key)?;
-    
+
     Ok((encrypted, context))
 }
 
@@ -142,16 +141,16 @@ pub fn decrypt_vault_key(
     let derived_key = derive_key_with_context(password, context)?;
     let crypto = VaultCrypto::from_key(derived_key);
     let decrypted = crypto.decrypt(encrypted_key)?;
-    
+
     if decrypted.len() != VAULT_KEY_SIZE {
         return Err(VaultError::InvalidFormat(
             "Decrypted key has wrong size".to_string(),
         ));
     }
-    
+
     let mut key = [0u8; VAULT_KEY_SIZE];
     key.copy_from_slice(&decrypted);
-    
+
     Ok(key)
 }
 
@@ -164,7 +163,7 @@ mod tests {
         let password = Password::new("test_password".to_string());
         let (key1, context1) = derive_key(&password).unwrap();
         let (key2, context2) = derive_key(&password).unwrap();
-        
+
         // Different salts should produce different keys
         assert_ne!(key1, key2);
         assert_ne!(context1.salt, context2.salt);
@@ -175,7 +174,7 @@ mod tests {
         let password = Password::new("test_password".to_string());
         let (key1, context) = derive_key(&password).unwrap();
         let key2 = derive_key_with_context(&password, &context).unwrap();
-        
+
         // Same password and context should produce same key
         assert_eq!(key1, key2);
     }
@@ -184,13 +183,13 @@ mod tests {
     fn test_encrypt_decrypt_vault_key() {
         let mut vault_key = [0u8; VAULT_KEY_SIZE];
         getrandom::getrandom(&mut vault_key).unwrap();
-        
+
         let password = Password::new("secure_password".to_string());
         let (encrypted, context) = encrypt_vault_key(&vault_key, &password).unwrap();
-        
+
         let decrypted = decrypt_vault_key(&encrypted, &password, &context).unwrap();
         assert_eq!(vault_key, decrypted);
-        
+
         // Wrong password should fail
         let wrong_password = Password::new("wrong_password".to_string());
         decrypt_vault_key(&encrypted, &wrong_password, &context).unwrap_err();

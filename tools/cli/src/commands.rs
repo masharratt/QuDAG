@@ -1142,7 +1142,7 @@ impl CommandRouter {
         }
 
         println!("Initializing new password vault...");
-        
+
         // Prompt for master password
         let master_password = self.prompt_new_password("Enter master password: ")?;
 
@@ -1181,19 +1181,25 @@ impl CommandRouter {
         if generate {
             // Generate password using vault's generator
             use qudag_vault_core::utils::CharacterSet;
-            let charset = if symbols { CharacterSet::All } else { CharacterSet::Alphanumeric };
+            let charset = if symbols {
+                CharacterSet::All
+            } else {
+                CharacterSet::Alphanumeric
+            };
             let password = vault.generate_password(length, charset);
             println!("Generated password: {}", password);
-            
+
             // Add to vault with generated password
-            vault.add_secret(&label, &username, Some(&password))
+            vault
+                .add_secret(&label, &username, Some(&password))
                 .map_err(|e| CliError::Command(format!("Failed to add secret: {}", e)))?;
         } else {
             // Prompt for password
             let password = self.prompt_new_password("Enter password for entry: ")?;
-            
+
             // Add to vault with user-provided password
-            vault.add_secret(&label, &username, Some(&password))
+            vault
+                .add_secret(&label, &username, Some(&password))
                 .map_err(|e| CliError::Command(format!("Failed to add secret: {}", e)))?;
         }
 
@@ -1224,7 +1230,8 @@ impl CommandRouter {
         let vault = Vault::open(&vault_path, &master_password)
             .map_err(|e| CliError::Command(format!("Failed to open vault: {}", e)))?;
 
-        let secret = vault.get_secret(&label)
+        let secret = vault
+            .get_secret(&label)
             .map_err(|e| CliError::Command(format!("Failed to get secret: {}", e)))?;
 
         println!("✓ Retrieved entry: {}", label);
@@ -1263,54 +1270,76 @@ impl CommandRouter {
         let vault = Vault::open(&vault_path, &master_password)
             .map_err(|e| CliError::Command(format!("Failed to open vault: {}", e)))?;
 
-        let secrets = vault.list_secrets(category.as_deref())
+        let secrets = vault
+            .list_secrets(category.as_deref())
             .map_err(|e| CliError::Command(format!("Failed to list secrets: {}", e)))?;
 
         match format.as_str() {
             "json" => {
-                let entries: Vec<serde_json::Value> = secrets.iter().map(|label| {
-                    // In verbose mode, we could fetch each secret for more details
-                    serde_json::json!({
-                        "label": label,
+                let entries: Vec<serde_json::Value> = secrets
+                    .iter()
+                    .map(|label| {
+                        // In verbose mode, we could fetch each secret for more details
+                        serde_json::json!({
+                            "label": label,
+                        })
                     })
-                }).collect();
-                
+                    .collect();
+
                 let json_output = serde_json::json!({
                     "entries": entries,
                     "count": secrets.len()
                 });
-                println!("{}", serde_json::to_string_pretty(&json_output)
-                    .map_err(|e| CliError::Command(format!("JSON formatting error: {}", e)))?);
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(&json_output)
+                        .map_err(|e| CliError::Command(format!("JSON formatting error: {}", e)))?
+                );
             }
             "tree" => {
                 // Build a tree structure from labels
                 println!("Password Vault");
-                let mut categories: std::collections::HashMap<String, Vec<String>> = std::collections::HashMap::new();
-                
+                let mut categories: std::collections::HashMap<String, Vec<String>> =
+                    std::collections::HashMap::new();
+
                 for label in &secrets {
                     if label.contains('/') {
                         let parts: Vec<&str> = label.split('/').collect();
                         if parts.len() >= 2 {
                             let category = parts[0].to_string();
                             let entry = parts[1..].join("/");
-                            categories.entry(category).or_insert_with(Vec::new).push(entry);
+                            categories
+                                .entry(category)
+                                .or_insert_with(Vec::new)
+                                .push(entry);
                         }
                     } else {
-                        categories.entry("(root)".to_string()).or_insert_with(Vec::new).push(label.clone());
+                        categories
+                            .entry("(root)".to_string())
+                            .or_insert_with(Vec::new)
+                            .push(label.clone());
                     }
                 }
-                
+
                 let cat_count = categories.len();
                 let mut idx = 0;
                 for (category, entries) in categories.iter() {
                     idx += 1;
-                    let prefix = if idx == cat_count { "└──" } else { "├──" };
+                    let prefix = if idx == cat_count {
+                        "└──"
+                    } else {
+                        "├──"
+                    };
                     println!("{} {}", prefix, category);
-                    
+
                     let entry_count = entries.len();
                     for (i, entry) in entries.iter().enumerate() {
                         let sub_prefix = if idx == cat_count { "    " } else { "│   " };
-                        let entry_prefix = if i + 1 == entry_count { "└──" } else { "├──" };
+                        let entry_prefix = if i + 1 == entry_count {
+                            "└──"
+                        } else {
+                            "├──"
+                        };
                         println!("{}{} {}", sub_prefix, entry_prefix, entry);
                     }
                 }
@@ -1322,7 +1351,7 @@ impl CommandRouter {
                 if let Some(cat) = &category {
                     println!("Category: {}", cat);
                 }
-                
+
                 if secrets.is_empty() {
                     println!("\nNo entries found.");
                 } else {
@@ -1346,11 +1375,7 @@ impl CommandRouter {
     }
 
     /// Route and execute vault remove command
-    pub async fn handle_vault_remove(
-        &self,
-        label: String,
-        force: bool,
-    ) -> Result<(), CliError> {
+    pub async fn handle_vault_remove(&self, label: String, force: bool) -> Result<(), CliError> {
         info!("Executing vault remove command for label: {}", label);
 
         if !force {
@@ -1447,9 +1472,12 @@ impl CommandRouter {
                     "format": "qudag-vault-encrypted",
                     "data": "[base64 encoded encrypted data]"
                 });
-                std::fs::write(&output, serde_json::to_string_pretty(&data)
-                    .map_err(|e| CliError::Command(format!("JSON formatting error: {}", e)))?)
-                    .map_err(|e| CliError::Command(format!("Failed to export: {}", e)))?;
+                std::fs::write(
+                    &output,
+                    serde_json::to_string_pretty(&data)
+                        .map_err(|e| CliError::Command(format!("JSON formatting error: {}", e)))?,
+                )
+                .map_err(|e| CliError::Command(format!("Failed to export: {}", e)))?;
                 println!("✓ Exported vault to {:?}", output);
                 println!("  Format: JSON with encrypted data");
             }
@@ -1469,7 +1497,7 @@ impl CommandRouter {
         &self,
         input: PathBuf,
         merge: bool,
-        force: bool,
+        _force: bool,
     ) -> Result<(), CliError> {
         info!("Executing vault import command from {:?}", input);
 
@@ -1684,9 +1712,8 @@ impl CommandRouter {
         print!("{}", prompt);
         use std::io::{self, Write};
         io::stdout().flush().unwrap();
-        
-        read_password()
-            .map_err(|e| CliError::Command(format!("Failed to read password: {}", e)))
+
+        read_password().map_err(|e| CliError::Command(format!("Failed to read password: {}", e)))
     }
 
     /// Prompt for new password with confirmation
@@ -1708,7 +1735,6 @@ impl CommandRouter {
         symbols: bool,
         numbers: bool,
     ) -> Result<String, CliError> {
-                
         let mut charset = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ".to_string();
         if numbers {
             charset.push_str("0123456789");

@@ -64,7 +64,7 @@ impl Vault {
     /// Create a new vault at the specified path.
     pub fn create(path: impl AsRef<Path>, master_password: &str) -> VaultResult<Self> {
         let path = path.as_ref().to_path_buf();
-        
+
         // Check if vault already exists
         if path.exists() {
             return Err(VaultError::VaultExists(path.display().to_string()));
@@ -78,9 +78,9 @@ impl Vault {
         // Create crypto components
         let crypto = VaultCrypto::new()?;
         let password = Password::new(master_password.to_string());
-        
+
         // Derive key from password and encrypt vault key
-        let (encrypted_vault_key, kdf_context) = 
+        let (encrypted_vault_key, kdf_context) =
             kdf::encrypt_vault_key(crypto.get_key(), &password)?;
 
         // Generate quantum-resistant key pair
@@ -88,7 +88,7 @@ impl Vault {
 
         // Create empty DAG
         let dag = VaultDag::new();
-        
+
         // Create metadata
         let metadata = VaultMetadata {
             version: VAULT_VERSION,
@@ -116,7 +116,7 @@ impl Vault {
     /// Open an existing vault.
     pub fn open(path: impl AsRef<Path>, master_password: &str) -> VaultResult<Self> {
         let path = path.as_ref().to_path_buf();
-        
+
         if !path.exists() {
             return Err(VaultError::VaultNotFound(path.display().to_string()));
         }
@@ -151,7 +151,10 @@ impl Vault {
         let serialized_dag: SerializedVaultDag = bincode::deserialize(&dag_data)?;
         let dag = VaultDag::deserialize(serialized_dag)?;
 
-        debug!("Vault opened with {} secrets", vault_file.metadata.secret_count);
+        debug!(
+            "Vault opened with {} secrets",
+            vault_file.metadata.secret_count
+        );
 
         Ok(Self {
             path,
@@ -174,17 +177,17 @@ impl Vault {
         };
 
         let secret = SecretEntry::new(label.to_string(), username.to_string(), password);
-        
+
         // Parse categories from label (e.g., "email/work" -> category "email")
         let categories = self.parse_categories(label);
-        
+
         self.dag.add_secret(secret, &self.crypto, categories)?;
         self.metadata.secret_count += 1;
         self.metadata.modified_at = chrono::Utc::now();
-        
+
         // Save changes
         self.save()?;
-        
+
         info!("Added secret: {}", label);
         Ok(())
     }
@@ -208,21 +211,21 @@ impl Vault {
         password: Option<&str>,
     ) -> VaultResult<()> {
         let mut secret = self.get_secret(label)?;
-        
+
         if let Some(u) = username {
             secret.username = u.to_string();
         }
-        
+
         if let Some(p) = password {
             secret.update_password(p.to_string());
         }
-        
+
         self.dag.update_secret(label, secret, &self.crypto)?;
         self.metadata.modified_at = chrono::Utc::now();
-        
+
         // Save changes
         self.save()?;
-        
+
         info!("Updated secret: {}", label);
         Ok(())
     }
@@ -232,10 +235,10 @@ impl Vault {
         self.dag.delete_secret(label)?;
         self.metadata.secret_count = self.metadata.secret_count.saturating_sub(1);
         self.metadata.modified_at = chrono::Utc::now();
-        
+
         // Save changes
         self.save()?;
-        
+
         info!("Deleted secret: {}", label);
         Ok(())
     }
@@ -244,47 +247,51 @@ impl Vault {
     pub fn export(&self, output_path: impl AsRef<Path>) -> VaultResult<()> {
         let output_path = output_path.as_ref();
         info!("Exporting vault to: {}", output_path.display());
-        
+
         // Read current vault file
         let data = std::fs::read(&self.path)?;
-        
+
         // Write to output (vault file is already encrypted)
         std::fs::write(output_path, data)?;
-        
+
         info!("Vault exported successfully");
         Ok(())
     }
 
     /// Import secrets from another vault file.
-    pub fn import(&mut self, input_path: impl AsRef<Path>, master_password: &str) -> VaultResult<()> {
+    pub fn import(
+        &mut self,
+        input_path: impl AsRef<Path>,
+        master_password: &str,
+    ) -> VaultResult<()> {
         let input_path = input_path.as_ref();
         info!("Importing vault from: {}", input_path.display());
-        
+
         // Open the other vault
         let other_vault = Self::open(input_path, master_password)?;
-        
+
         // Import all secrets
         let secrets = other_vault.list_secrets(None)?;
         let mut imported = 0;
-        
+
         for label in secrets {
             if self.dag.get_secret(&label, &self.crypto).is_ok() {
                 warn!("Skipping duplicate secret: {}", label);
                 continue;
             }
-            
+
             let secret = other_vault.get_secret(&label)?;
             let categories = self.parse_categories(&label);
             self.dag.add_secret(secret, &self.crypto, categories)?;
             imported += 1;
         }
-        
+
         self.metadata.secret_count += imported;
         self.metadata.modified_at = chrono::Utc::now();
-        
+
         // Save changes
         self.save()?;
-        
+
         info!("Imported {} secrets", imported);
         Ok(())
     }
@@ -299,7 +306,7 @@ impl Vault {
         // Re-read the file to get current KDF context and keypair
         let data = std::fs::read(&self.path)?;
         let current_file: VaultFile = serde_json::from_slice(&data)?;
-        
+
         self.save_internal(
             current_file.encrypted_vault_key,
             current_file.kdf_context,
@@ -318,7 +325,7 @@ impl Vault {
         let serialized_dag = self.dag.serialize()?;
         let dag_data = bincode::serialize(&serialized_dag)?;
         let encrypted_dag = self.crypto.encrypt(&dag_data)?;
-        
+
         // Create vault file
         let vault_file = VaultFile {
             version: VAULT_VERSION,
@@ -328,15 +335,15 @@ impl Vault {
             encrypted_dag,
             metadata: self.metadata.clone(),
         };
-        
+
         // Serialize to JSON
         let data = serde_json::to_vec_pretty(&vault_file)?;
-        
+
         // Write atomically (write to temp file then rename)
         let temp_path = self.path.with_extension("tmp");
         std::fs::write(&temp_path, data)?;
         std::fs::rename(&temp_path, &self.path)?;
-        
+
         debug!("Vault saved successfully");
         Ok(())
     }
@@ -365,15 +372,15 @@ mod tests {
     fn test_vault_create_open() {
         let temp_dir = tempfile::tempdir().unwrap();
         let path = temp_dir.path().join("test_vault.qdag");
-        
+
         // Create vault
         let vault = Vault::create(&path, "test_password").unwrap();
         drop(vault);
-        
+
         // Open vault
         let vault = Vault::open(&path, "test_password").unwrap();
         assert_eq!(vault.metadata.version, VAULT_VERSION);
-        
+
         // Wrong password should fail
         assert!(Vault::open(&path, "wrong_password").is_err());
     }
@@ -382,28 +389,32 @@ mod tests {
     fn test_vault_secrets() {
         let temp_dir = tempfile::tempdir().unwrap();
         let path = temp_dir.path().join("test_vault.qdag");
-        
+
         let mut vault = Vault::create(&path, "test_password").unwrap();
-        
+
         // Add secret
-        vault.add_secret("test/secret", "user", Some("password")).unwrap();
-        
+        vault
+            .add_secret("test/secret", "user", Some("password"))
+            .unwrap();
+
         // Get secret
         let secret = vault.get_secret("test/secret").unwrap();
         assert_eq!(secret.username, "user");
         assert_eq!(secret.password.as_str(), "password");
-        
+
         // List secrets
         let secrets = vault.list_secrets(None).unwrap();
         assert_eq!(secrets.len(), 2); // "test/secret" and "test" category
         assert!(secrets.contains(&"test/secret".to_string()));
         assert!(secrets.contains(&"test".to_string()));
-        
+
         // Update secret
-        vault.update_secret("test/secret", Some("new_user"), None).unwrap();
+        vault
+            .update_secret("test/secret", Some("new_user"), None)
+            .unwrap();
         let updated = vault.get_secret("test/secret").unwrap();
         assert_eq!(updated.username, "new_user");
-        
+
         // Delete secret
         vault.delete_secret("test/secret").unwrap();
         vault.get_secret("test/secret").unwrap_err();

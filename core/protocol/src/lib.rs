@@ -33,6 +33,10 @@ pub use instrumentation::{MemoryMetrics, MemoryTracker};
 pub use message::{Message, MessageError, MessageFactory, MessageType, ProtocolVersion};
 pub use node::{Node, NodeConfig, NodeStateProvider};
 pub use node_runner_adapter::NodeRunnerAdapter;
+pub use optimization_config::{
+    AsyncCoordinationConfig, ConfigError as OptimizationConfigError, MessageChunkingConfig,
+    OptimizationConfig, ValidationCacheConfig,
+};
 #[cfg(feature = "rocksdb")]
 pub use persistence::RocksDbBackend;
 pub use persistence::{
@@ -41,10 +45,6 @@ pub use persistence::{
 };
 pub use rpc_server::{
     NetworkStats, NodeRunnerTrait, PeerInfo as RpcPeerInfo, RpcCommand, RpcServer, RpcTransport,
-};
-pub use optimization_config::{
-    OptimizationConfig, ConfigError as OptimizationConfigError,
-    MessageChunkingConfig, ValidationCacheConfig, AsyncCoordinationConfig,
 };
 pub use state::{ProtocolState, ProtocolStateMachine, StateError, StateMachineConfig};
 pub use types::{ProtocolError, ProtocolEvent};

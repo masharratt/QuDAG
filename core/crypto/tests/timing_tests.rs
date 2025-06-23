@@ -1,4 +1,4 @@
-use qudag_crypto::kem::ml_kem::*;
+use qudag_crypto::ml_kem::*;
 use rand::RngCore;
 use std::time::{Duration, Instant};
 

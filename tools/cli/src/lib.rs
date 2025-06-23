@@ -16,6 +16,7 @@
 pub mod async_optimizations;
 pub mod commands;
 pub mod config;
+pub mod mcp;
 pub mod node_manager;
 pub mod output;
 pub mod peer_manager;
@@ -57,4 +58,6 @@ pub enum CliError {
     Timeout(String),
     #[error("Validation error: {0}")]
     Validation(String),
+    #[error("Server error: {0}")]
+    Server(String),
 }

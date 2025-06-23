@@ -1,9 +1,9 @@
 //! Tests to validate network optimizations
 
+use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::sync::RwLock;
-use std::collections::HashMap;
 
 #[cfg(test)]
 mod tests {
@@ -39,7 +39,12 @@ mod tests {
 
             // Check chunk counts
             let expected_chunks = (size + chunk_size - 1) / chunk_size;
-            assert_eq!(chunks.len(), expected_chunks, "Wrong chunk count for size {}", size);
+            assert_eq!(
+                chunks.len(),
+                expected_chunks,
+                "Wrong chunk count for size {}",
+                size
+            );
 
             println!("✓ Size {} -> {} chunks", size, chunks.len());
         }
@@ -144,7 +149,10 @@ mod tests {
         println!("Cache performance:");
         println!("  Miss time: {:?}", miss_time);
         println!("  Hit time: {:?}", hit_time);
-        println!("  Speedup: {:.2}x", miss_time.as_secs_f64() / hit_time.as_secs_f64());
+        println!(
+            "  Speedup: {:.2}x",
+            miss_time.as_secs_f64() / hit_time.as_secs_f64()
+        );
     }
 
     #[tokio::test]
@@ -182,7 +190,10 @@ mod tests {
 
         println!("Concurrent validation:");
         println!("  100 tasks completed in {:?}", elapsed);
-        println!("  Throughput: {:.0} validations/sec", 100.0 / elapsed.as_secs_f64());
+        println!(
+            "  Throughput: {:.0} validations/sec",
+            100.0 / elapsed.as_secs_f64()
+        );
     }
 
     #[test]
@@ -201,9 +212,11 @@ mod tests {
         println!("  Original size: {} bytes", original_size);
         println!("  Number of chunks: {}", chunks.len());
         println!("  Overhead per chunk: {} bytes", mem::size_of::<Vec<u8>>());
-        println!("  Total overhead: {} bytes ({:.2}%)", 
-                 chunk_overhead, 
-                 (chunk_overhead as f64 / original_size as f64) * 100.0);
+        println!(
+            "  Total overhead: {} bytes ({:.2}%)",
+            chunk_overhead,
+            (chunk_overhead as f64 / original_size as f64) * 100.0
+        );
 
         // Overhead should be minimal
         assert!(chunk_overhead < original_size / 100); // Less than 1%
