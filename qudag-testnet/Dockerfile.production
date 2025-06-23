@@ -85,4 +85,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 
 # Entry point - run enhanced node directly
 ENTRYPOINT ["/usr/local/bin/qudag-node"]
-CMD ["--config", "/data/qudag/config.toml"]
+# Default command arguments (can be overridden by fly.toml)
+CMD ["run-node", "--port", "4001", "--data-dir", "/data/qudag"]
