@@ -69,6 +69,7 @@ kill_timeout = "5s"
 [[services]]
   internal_port = 4001
   protocol = "tcp"
+  processes = ["app"]
   
   [[services.ports]]
     port = 4001
@@ -77,6 +78,7 @@ kill_timeout = "5s"
 [[services]]
   internal_port = 4001
   protocol = "udp"
+  processes = ["app"]
   
   [[services.ports]]
     port = 4001
@@ -85,6 +87,7 @@ kill_timeout = "5s"
 [[services]]
   internal_port = 9090
   protocol = "tcp"
+  processes = ["app"]
   
   [[services.ports]]
     port = 9090
@@ -101,9 +104,8 @@ kill_timeout = "5s"
   memory_mb = 2048
 
 [mounts]
-  source = "qudag_data_node3"
+  source = "qudag_data"
   destination = "/data/qudag"
-  initial_size = "10gb"
 
 [processes]
   app = """

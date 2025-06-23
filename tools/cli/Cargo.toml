@@ -5,10 +5,10 @@ edition.workspace = true
 authors.workspace = true
 repository.workspace = true
 license.workspace = true
-description = "Command-line interface for QuDAG - Manage nodes, peers, and dark addresses"
+description = "Command-line interface for QuDAG - Manage nodes, peers, dark addresses, rUv token exchange, and business plan payouts"
 documentation = "https://docs.rs/qudag-cli"
 readme = "README.md"
-keywords = ["cli", "quantum", "dag", "p2p", "darknet"]
+keywords = ["cli", "darknet", "agent-swarm", "exchange", "quantum"]
 categories = ["command-line-utilities"]
 
 [dependencies]
