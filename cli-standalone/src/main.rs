@@ -11,6 +11,15 @@ use tokio::signal;
 use tokio::sync::RwLock;
 use tracing::{error, info};
 use tracing_subscriber::fmt::format::FmtSpan;
+use axum::{
+    routing::{get},
+    Router,
+    Json,
+    http::StatusCode,
+};
+use serde::{Deserialize, Serialize};
+use std::net::SocketAddr;
+use tower_http::cors::CorsLayer;
 
 // Import the CLI module for peer management
 // (CLI module is available as crate root)

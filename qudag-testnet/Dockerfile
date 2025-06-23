@@ -1,5 +1,5 @@
-# Build Stage: Compile QuDAG node stub
-FROM rust:1.75 AS builder
+# Build Stage: Compile QuDAG binaries
+FROM rust:1.83 AS builder
 WORKDIR /app
 
 # Install system dependencies
@@ -11,21 +11,12 @@ RUN apt-get update && apt-get install -y \
     clang \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy the stub source
-COPY configs/qudag-node-stub.rs ./src/main.rs
+# Copy entire workspace
+COPY . .
 
-# Create a minimal Cargo.toml
-RUN echo '[package]' > Cargo.toml && \
-    echo 'name = "qudag-node"' >> Cargo.toml && \
-    echo 'version = "1.0.0"' >> Cargo.toml && \
-    echo 'edition = "2021"' >> Cargo.toml && \
-    echo '' >> Cargo.toml && \
-    echo '[[bin]]' >> Cargo.toml && \
-    echo 'name = "qudag-node"' >> Cargo.toml && \
-    echo 'path = "src/main.rs"' >> Cargo.toml
-
-# Build the node
-RUN cargo build --release
+# Build both qudag CLI and exchange server in release mode
+RUN cargo build --release --bin qudag && \
+    cargo build --release --bin qudag-exchange-server
 
 # Runtime Stage
 FROM debian:bookworm-slim
@@ -40,11 +31,16 @@ RUN apt-get update && apt-get install -y \
 # Create non-root user
 RUN useradd -m -u 1001 -s /bin/bash qudag
 
-# Copy binary from builder
-COPY --from=builder /app/target/release/qudag-node /usr/local/bin/qudag-node
+# Copy both binaries from builder
+COPY --from=builder /app/target/release/qudag /usr/local/bin/qudag
+COPY --from=builder /app/target/release/qudag-exchange-server /usr/local/bin/qudag-exchange-server
 
 # Copy configuration files
 COPY configs/*.toml /app/configs/
+
+# Copy startup script
+COPY startup.sh /usr/local/bin/startup.sh
+RUN chmod +x /usr/local/bin/startup.sh
 
 # Create data directories
 RUN mkdir -p /data/qudag && chown -R qudag:qudag /data
@@ -71,10 +67,12 @@ EXPOSE 8080/tcp
 # Metrics
 EXPOSE 9090/tcp
 
-# Health check
+# Health check - works for both node types
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:8080/health || exit 1
+    CMD curl -f http://localhost:${QUDAG_RPC_PORT:-8080}/health || \
+        curl -f http://localhost:${QUDAG_RPC_PORT:-8080}/api/health || \
+        exit 1
 
-# Entry point
-ENTRYPOINT ["qudag-node"]
+# Entry point - uses startup script that selects binary based on NODE_TYPE
+ENTRYPOINT ["/usr/local/bin/startup.sh"]
 CMD ["--config", "/data/qudag/config.toml"]

@@ -74,7 +74,7 @@ async fn main() -> anyhow::Result<()> {
         .layer(CorsLayer::permissive());
 
     // Start server
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+    let addr = SocketAddr::from(([0, 0, 0, 0], 8080));
     info!("QuDAG Exchange server listening on {}", addr);
     
     let listener = tokio::net::TcpListener::bind(addr).await?;
