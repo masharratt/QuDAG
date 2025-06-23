@@ -106,27 +106,8 @@ kill_timeout = "5s"
   source = "qudag_data_node3"
   destination = "/data/qudag"
 
-[processes]
-  app = """
-    set -e
-    echo "Starting QuDAG Validator Node (Singapore) with full functionality..."
-    
-    # Copy configuration if it exists
-    if [ -f /app/configs/node3.toml ]; then
-      cp /app/configs/node3.toml /data/qudag/config.toml
-    fi
-    
-    # Ensure directories exist
-    mkdir -p /data/qudag/tls
-    mkdir -p /data/qudag/db
-    
-    # Wait for bootstrap node
-    echo "Waiting for bootstrap node..."
-    sleep 20
-    
-    # Start the real QuDAG node with full functionality
-    exec /usr/local/bin/qudag-node run-node --port 4001 --data-dir /data/qudag --peer /dns4/qudag-testnet-node1.fly.dev/tcp/4001
-  """
+# Command arguments for the QuDAG node (handled by Dockerfile ENTRYPOINT)
+# The node will use the config file at /data/qudag/config.toml
 
 [[statics]]
   guest_path = "/app/configs/node3.toml"
