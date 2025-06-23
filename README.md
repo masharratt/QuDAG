@@ -238,6 +238,28 @@ cd qudag-testnet
 ./verify-deployment.sh
 ```
 
+### Testnet MCP Client Configuration
+
+To connect AI tools (like Claude Desktop) to the QuDAG testnet MCP server:
+
+1. **Quick Setup** - Add to your MCP configuration:
+```json
+{
+  "qudag-testnet": {
+    "command": "npx",
+    "args": [
+      "qudag-mcp-proxy",
+      "https://qudag-testnet-node1.fly.dev"
+    ],
+    "description": "QuDAG Testnet MCP Server"
+  }
+}
+```
+
+2. **Full Configuration** - See [MCP Integration Examples](#testnet-mcp-configuration) for complete setup with HTTP proxy script.
+
+3. **Available Tools**: `qudag_crypto`, `qudag_vault`, `qudag_dag`, `qudag_network`, `qudag_exchange`
+
 ## Use Cases
 
 | Category | Applications | Description |
@@ -410,6 +432,90 @@ qudag mcp test --endpoint http://localhost:3000
     }
   }
 }
+```
+
+#### Testnet MCP Configuration
+```json
+// ~/.roo/mcp.json or claude_desktop_config.json
+{
+  "mcpServers": {
+    "qudag-testnet": {
+      "command": "node",
+      "args": [
+        "/path/to/mcp-http-proxy.js",
+        "https://qudag-testnet-node1.fly.dev"
+      ],
+      "alwaysAllow": [
+        "qudag_crypto",
+        "qudag_vault", 
+        "qudag_dag",
+        "qudag_network",
+        "qudag_exchange"
+      ],
+      "description": "QuDAG Testnet MCP Server (Toronto Node)",
+      "timeout": 600
+    }
+  }
+}
+```
+
+For the HTTP proxy script, create `mcp-http-proxy.js`:
+```javascript
+// mcp-http-proxy.js - Bridge HTTP MCP to stdio transport
+const readline = require('readline');
+const baseUrl = process.argv[2] || 'https://qudag-testnet-node1.fly.dev';
+
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout,
+  terminal: false
+});
+
+async function makeRequest(endpoint, method = 'GET', body = null) {
+  const url = `${baseUrl}/mcp${endpoint}`;
+  const options = { method, headers: { 'Content-Type': 'application/json' } };
+  if (body) options.body = JSON.stringify(body);
+  const response = await fetch(url, options);
+  return response.json();
+}
+
+rl.on('line', async (line) => {
+  try {
+    const request = JSON.parse(line);
+    let result;
+    
+    switch (request.method) {
+      case 'initialize':
+        const discovery = await makeRequest('');
+        result = {
+          protocolVersion: '2024-11-05',
+          capabilities: discovery.mcp?.capabilities || {},
+          serverInfo: discovery.mcp?.serverInfo || {}
+        };
+        break;
+      case 'tools/list':
+        result = await makeRequest('/tools');
+        break;
+      case 'tools/call':
+        result = await makeRequest('/tools/execute', 'POST', request.params);
+        break;
+      case 'resources/list':
+        result = await makeRequest('/resources');
+        break;
+      case 'resources/read':
+        result = await makeRequest(`/resources/read?uri=${encodeURIComponent(request.params.uri)}`);
+        break;
+      default:
+        throw new Error(`Unknown method: ${request.method}`);
+    }
+    
+    const response = { jsonrpc: '2.0', id: request.id, result };
+    console.log(JSON.stringify(response));
+  } catch (error) {
+    const response = { jsonrpc: '2.0', id: request.id, error: { code: -32603, message: error.message } };
+    console.log(JSON.stringify(response));
+  }
+});
 ```
 
 #### VS Code Extension
