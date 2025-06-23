@@ -186,12 +186,12 @@ QuDAG has a live testnet deployed across 4 global regions, demonstrating the pla
 
 ### Testnet Nodes
 
-| Node | Location | IP Address | Status | Features |
-|------|----------|------------|--------|----------|
-| **node1** | Toronto (yyz) | [109.105.222.156](http://109.105.222.156/health) | ✅ Healthy | Bootstrap, **MCP Server (HTTPS)**, Enhanced P2P |
-| **node2** | Amsterdam (ams) | [149.248.199.86](http://149.248.199.86/health) | ✅ Healthy | Full node, 4 peers connected |
-| **node3** | Singapore (sin) | [149.248.218.16](http://149.248.218.16/health) | ✅ Healthy | Full node, 4 peers connected |
-| **node4** | San Francisco (sjc) | [137.66.62.149](http://137.66.62.149/health) | ✅ Healthy | Full node, 4 peers connected |
+| Node | Location | Domain | Status | Features |
+|------|----------|--------|--------|----------|
+| **node1** | Toronto (yyz) | [qudag-testnet-node1.fly.dev](https://qudag-testnet-node1.fly.dev/health) | ✅ Healthy | Bootstrap, **MCP Server (HTTPS)**, Enhanced P2P |
+| **node2** | Amsterdam (ams) | [qudag-testnet-node2.fly.dev](https://qudag-testnet-node2.fly.dev/health) | ✅ Healthy | Full node, 4 peers connected |
+| **node3** | Singapore (sin) | [qudag-testnet-node3.fly.dev](https://qudag-testnet-node3.fly.dev/health) | ✅ Healthy | Full node, 4 peers connected |
+| **node4** | San Francisco (sjc) | [qudag-testnet-node4.fly.dev](https://qudag-testnet-node4.fly.dev/health) | ✅ Healthy | Full node, 4 peers connected |
 
 ### Testnet Features
 
@@ -202,20 +202,20 @@ QuDAG has a live testnet deployed across 4 global regions, demonstrating the pla
 - **Global Distribution**: Low-latency coverage across North America, Europe, and Asia
 - **MCP Server**: Model Context Protocol server on node1 with **HTTPS support** 
   - HTTPS endpoint: [https://qudag-testnet-node1.fly.dev/mcp](https://qudag-testnet-node1.fly.dev/mcp)
-  - HTTP fallback: [http://109.105.222.156:3333/mcp](http://109.105.222.156:3333/mcp)
   - Complete MCP 2024-11-05 protocol compliance
+  - Full tool and resource integration for AI development
 
 ### Accessing the Testnet
 
 ```bash
 # Check node health
-curl http://109.105.222.156/health | jq
+curl https://qudag-testnet-node1.fly.dev/health | jq
 
 # View node metrics
-curl http://109.105.222.156/metrics
+curl https://qudag-testnet-node1.fly.dev/metrics
 
 # Connect your QuDAG node to testnet
-qudag start --bootstrap-peers /ip4/109.105.222.156/tcp/4001
+qudag start --bootstrap-peers /dns4/qudag-testnet-node1.fly.dev/tcp/4001
 
 # Access MCP server for AI integration (HTTPS - recommended)
 curl https://qudag-testnet-node1.fly.dev/mcp | jq
@@ -224,8 +224,10 @@ curl https://qudag-testnet-node1.fly.dev/mcp | jq
 curl https://qudag-testnet-node1.fly.dev/mcp/tools | jq
 curl https://qudag-testnet-node1.fly.dev/mcp/info | jq
 
-# HTTP fallback endpoint
-curl http://109.105.222.156:3333/mcp | jq
+# Test other nodes
+curl https://qudag-testnet-node2.fly.dev/health | jq
+curl https://qudag-testnet-node3.fly.dev/health | jq
+curl https://qudag-testnet-node4.fly.dev/health | jq
 ```
 
 ### Testnet Verification
