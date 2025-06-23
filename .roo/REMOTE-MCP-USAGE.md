@@ -6,9 +6,15 @@ The QuDAG testnet now has a live MCP (Model Context Protocol) server running on 
 
 ### Connection Details
 
-- **URL**: http://109.105.222.156:3333/mcp
+- **Working URL**: http://109.105.222.156:3333/mcp
 - **Transport**: HTTP (via stdio proxy)
 - **Server**: QuDAG Toronto Node (qudag-testnet-node1)
+
+### Known Issues
+
+- **HTTPS Access**: The HTTPS endpoint `https://qudag-testnet-node1.fly.dev/mcp` times out due to Fly.io proxy issues
+- **Workaround**: Use the direct HTTP endpoint on port 3333 instead
+- **Intro Page**: The main site at `https://qudag-testnet-node1.fly.dev/` works fine
 
 ### Configuration Added to .roo/mcp.json
 

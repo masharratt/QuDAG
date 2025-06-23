@@ -1,4 +1,5 @@
 {
+  "_comment": "QuDAG MCP Configurations - See mcp-configs-explained.json for details",
   "mcpServers": {
     "qudag": {
       "command": "qudag",
@@ -20,10 +21,11 @@
       "timeout": 600
     },
     "qudag-testnet": {
+      "_comment": "HTTPS working with v3 node - enhanced HTTP/2 support",
       "command": "node",
       "args": [
         "/workspaces/QuDAG/.roo/mcp-http-proxy.js",
-        "http://109.105.222.156:3333"
+        "https://qudag-testnet-node1.fly.dev"
       ],
       "alwaysAllow": [
         "qudag_crypto",
@@ -32,8 +34,13 @@
         "qudag_network",
         "qudag_exchange"
       ],
-      "description": "QuDAG Testnet MCP Server (Toronto Node)",
-      "timeout": 600
+      "description": "QuDAG Testnet MCP Server (Toronto Node - v3)",
+      "timeout": 600,
+      "_urls": {
+        "working": "https://qudag-testnet-node1.fly.dev/mcp (FIXED!)",
+        "also_working": "http://109.105.222.156:3333/mcp",
+        "intro_page": "https://qudag-testnet-node1.fly.dev/ (works)"
+      }
     },
     "supabase": {
       "command": "npx",
