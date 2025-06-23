@@ -1,1501 +1,697 @@
-# QuDAG Protocol 🌐
+# QuDAG CLI
 
-> The Darkest of Darknets - Built for the Quantum Age
+Comprehensive command-line interface for QuDAG - the darknet for agent swarms with quantum-resistant distributed communication, rUv token exchange, and business plan payouts.
 
-QuDAG is a revolutionary quantum-resistant distributed communication platform built on a Directed Acyclic Graph (DAG) architecture. Unlike traditional blockchain systems that use linear chains, QuDAG uses a DAG structure for parallel message processing and consensus, enabling high throughput while maintaining cryptographic security against quantum computing attacks. **The platform is uniquely suited for distributed agentic systems and swarms**, providing the secure, decentralized infrastructure needed for autonomous AI agents to coordinate and communicate at scale.
+## Features
 
-The platform creates a decentralized mesh network where messages are processed through a DAG-based consensus mechanism and routed through multiple encrypted layers (onion routing), making communication both scalable and anonymous. **What makes QuDAG truly unique is its built-in dark domain system** - allowing you to register and resolve human-readable `.dark` addresses (like `myservice.dark`) without any central authority, creating your own darknet namespace with quantum-resistant authentication.
+- **Node Management**: Start, stop, and manage QuDAG nodes
+- **Exchange Operations**: rUv token transfers with dynamic fee models
+- **Business Plan**: Automated payout distribution for contributors
+- **Dark Addressing**: Anonymous .dark domain registration and routing
+- **MCP Server**: Model Context Protocol integration for AI agents
+- **Quantum Crypto**: ML-DSA signatures and ML-KEM encryption
+- **Password Vault**: Quantum-resistant credential management
+- **P2P Networking**: Onion routing and NAT traversal
 
-Built with an **MCP-first approach**, QuDAG seamlessly integrates with modern AI development workflows through the Model Context Protocol, providing native support for stdio/HTTP transports, comprehensive CLI tools, SDK libraries, and RESTful APIs. This makes it the ideal backbone for next-generation distributed AI systems that require both quantum-resistant security and high-performance communication.
+## Installation
 
-Think of it as combining the anonymity of Tor with the decentralization of Bitcoin, but built for the quantum age and optimized for high-performance communication rather than financial transactions - all while providing first-class support for AI agent coordination and swarm intelligence.
-
-**Key Highlights:**
-- 🔒 Post-quantum cryptography using ML-KEM-768 & ML-DSA with BLAKE3
-- ⚡ High-performance asynchronous DAG with QR-Avalanche consensus
-- 🌐 Built-in `.dark` domain system for decentralized darknet addressing
-- 🕵️ Anonymous onion routing with ChaCha20Poly1305 traffic obfuscation
-- 🔐 Quantum-resistant password vault with AES-256-GCM encryption
-- 🛡️ Memory-safe Rust implementation with zero unsafe code
-- 🔗 LibP2P-based networking with Kademlia DHT peer discovery
-- 📊 Real-time performance metrics and benchmarking
-- 🤖 Native MCP server with stdio/HTTP/WebSocket transports for AI integration
-- 🌍 WebAssembly support for browser and Node.js applications
-
-## 🚀 Quick Installation
-
-### For Users (CLI Tool)
 ```bash
-# Install QuDAG CLI directly from crates.io
 cargo install qudag-cli
-
-# Verify installation
-qudag --help
-
-# Start your first node
-qudag start --port 8000
-
-# Use the built-in password vault
-qudag vault generate --length 16
-qudag vault config show
 ```
 
-### For Developers (Library)
-```bash
-# Add QuDAG to your Rust project
-cargo add qudag
+> **Note:** The CLI binary is named `qudag` after installation.
 
-# Or add specific components
-cargo add qudag-crypto      # Quantum-resistant cryptography
-cargo add qudag-network     # P2P networking with dark addressing
-cargo add qudag-dag         # DAG consensus implementation
-cargo add qudag-vault-core  # Password vault with post-quantum crypto
-cargo add qudag-mcp         # Model Context Protocol server
-```
-
-### For Web/JavaScript (WASM)
-```bash
-# Use QuDAG in browser or Node.js via npm
-npx qudag@latest --help
-
-# Or install globally
-npm install -g qudag
-
-# Or use programmatically
-npm install qudag
-```
-
-### Quick Start Example (Rust)
-```rust
-use qudag::prelude::*;
-
-#[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    // Create quantum-resistant keys
-    let keypair = MlDsaKeyPair::generate()?;
-    
-    // Create a new DAG
-    let mut dag = Dag::new();
-    
-    // Register a .dark domain
-    let network_manager = NetworkManager::new()?;
-    // network_manager.register_domain("mynode.dark").await?;
-    
-    println!("QuDAG node ready! 🌐");
-    Ok(())
-}
-```
-
-### Quick Start Example (JavaScript/WASM)
-```javascript
-import { QuDAGClient, WasmMlDsaKeyPair, Blake3Hash } from 'qudag';
-
-// Initialize QuDAG client
-const client = new QuDAGClient();
-console.log(`QuDAG version: ${client.getVersion()}`);
-
-// Generate quantum-resistant keys
-const keyPair = new WasmMlDsaKeyPair();
-const publicKey = keyPair.getPublicKey();
-
-// Create quantum fingerprints
-const message = "Hello QuDAG WASM!";
-const hash = Blake3Hash.hash(message);
-
-console.log("QuDAG WASM client ready! 🌐");
-```
-
-**📦 Available Packages:**
-- [**qudag**](https://crates.io/crates/qudag) - Main library with all components
-- [**qudag-cli**](https://crates.io/crates/qudag-cli) - Command-line interface tool
-- [**qudag-crypto**](https://crates.io/crates/qudag-crypto) - Quantum-resistant cryptography
-- [**qudag-network**](https://crates.io/crates/qudag-network) - P2P networking & dark addressing
-- [**qudag-dag**](https://crates.io/crates/qudag-dag) - DAG consensus implementation
-- [**qudag-exchange**](https://crates.io/crates/qudag-exchange) - Resource exchange with rUv tokens and dynamic fees
-- [**qudag-vault-core**](https://crates.io/crates/qudag-vault-core) - Password vault with post-quantum encryption
-- [**qudag-protocol**](https://crates.io/crates/qudag-protocol) - Protocol coordination
-- [**qudag-mcp**](https://crates.io/crates/qudag-mcp) - Model Context Protocol server for AI integration
-- [**qudag-wasm**](https://www.npmjs.com/package/qudag) - WebAssembly bindings for browser and Node.js
-
-## Use Cases
-
-| Category | Applications | Description |
-|----------|--------------|-------------|
-| **🔐 Secure Communication** | End-to-end messaging | Quantum-resistant encrypted messaging between peers |
-| | Secure file transfer | Protected file sharing with ML-KEM encryption |
-| | Private group communication | Multi-party secure channels with perfect forward secrecy |
-| | Data streaming | Real-time encrypted data transmission |
-| **🌐 Network Infrastructure** | P2P message routing | Decentralized message relay without central servers |
-| | Distributed content storage | Content-addressed storage with quantum fingerprints |
-| | Secure relay networks | Anonymous relay nodes for traffic obfuscation |
-| | Anonymous networking | Onion routing with quantum-resistant encryption |
-| **🌐 Dark Domain System** | Decentralized naming | Register human-readable `.dark` domains without central authority |
-| | Quantum-resistant DNS | ML-DSA authenticated domain resolution with quantum fingerprints |
-| | Shadow addresses | Temporary `.shadow` domains for ephemeral communication |
-| | Darknet namespaces | Create your own darknet identity and addressing system |
-| **🛡️ Privacy Applications** | Anonymous messaging | Metadata-resistant communication channels |
-| | Private data transfer | Untraceable data exchange between parties |
-| | Secure group coordination | Private collaboration without identity exposure |
-| | Metadata protection | Full protocol-level metadata obfuscation |
-| **🔐 Password Management** | Quantum-resistant vault | AES-256-GCM encrypted passwords with ML-KEM/ML-DSA |
-| | Secure password generation | Cryptographically secure random password generation |
-| | DAG-based organization | Hierarchical password storage with categories |
-| | Encrypted backup/restore | Secure vault export/import functionality |
-| **🤖 Distributed AI Systems** | Agent coordination | Secure communication backbone for autonomous AI agents |
-| | Swarm intelligence | Decentralized coordination for AI agent swarms |
-| | MCP integration | Native Model Context Protocol server for AI tools |
-| | Tool orchestration | Distributed tool execution across agent networks |
-| **💱 Resource Exchange** | rUv token system | Resource Utilization Vouchers for computational trading |
-| | Dynamic fee model | Tiered fee structure with agent verification benefits |
-| | Immutable deployment | Quantum-resistant locked configurations |
-| | Multi-agent trading | Decentralized resource marketplace for AI agents |
-
-## Core Features
-
-### 🔐 Quantum-Resistant Cryptography
-
-| Feature | Implementation | Security Level | Standard | Status |
-|---------|----------------|----------------|----------|---------|
-| **Key Encapsulation** | ML-KEM-768 | NIST Level 3 | FIPS 203 | ✅ Production Ready |
-| **Digital Signatures** | ML-DSA (Dilithium-3) | NIST Level 3 | FIPS 204 | ✅ Production Ready |
-| **Code-Based Encryption** | HQC-128/192/256 | 128/192/256-bit | NIST Round 4 | ✅ Production Ready |
-| **Hash Functions** | BLAKE3 | 256-bit quantum-resistant | RFC Draft | ✅ Production Ready |
-| **Data Authentication** | Quantum Fingerprinting | ML-DSA based signatures | Custom | ✅ Production Ready |
-| **Memory Protection** | `ZeroizeOnDrop` | Automatic secret clearing | - | ✅ Production Ready |
-| **Side-Channel Defense** | Constant-time operations | Timing attack resistant | - | ✅ Production Ready |
-
-### 📊 DAG Architecture
-
-| Component | Technology | Benefits |
-|-----------|------------|----------|
-| **Message Processing** | Asynchronous handling | Non-blocking, high throughput |
-| **Consensus Algorithm** | QR-Avalanche | Byzantine fault-tolerant |
-| **Conflict Handling** | Automatic resolution | Self-healing network |
-| **Parent Selection** | Optimal tip algorithm | Efficient DAG growth |
-| **Performance Monitoring** | Real-time metrics | Latency & throughput tracking |
-| **State Transitions** | Atomic operations | Consistency guaranteed |
-
-### 🌐 Network Layer
-
-| Feature | Implementation | Purpose |
-|---------|----------------|---------|
-| **P2P Framework** | LibP2P | Decentralized networking |
-| **Anonymous Routing** | Multi-hop onion routing | Traffic anonymization |
-| **Traffic Protection** | ChaCha20Poly1305 | Message disguising |
-| **Peer Discovery** | Kademlia DHT | Decentralized lookup |
-| **Transport Security** | ML-KEM TLS | Quantum-resistant channels |
-| **Session Management** | Secure handshakes | Authenticated connections |
-
-### 🌐 Dark Addressing
-
-| Address Type | Format | Features |
-|--------------|--------|----------|
-| **Dark Domains** | `name.dark` | Quantum-resistant, human-readable |
-| **Shadow Addresses** | `shadow-[id].dark` | Temporary, auto-expiring |
-| **Quantum Fingerprints** | 64-byte hash | ML-DSA authentication |
-| **Resolution System** | Decentralized | No central authority |
-
-## Technical Achievements
-
-### 🏆 Major Milestones Completed
-
-| Achievement | Description | Impact |
-|-------------|-------------|--------|
-| **NIST Compliance** | Full implementation of NIST post-quantum standards | Future-proof security |
-| **Zero Unsafe Code** | Entire codebase with `#![deny(unsafe_code)]` | Memory safety guaranteed |
-| **LibP2P Integration** | Complete P2P stack with advanced features | Production-ready networking |
-| **Onion Routing** | ML-KEM encrypted multi-hop routing | True anonymity |
-| **DAG Consensus** | QR-Avalanche with parallel processing | High throughput |
-| **SIMD Optimization** | Hardware-accelerated crypto operations | 10x performance boost |
-| **NAT Traversal** | STUN/TURN/UPnP implementation | Works behind firewalls |
-| **Dark Addressing** | Quantum-resistant domain system | Decentralized naming |
-| **MCP Integration** | Model Context Protocol server | AI development tools integration |
-
-## 🤖 MCP Server Integration
-
-QuDAG includes a complete **Model Context Protocol (MCP)** server implementation, enabling seamless integration with AI development tools like Claude Desktop, VS Code, and custom applications. This MCP-first approach makes QuDAG the ideal infrastructure for distributed AI agent systems.
-
-### MCP Features
-- **Quantum-Resistant Security**: All MCP operations secured with post-quantum cryptography
-- **Comprehensive Tool Suite**: 6 built-in tools for vault, DAG, network, crypto, system, and config operations
-- **Rich Resource Access**: 4 dynamic resources providing real-time system state
-- **Multiple Transports**: stdio (for Claude Desktop), HTTP, and WebSocket support
-- **AI-Ready Prompts**: 10 pre-built prompts for common QuDAG workflows
-- **Real-time Updates**: Live resource subscriptions for dynamic data
-- **JWT Authentication**: Secure authentication with configurable RBAC
-- **Audit Logging**: Complete audit trail of all MCP operations
-
-### Available MCP Tools
-
-| Tool | Description | Key Operations |
-|------|-------------|----------------|
-| **vault** | Quantum-resistant password management | create, list, read, delete, search |
-| **dag** | DAG consensus operations | query, add, validate, status |
-| **network** | P2P network management | peers, connect, discover, status |
-| **crypto** | Cryptographic operations | keygen, sign, verify, encrypt, hash |
-| **system** | System information and monitoring | info, resources, processes, health |
-| **config** | Configuration management | get, set, list, validate, export |
-
-### Available MCP Resources
-
-| Resource | URI | Description |
-|----------|-----|-------------|
-| **Vault State** | `qudag://vault/state` | Current vault entries and metadata |
-| **DAG Status** | `qudag://dag/status` | DAG consensus state and metrics |
-| **Network Info** | `qudag://network/info` | Peer connections and network stats |
-| **System Status** | `qudag://system/status` | System health and performance metrics |
-
-### Quick MCP Setup
-```bash
-# Start MCP server (default: HTTP on port 3000)
-qudag mcp start
-
-# Start with stdio transport (for Claude Desktop)
-qudag mcp start --transport stdio
-
-# Start with WebSocket support
-qudag mcp start --transport ws --port 8080
-
-# Configure MCP server settings
-qudag mcp config init
-qudag mcp config show
-
-# List available tools and resources
-qudag mcp tools
-qudag mcp resources
-
-# Test server connectivity
-qudag mcp test --endpoint http://localhost:3000
-```
-
-### Integration Examples
-
-#### Claude Desktop Configuration
-```json
-// ~/.claude/claude_desktop_config.json
-{
-  "mcpServers": {
-    "qudag": {
-      "command": "qudag",
-      "args": ["mcp", "start", "--transport", "stdio"]
-    }
-  }
-}
-```
-
-#### VS Code Extension
-```typescript
-// Use QuDAG MCP in VS Code extensions
-import { MCPClient } from 'qudag-mcp-client';
-
-const client = new MCPClient('http://localhost:3000');
-await client.connect();
-
-// Use tools
-const passwords = await client.callTool('vault', {
-  operation: 'list',
-  category: 'development'
-});
-
-// Subscribe to resources
-client.subscribe('qudag://network/info', (data) => {
-  console.log('Network update:', data);
-});
-```
-
-#### Python Integration
-```python
-# Use QuDAG MCP from Python
-from qudag_mcp import MCPClient
-
-client = MCPClient("http://localhost:3000")
-client.connect()
-
-# Query DAG status
-dag_status = client.call_tool("dag", {
-    "operation": "status"
-})
-
-# Monitor system resources
-for update in client.subscribe("qudag://system/status"):
-    print(f"CPU: {update['cpu_usage']}%, Memory: {update['memory_usage']}%")
-```
-
-## 💱 QuDAG Exchange
-
-QuDAG Exchange is a quantum-resistant resource trading platform that enables autonomous AI agents to exchange computational resources using rUv (Resource Utilization Voucher) tokens. The exchange features a dynamic tiered fee model, immutable deployment capabilities, and seamless integration with the QuDAG DAG consensus system.
-
-### 🎯 Key Features
-
-- **🪙 rUv Token System**: Native Resource Utilization Vouchers for computational resource trading
-- **📊 Dynamic Tiered Fee Model**: Mathematical fee structure that rewards verification and high usage
-- **🔒 Immutable Deployment**: Quantum-resistant configuration locking with ML-DSA-87 signatures
-- **🤖 Agent Verification**: Reduced fees for verified agents with proof-based authentication
-- **⚡ DAG Integration**: Seamless integration with QuDAG's quantum-resistant consensus
-- **🛡️ Security First**: All operations secured with post-quantum cryptography
-
-### 🏗️ Architecture Overview
-
-```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Agent Pool    │    │  Fee Calculator │    │ Immutable Lock  │
-│                 │    │                 │    │                 │
-│ ┌─────────────┐ │    │ ┌─────────────┐ │    │ ┌─────────────┐ │
-│ │ Verified    │ │◄──►│ │ Dynamic     │ │◄──►│ │ ML-DSA-87   │ │
-│ │ Agents      │ │    │ │ Tiered      │ │    │ │ Signatures  │ │
-│ └─────────────┘ │    │ │ Model       │ │    │ └─────────────┘ │
-│ ┌─────────────┐ │    │ └─────────────┘ │    │ ┌─────────────┐ │
-│ │ Unverified  │ │    │ ┌─────────────┐ │    │ │ Grace       │ │
-│ │ Agents      │ │    │ │ Usage       │ │    │ │ Period      │ │
-│ └─────────────┘ │    │ │ Tracking    │ │    │ └─────────────┘ │
-└─────────────────┘    │ └─────────────┘ │    └─────────────────┘
-                       └─────────────────┘
-```
-
-### 🪙 rUv Token Economics
-
-**Resource Utilization Vouchers (rUv)** are the native tokens for computational resource trading:
-
-- **Purpose**: Facilitate trustless exchange of computational resources between agents
-- **Quantum Security**: All transfers protected with ML-DSA signatures
-- **Precision**: 64-bit integer precision for micro-transactions
-- **Supply**: Configurable maximum supply with mint/burn operations
-- **Integration**: Native support in QuDAG DAG consensus system
-
-#### Token Operations
-```bash
-# Create account and manage tokens
-qudag exchange create-account --name alice
-qudag exchange balance --account alice
-qudag exchange transfer --from alice --to bob --amount 1000
-qudag exchange mint --account alice --amount 5000
-qudag exchange supply
-```
-
-### 📊 Dynamic Tiered Fee Model
-
-The exchange implements a sophisticated mathematical fee model that incentivizes agent verification and rewards high-usage participants:
-
-#### Fee Structure
-
-| Agent Type | Base Fee | Maximum Fee | Usage Behavior |
-|------------|----------|-------------|----------------|
-| **Unverified** | 0.1% | 1.0% | Increases with time and usage |
-| **Verified** | 0.25% | 0.50% → 0.25% | Decreases with high usage |
-
-#### Mathematical Formulation
-
-**Unverified Agent Fee:**
-```
-f_unv(u,t) = F_min + (F_max - F_min) × α(t) × β(u)
-where:
-α(t) = 1 - e^(-t/T)     # Time phase-in (3 months)
-β(u) = 1 - e^(-u/U)     # Usage scaling (10,000 rUv threshold)
-```
-
-**Verified Agent Fee:**
-```
-f_ver(u,t) = F_min_ver + (F_max_ver - F_min_ver) × α(t) × (1 - β(u))
-# Rewards high usage with lower fees
-```
-
-#### Fee Examples
-
-| Scenario | Time | Usage | Fee Rate | Description |
-|----------|------|-------|----------|-------------|
-| New unverified agent | 0 months | 0 rUv/month | 0.100% | Introductory rate |
-| Moderate unverified | 3 months | 5,000 rUv/month | 0.324% | Standard progression |
-| High-usage unverified | 6 months | 50,000 rUv/month | 0.873% | Penalty for unverified high usage |
-| New verified agent | 0 months | 0 rUv/month | 0.250% | Verified base rate |
-| High-usage verified | 6 months | 20,000 rUv/month | 0.279% | Reward for verified high usage |
-
-#### Configure Fee Parameters
-```bash
-# Update fee model parameters
-qudag exchange configure-fees \
-  --f-min 0.002 \
-  --f-max 0.012 \
-  --f-min-verified 0.003 \
-  --f-max-verified 0.006 \
-  --time-constant-days 90 \
-  --usage-threshold 10000
-
-# View current fee status and examples
-qudag exchange fee-status --examples
-
-# Calculate specific fees
-qudag exchange calculate-fee --account alice --amount 1000
-```
-
-### 🔒 Immutable Deployment System
-
-The exchange supports optional immutable deployment mode for governance-free operation:
-
-#### Security Features
-
-- **Quantum-Resistant Signatures**: ML-DSA-87 signatures lock configurations
-- **Configuration Hashing**: Blake3 hashes ensure integrity
-- **Grace Period**: Configurable grace period before enforcement (default 24 hours)
-- **Emergency Override**: Optional governance keys for emergency situations
-- **Atomic Locking**: All-or-nothing configuration locking
-
-#### Deployment Workflow
+## Quick Start
 
 ```bash
-# 1. Configure the exchange
-qudag exchange configure-fees --f-min 0.001 --f-max 0.01
+# Start a QuDAG node with exchange enabled
+qudag start --port 8000 --enable-exchange
 
-# 2. Deploy in immutable mode with 1-hour grace period
-qudag exchange deploy-immutable --grace-period 1
+# Create an rUv token account
+qudag exchange create-account --name "alice" --email "alice@example.com"
 
-# 3. Check deployment status
-qudag exchange immutable-status
+# Register your darknet domain
+qudag address register mynode.dark
 
-# During grace period (1 hour):
-# - Configuration can still be modified
-# - System shows "locked but not enforced"
+# Start MCP server for AI agent integration
+qudag mcp start --port 3000
 
-# After grace period:
-# - All configuration changes blocked
-# - System operates in governance-free mode
+# Check comprehensive status
+qudag status
 ```
 
-#### Status Monitoring
-```bash
-# Detailed immutable deployment status
-qudag exchange immutable-status --format json
-```
+## Commands
 
-Example output:
-```json
-{
-  "enabled": true,
-  "locked": true,
-  "enforced": true,
-  "in_grace_period": false,
-  "locked_at": "2025-06-22T15:30:00Z",
-  "grace_period_seconds": 3600,
-  "config_hash": "blake3:a1b2c3d4..."
-}
-```
-
-### 🤖 Agent Verification System
-
-Agents can be verified to receive reduced fees and enhanced privileges:
-
-#### Verification Benefits
-
-- **Lower Fees**: Reduced base fees (0.25% vs 0.1%)
-- **Usage Rewards**: High usage decreases fees further
-- **Priority Access**: Enhanced access to network resources
-- **Trust Signals**: Cryptographic proof of verification status
-
-#### Verification Process
+### Node Management
 
 ```bash
-# 1. Create verification proof file
-cat > agent_proof.json << EOF
-{
-  "agent_id": "alice",
-  "verification_type": "kyc_document",
-  "proof_hash": "blake3:verification_data_hash",
-  "timestamp": "2025-06-22T15:30:00Z",
-  "signature": "ml_dsa_signature_bytes"
-}
-EOF
-
-# 2. Submit verification
-qudag exchange verify-agent \
-  --account alice \
-  --proof-path agent_proof.json
-
-# 3. Update usage statistics for better rates
-qudag exchange update-usage \
-  --account alice \
-  --usage 15000
-
-# 4. Calculate fees with verified status
-qudag exchange calculate-fee \
-  --account alice \
-  --amount 1000
-```
-
-### 🛠️ CLI Command Reference
-
-#### Account Management
-```bash
-# Account operations
-qudag exchange create-account --name <name>
-qudag exchange balance --account <account>
-qudag exchange accounts --format json
-qudag exchange transfer --from <source> --to <dest> --amount <amount>
-```
-
-#### Token Operations
-```bash
-# Token supply management
-qudag exchange mint --account <account> --amount <amount>
-qudag exchange burn --account <account> --amount <amount>
-qudag exchange supply
-```
-
-#### Fee Model Management
-```bash
-# Fee configuration
-qudag exchange configure-fees [parameters]
-qudag exchange fee-status --examples
-qudag exchange calculate-fee --account <account> --amount <amount>
-```
-
-#### Immutable Deployment
-```bash
-# Deployment operations
-qudag exchange deploy-immutable --grace-period <hours>
-qudag exchange immutable-status --format json
-```
-
-#### Agent Verification
-```bash
-# Verification and usage
-qudag exchange verify-agent --account <account> --proof-path <path>
-qudag exchange update-usage --account <account> --usage <monthly_ruv>
-```
-
-#### Network Status
-```bash
-# System monitoring
-qudag exchange status
-qudag network stats
-```
-
-### 🔗 Integration with QuDAG Components
-
-#### DAG Consensus Integration
-- **Transaction Validation**: All transfers validated through QR-Avalanche consensus
-- **Quantum Signatures**: ML-DSA signatures on all transaction messages
-- **Finality Guarantees**: Byzantine fault-tolerant transaction finality
-- **Parallel Processing**: High-throughput transaction processing
-
-#### P2P Network Integration
-- **Dark Addressing**: Exchange nodes accessible via `.dark` domains
-- **Onion Routing**: Anonymous transaction routing through the network
-- **NAT Traversal**: Seamless operation behind firewalls and NAT
-- **Peer Discovery**: Automatic discovery of exchange-enabled nodes
-
-#### Vault Integration
-- **Key Management**: Secure storage of exchange private keys
-- **Multi-Signature**: Support for multi-signature exchange accounts
-- **Backup/Recovery**: Encrypted backup of exchange key material
-- **Hardware Security**: Integration with hardware security modules
-
-### 📈 Performance Characteristics
-
-#### Transaction Throughput
-- **Peak Throughput**: 10,000+ transactions per second (theoretical)
-- **Average Latency**: <150ms transaction finality
-- **Fee Calculation**: <1ms per fee calculation
-- **Concurrent Users**: 1,000+ simultaneous agents supported
-
-#### Resource Usage
-- **Memory**: 15MB additional memory for exchange operations
-- **CPU**: <5% overhead for fee calculations
-- **Storage**: Minimal on-disk state (in-memory by default)
-- **Network**: Standard QuDAG P2P overhead
-
-### 🔧 Configuration Examples
-
-#### Development Configuration
-```bash
-# Quick development setup
-qudag exchange create-account --name dev_alice
-qudag exchange create-account --name dev_bob
-qudag exchange mint --account dev_alice --amount 10000
-qudag exchange transfer --from dev_alice --to dev_bob --amount 1000
-```
-
-#### Production Configuration
-```bash
-# Production deployment with immutable mode
-qudag exchange configure-fees \
-  --f-min 0.001 \
-  --f-max 0.008 \
-  --f-min-verified 0.002 \
-  --f-max-verified 0.004 \
-  --time-constant-days 90 \
-  --usage-threshold 15000
-
-qudag exchange deploy-immutable --grace-period 24
-```
-
-#### High-Volume Agent Setup
-```bash
-# Setup for high-volume verified agent
-qudag exchange create-account --name production_agent
-qudag exchange verify-agent \
-  --account production_agent \
-  --proof-path production_verification.json
-qudag exchange update-usage \
-  --account production_agent \
-  --usage 50000
-```
-
-### 🛡️ Security Considerations
-
-#### Quantum Resistance
-- **Signature Algorithm**: ML-DSA-87 for all transactions
-- **Key Exchange**: ML-KEM-768 for secure communications
-- **Hash Functions**: Blake3 for all integrity checking
-- **Future-Proof**: Resistant to quantum computer attacks
-
-#### Network Security
-- **Anonymous Routing**: All transactions routed through onion circuits
-- **Traffic Obfuscation**: ChaCha20Poly1305 traffic disguising
-- **Peer Authentication**: ML-DSA peer verification
-- **DDoS Protection**: Rate limiting and connection filtering
-
-#### Economic Security
-- **Fee Model Integrity**: Mathematical guarantees on fee calculations
-- **Immutable Deployment**: Prevents unauthorized configuration changes
-- **Agent Verification**: Cryptographic proof of agent authenticity
-- **Audit Trail**: Complete transaction history with signatures
-
-### 📚 API Integration
-
-#### Rust API
-```rust
-use qudag_exchange::{Exchange, rUv, AgentStatus};
-
-// Create exchange instance
-let mut exchange = Exchange::new()?;
-
-// Create accounts
-let alice = exchange.create_account("alice".to_string())?;
-let bob = exchange.create_account("bob".to_string())?;
-
-// Transfer tokens
-let amount = rUv::new(1000);
-let tx_id = exchange.transfer(&alice, &bob, amount, None)?;
-
-// Calculate fees
-let fee = exchange.calculate_fee(&alice, amount)?;
-```
-
-#### WASM Integration
-```javascript
-import { QuDAGExchange, rUv } from 'qudag-exchange';
-
-// Initialize exchange
-const exchange = new QuDAGExchange();
-
-// Create and manage accounts
-const alice = await exchange.createAccount('alice');
-const balance = await exchange.getBalance('alice');
-
-// Transfer with automatic fee calculation
-await exchange.transfer('alice', 'bob', 1000);
-```
-
-## How It Works
-
-### DAG Architecture
-```
-     Message C ────┐
-    ╱              ▼
-Message A ───► [DAG Vertex] ◄─── Message D
-    ╲              ▲
-     Message B ────┘
-     
-Each vertex contains:
-- ML-KEM encrypted payload
-- Parent vertex references  
-- ML-DSA signatures
-- Consensus metadata
-```
-
-### Core Components
-- **DAG Consensus**: QR-Avalanche algorithm for Byzantine fault tolerance
-- **Vertex Processing**: Parallel message validation and ordering
-- **Quantum Cryptography**: ML-KEM-768 encryption + ML-DSA signatures
-- **P2P Network**: LibP2P mesh with Kademlia DHT discovery
-- **Anonymous Routing**: Multi-hop onion routing through the DAG
-
-### Message Processing Flow
-1. **Message Creation**: Encrypt with ML-KEM-768, sign with ML-DSA
-2. **DAG Insertion**: Create vertex with parent references
-3. **Consensus**: QR-Avalanche validation across network
-4. **Propagation**: Distribute through P2P mesh network
-5. **Finalization**: Achieve consensus finality in DAG structure
-
-## Current Implementation Status
-
-### What's Working Now
-
-The QuDAG project has made significant progress with core cryptographic and networking components fully implemented:
-
-#### ✅ **Fully Functional Features**
-- **Post-Quantum Cryptography**: Complete implementation of all quantum-resistant algorithms
-  - ML-KEM-768 (Kyber) for key encapsulation
-  - ML-DSA (Dilithium) for digital signatures  
-  - HQC for code-based encryption (128/192/256-bit)
-  - BLAKE3 for quantum-resistant hashing
-  - Quantum fingerprinting with ML-DSA signatures
-- **Dark Address System**: Complete implementation of quantum-resistant addressing
-  - Register `.dark` domains with validation
-  - Resolve registered addresses
-  - Generate temporary shadow addresses with TTL
-  - Create quantum fingerprints using ML-DSA
-- **P2P Networking**: LibP2P integration with advanced features
-  - Kademlia DHT for peer discovery
-  - Gossipsub for pub/sub messaging
-  - Multi-hop onion routing with ML-KEM encryption
-  - NAT traversal with STUN/TURN support
-  - Traffic obfuscation with ChaCha20Poly1305
-- **DAG Consensus**: QR-Avalanche consensus implementation
-  - Vertex validation and state management
-  - Parallel message processing
-  - Conflict detection and resolution
-  - Tip selection algorithms
-- **CLI Infrastructure**: Complete command-line interface
-  - All commands parse and validate input correctly
-  - Help system and documentation
-  - Error handling and user feedback
-  - Multiple output formats (text, JSON, tables)
-
-#### ⚙️ **Integration Pending** (Components built, integration in progress)
-- **Node Process**: RPC server implemented, node startup integration pending
-- **Network-DAG Bridge**: Both components functional, bridging layer needed
-- **State Persistence**: Storage layer defined, implementation pending
-
-#### 🚧 **Active Development**
-- **Network Protocol**: Final protocol message handling
-- **Consensus Integration**: Connecting DAG to network layer
-- **Performance Optimization**: SIMD optimizations for crypto operations
-
-### Understanding the Output
-
-When you run commands, you'll see different types of responses:
-
-1. **Working Features**: Dark addressing commands show real functionality
-2. **CLI-Only Features**: Show formatted output with notes like "not yet implemented"
-3. **Unimplemented Features**: Return error "not implemented" (this is intentional in TDD)
-
-## Build Status
-
-### Latest Build Results
-
-| Module | Status | Tests | Coverage |
-|--------|--------|-------|----------|
-| **qudag-crypto** | ✅ Passing | 45/45 | 94% |
-| **qudag-network** | ✅ Passing | 62/62 | 89% |
-| **qudag-dag** | ✅ Passing | 38/38 | 91% |
-| **qudag-protocol** | ✅ Passing | 27/27 | 87% |
-| **qudag-mcp** | ✅ Passing | 35/35 | 88% |
-| **qudag-cli** | ✅ Passing | 51/51 | 92% |
-| **Overall** | ✅ Passing | 258/258 | 91% |
-
-### Compilation
-
-- **Rust Version**: 1.87.0 (stable)
-- **MSRV**: 1.75.0
-- **Build Time**: ~3 minutes (full workspace)
-- **Dependencies**: 147 crates
-- **Binary Size**: 28MB (release build with LTO)
-
-## Performance Optimizations 🚀
-
-QuDAG v2.0 includes comprehensive performance optimizations that deliver:
-
-- **3.2x Performance Improvement** - Faster message processing and routing
-- **65% Memory Reduction** - Efficient memory pooling and management
-- **100% Cache Hit Rate** - Intelligent multi-level caching system
-- **11x DNS Resolution Speed** - Optimized dark domain lookups
-- **Sub-millisecond Latencies** - P99 < 100ms for all operations
-
-### Key Optimizations
-- **DNS Caching**: Multi-level cache (L1: Memory, L2: Redis, L3: DNS)
-- **Batch Operations**: Automatic batching for 50-80% improvement
-- **Connection Pooling**: Persistent connections with health checks
-- **Parallel Execution**: Separate thread pools for CPU/IO operations
-- **Memory Pooling**: Custom allocators reduce allocation overhead
-
-For deployment details, see [Deployment Guide](/benchmarking/deployment/UNIFIED_DEPLOYMENT_GUIDE.md).
-
-## Development Setup
-
-> **💡 For quick installation, see the [🚀 Quick Installation](#-quick-installation) section above.**
-
-### Build from Source
-
-```bash
-# Clone the repository
-git clone https://github.com/ruvnet/QuDAG
-cd QuDAG
-
-# Build all components
-cargo build --workspace
-
-# Install CLI from source
-cargo install --path tools/cli
-
-# Verify installation
-qudag-cli --help
-```
-
-### Testing and Development
-
-```bash
-# Run comprehensive tests
-cargo test --workspace
-
-# Run specific module tests
-cargo test -p qudag-crypto
-cargo test -p qudag-network
-cargo test -p qudag-dag
-
-# Run benchmarks
-cargo bench
-
-# Build with optimizations
-cargo build --release --features optimizations
-```
-
-### Advanced Library Usage
-
-For more advanced usage examples, see the individual crate documentation:
-
-```rust
-// Quantum-resistant cryptography
-use qudag_crypto::{MlDsaKeyPair, MlKem768};
-
-// DAG consensus
-use qudag_dag::{Dag, Vertex, QRAvalanche};
-
-// P2P networking with dark addressing
-use qudag_network::{DarkResolver, OnionRouter};
-
-// Full protocol integration
-use qudag_protocol::{Node, NodeConfig};
-```
-
-📚 **Documentation Links:**
-- [QuDAG Crypto Documentation](https://docs.rs/qudag-crypto)
-- [QuDAG Network Documentation](https://docs.rs/qudag-network) 
-- [QuDAG DAG Documentation](https://docs.rs/qudag-dag)
-- [QuDAG Protocol Documentation](https://docs.rs/qudag-protocol)
-- [QuDAG CLI Documentation](https://docs.rs/qudag-cli)
-
-For more examples, see the [examples](examples/) directory.
-
-### First Run
-
-```bash
-# Start your first node
-qudag-cli start --port 8000
-
-# In another terminal, create your own darknet domain
-qudag-cli address register mynode.dark
-qudag-cli address register secret-service.dark
-qudag-cli address register anonymous-chat.dark
-
-# Resolve any .dark domain to find peers
-qudag-cli address resolve mynode.dark
-
-# Generate temporary shadow addresses for ephemeral communication
-qudag-cli address shadow --ttl 3600
-
-# Create quantum-resistant content fingerprints
-qudag-cli address fingerprint --data "First QuDAG message!"
+# Start a node
+qudag start [--port 8000] [--rpc-port 9090]
 
 # Stop the node
-qudag-cli stop
+qudag stop
+
+# Get node status
+qudag status
+
+# Restart node
+qudag restart
 ```
 
-## CLI & API Overview
+### Peer Operations
 
-QuDAG provides multiple interfaces for interacting with the protocol, from command-line tools to programmatic APIs.
-
-### 🖥️ Command Line Interface (CLI)
-
-The QuDAG CLI provides comprehensive access to all protocol features:
-
-#### **Node Management**
 ```bash
-qudag-cli start --port 8000                    # Start a QuDAG node
-qudag-cli stop                                  # Stop running node
-qudag-cli status                               # Get node health and status
-qudag-cli restart                              # Restart node with same config
+# List connected peers
+qudag peer list
+
+# Add a peer
+qudag peer add <multiaddr>
+
+# Remove a peer
+qudag peer remove <peer_id>
+
+# Ban a peer
+qudag peer ban <peer_id>
+
+# Test connectivity
+qudag network test
 ```
 
-#### **Peer & Network Operations**
+### Dark Addressing
+
 ```bash
-qudag-cli peer list                            # List connected peers
-qudag-cli peer add <multiaddr>                 # Connect to peer
-qudag-cli peer remove <peer_id>                # Disconnect from peer
-qudag-cli peer ban <peer_id>                   # Ban peer (blacklist)
-qudag-cli network stats                        # Network performance metrics
-qudag-cli network test                         # Test peer connectivity
+# Register a .dark domain
+qudag address register mydomain.dark
+
+# Resolve a domain
+qudag address resolve somedomain.dark
+
+# Create temporary shadow address
+qudag address shadow --ttl 3600
+
+# Generate quantum fingerprint
+qudag address fingerprint --data "Hello World"
+
+# List your registered domains
+qudag address list
 ```
 
-#### **Dark Addressing System**
-```bash
-qudag-cli address register mynode.dark         # Register .dark domain
-qudag-cli address resolve domain.dark          # Resolve dark address
-qudag-cli address shadow --ttl 3600           # Generate temporary address
-qudag-cli address fingerprint --data "text"    # Create quantum fingerprint
-qudag-cli address list                        # List registered domains
-```
+### Exchange Operations
 
-#### **Exchange Operations**
+Manage rUv tokens and business plan payouts:
+
 ```bash
 # Account Management
-qudag exchange create-account --name alice     # Create new exchange account
-qudag exchange balance --account alice         # Check account balance
-qudag exchange accounts --format json          # List all accounts
-qudag exchange transfer --from alice --to bob --amount 1000  # Transfer rUv tokens
+qudag exchange create-account --name "alice" --email alice@example.com
+qudag exchange balance --account "alice"
+qudag exchange list-accounts --format table
 
-# Fee Model Configuration
-qudag exchange configure-fees --f-min 0.001 --f-max 0.01    # Configure fee parameters
-qudag exchange fee-status --examples           # Show fee examples
-qudag exchange calculate-fee --account alice --amount 1000   # Calculate specific fee
+# Token Transfers
+qudag exchange transfer --from "alice" --to "bob" --amount 1000
+qudag exchange transfer --from "alice" --to "bob" --amount 5000 --memo "Payment for services"
+
+# Fee Management
+qudag exchange fee-info --examples
+qudag exchange calculate-fee --account "alice" --amount 10000
+qudag exchange verify-agent "alice" --proof-path ./proofs/alice_kyc.proof
 
 # Immutable Deployment
-qudag exchange deploy-immutable --grace-period 24            # Deploy with 24h grace period
-qudag exchange immutable-status --format json # Check deployment status
-
-# Agent Verification
-qudag exchange verify-agent --account alice --proof-path proof.json  # Verify agent
-qudag exchange update-usage --account alice --usage 15000            # Update usage stats
-
-# Token Operations
-qudag exchange mint --account alice --amount 5000           # Mint new tokens
-qudag exchange burn --account alice --amount 1000           # Burn tokens
-qudag exchange supply                           # Show total supply
-qudag exchange status                          # Exchange network status
+qudag exchange deploy-immutable --key-path ./keys/quantum_master.key
+qudag exchange immutable-status --format json
 ```
 
-#### **Advanced Features**
-```bash
-qudag-cli logs --follow                       # Stream node logs
-qudag-cli systemd --output /etc/systemd      # Generate systemd service
-```
+### Business Plan Management
 
-**📚 For detailed CLI documentation:** [docs/cli/README.md](docs/cli/README.md)
-
-### 🔌 JSON-RPC API
-
-QuDAG runs a production-ready JSON-RPC server for programmatic access:
-
-#### **Connection Details**
-- **Protocol**: JSON-RPC 2.0 over TCP/HTTP
-- **Default Port**: 9090 
-- **Authentication**: Optional ML-DSA signatures
-- **Transport**: TCP sockets or Unix domain sockets
-
-#### **Available Methods**
-```javascript
-// Node management
-{"method": "get_status", "params": {}}
-{"method": "stop", "params": {}}
-
-// Peer management
-{"method": "list_peers", "params": {}}
-{"method": "add_peer", "params": {"address": "/ip4/.../tcp/8000"}}
-{"method": "remove_peer", "params": {"peer_id": "12D3Koo..."}}
-{"method": "ban_peer", "params": {"peer_id": "12D3Koo..."}}
-
-// Network operations
-{"method": "get_network_stats", "params": {}}
-{"method": "test_network", "params": {}}
-```
-
-#### **Example Usage**
-```bash
-# Get node status
-curl -X POST http://localhost:9090 \
-  -H "Content-Type: application/json" \
-  -d '{"id": 1, "method": "get_status", "params": {}}'
-
-# List connected peers
-curl -X POST http://localhost:9090 \
-  -H "Content-Type: application/json" \
-  -d '{"id": 2, "method": "list_peers", "params": {}}'
-```
-
-**📚 For complete API reference:** [docs/api/README.md](docs/api/README.md)
-
-### 🌐 P2P Protocol API
-
-Direct access to the P2P network layer for advanced integration:
-
-#### **Network Protocols**
-- **Port**: 8000 (default, configurable)
-- **Transport**: libp2p with multiple protocols
-- **Encryption**: ML-KEM-768 for all communications
-- **Discovery**: Kademlia DHT + mDNS
-
-#### **Supported Protocols**
-```
-/qudag/req/1.0.0          # Request-response messaging
-/kad/1.0.0                # Kademlia DHT routing
-/gossipsub/1.1.0          # Publish-subscribe messaging
-/identify/1.0.0           # Peer identification
-/dark-resolve/1.0.0       # Dark address resolution
-```
-
-#### **Message Types**
-- **DAG Messages**: Consensus transactions and vertices
-- **Dark Queries**: Address resolution requests  
-- **Peer Discovery**: Network topology updates
-- **File Transfer**: Large data transmission
-
-**📚 For P2P protocol specification:** [docs/protocol/README.md](docs/protocol/README.md)
-
-### 📊 Monitoring & Metrics
-
-Built-in observability for production deployments:
-
-#### **Real-time Metrics**
-```bash
-qudag-cli network stats      # Network performance metrics
-qudag-cli peer stats <id>    # Individual peer statistics  
-qudag-cli status             # Overall node health
-```
-
-#### **Exportable Data**
-- **Prometheus**: Metrics endpoint at `/metrics`
-- **JSON**: Structured data export
-- **CSV**: Historical data for analysis
-- **Logs**: Structured JSON logging
-
-**📚 For monitoring setup:** [docs/monitoring/README.md](docs/monitoring/README.md)
-
-### 🛠️ SDK & Libraries
-
-Language-specific libraries for application development:
-
-#### **Rust SDK** (Native)
-```rust
-use qudag_protocol::Client;
-
-let client = Client::connect("localhost:9090").await?;
-let status = client.get_status().await?;
-let peers = client.list_peers().await?;
-```
-
-#### **Python SDK** (Coming Soon)
-```python
-# Future: Python bindings for QuDAG
-from qudag import QuDAGClient
-
-client = QuDAGClient("localhost:9090")
-status = await client.get_status()
-peers = await client.list_peers()
-```
-
-#### **JavaScript SDK** (Coming Soon)
-```javascript
-// Future: JavaScript/TypeScript bindings for QuDAG
-import { QuDAGClient } from '@qudag/client';
-
-const client = new QuDAGClient('ws://localhost:9090');
-const status = await client.getStatus();
-const peers = await client.listPeers();
-```
-
-**📚 For SDK documentation:** [docs/sdk/README.md](docs/sdk/README.md)
-
-### 🔐 Authentication & Security
-
-Production-grade security for all API access:
-
-#### **Authentication Methods**
-- **ML-DSA Signatures**: Quantum-resistant authentication
-- **Token-based**: Bearer tokens for HTTP APIs
-- **mTLS**: Mutual TLS for RPC connections
-- **IP Allowlists**: Network-level access control
-
-#### **Authorization Levels**
-- **Public**: Read-only status and metrics
-- **Operator**: Peer management and network operations
-- **Admin**: Full node control and configuration
-
-**📚 For security configuration:** [docs/security/authentication.md](docs/security/authentication.md)
-
-## Architecture
-
-QuDAG follows a modular workspace architecture designed for security, performance, and maintainability:
-
-```
-core/
-├── crypto/           # Production quantum-resistant cryptographic primitives
-│   ├── ml_kem/      # ML-KEM-768 implementation (FIPS 203 compliant)
-│   ├── ml_dsa/      # ML-DSA (Dilithium-3) signatures (FIPS 204 compliant)
-│   ├── hqc.rs       # HQC code-based encryption (3 security levels)
-│   ├── fingerprint.rs # Quantum fingerprinting using ML-DSA
-│   ├── hash.rs      # BLAKE3 quantum-resistant hashing
-│   ├── signature.rs # Generic signature interface
-│   └── encryption/  # Asymmetric encryption interfaces
-├── dag/             # DAG consensus with QR-Avalanche algorithm
-│   ├── consensus.rs # QR-Avalanche consensus implementation
-│   ├── vertex.rs    # DAG vertex management
-│   ├── tip_selection.rs # Optimal parent selection algorithm
-│   └── graph.rs     # DAG structure and validation
-├── network/         # P2P networking with anonymous routing
-│   ├── dark_resolver.rs   # .dark domain resolution system
-│   ├── shadow_address.rs  # .shadow stealth addressing
-│   ├── onion.rs          # ML-KEM onion routing implementation
-│   ├── connection.rs     # Secure connection management
-│   └── router.rs         # Anonymous routing strategies
-└── protocol/        # Protocol coordination and state management
-    ├── coordinator.rs # Main protocol coordinator
-    ├── node.rs       # Node lifecycle management
-    ├── validation.rs # Message and state validation
-    └── metrics.rs    # Performance monitoring
-
-tools/
-├── cli/             # Command-line interface with performance optimizations
-│   ├── commands.rs  # CLI command implementations
-│   ├── config.rs    # Configuration management
-│   └── performance.rs # Performance monitoring and optimization
-└── simulator/       # Network simulation and testing framework
-    ├── network.rs   # Network simulation engine
-    ├── scenarios.rs # Test scenario definitions
-    └── metrics.rs   # Simulation metrics collection
-
-benchmarks/          # Performance benchmarking suite
-├── crypto/         # Cryptographic operation benchmarks
-├── network/        # Network performance benchmarks
-├── consensus/      # Consensus algorithm benchmarks
-└── system/         # End-to-end system benchmarks
-
-infra/              # Infrastructure and deployment
-├── docker/         # Docker containerization
-├── k8s/           # Kubernetes deployment manifests
-└── terraform/     # Infrastructure as code
-```
-
-## Development
-
-### Testing Strategy
-
-| Test Type | Command | Coverage |
-|-----------|---------|----------|
-| **Unit Tests** | `cargo test` | >90% code coverage |
-| **Integration Tests** | `cargo test --test integration` | End-to-end workflows |
-| **Security Tests** | `cargo test --features security-tests` | Cryptographic validation |
-| **Performance Tests** | `cargo bench` | Performance regression |
-| **Fuzz Tests** | `./fuzz/run_all_fuzz_tests.sh` | Edge case discovery |
-| **Memory Tests** | `cargo test --features memory-tests` | Memory safety validation |
-
-### Module-Specific Testing
+Configure and manage automated payout distribution:
 
 ```bash
-# Cryptographic primitives
-cargo test -p qudag-crypto
+# Enable Business Plan Features
+qudag exchange business-plan enable \
+    --auto-distribution \
+    --vault-management \
+    --role-earnings \
+    --bounty-rewards
 
-# Network layer
-cargo test -p qudag-network
+# Check Status
+qudag exchange business-plan status
 
-# DAG consensus
-cargo test -p qudag-dag
+# Configure Payouts
+qudag exchange business-plan configure threshold 100
+qudag exchange business-plan configure system-fee 0.001
+qudag exchange business-plan configure single-agent --agent 0.95 --infrastructure 0.05
+qudag exchange business-plan configure plugin-enhanced --agent 0.85 --plugin 0.10 --infrastructure 0.05
 
-# Protocol coordination
-cargo test -p qudag-protocol
+# Contributor Management
+qudag exchange business-plan contributors register agent-001 agent-provider vault-001
+qudag exchange business-plan contributors register plugin-002 plugin-creator vault-002 --custom-percentage 0.12
+qudag exchange business-plan contributors list
+qudag exchange business-plan contributors show agent-001
+qudag exchange business-plan contributors update agent-001 --custom-percentage 0.90
 
-# CLI interface
-cargo test -p qudag-cli
+# View Payout History
+qudag exchange business-plan payouts --limit 50
+qudag exchange business-plan payouts --contributor agent-001
 ```
 
-### Code Quality
+### MCP Server Operations
+
+Model Context Protocol server for AI agent integration:
 
 ```bash
-# Format code
-cargo fmt
+# Start MCP Server
+qudag mcp start --port 3000 --host 0.0.0.0
+qudag mcp start --stdio  # For stdio transport
 
-# Check for common issues
-cargo clippy -- -D warnings
+# Server Management
+qudag mcp status
+qudag mcp stop
+qudag mcp logs --follow
 
-# Security audit
-cargo audit
+# List Available Tools
+qudag mcp tools list
+qudag mcp resources list
 
-# Check dependencies
-cargo outdated
+# Configuration
+qudag mcp config show
+qudag mcp config set max_connections 100
 ```
 
-### Performance Profiling
+### Quantum Cryptography
+
+Generate and manage quantum-resistant keys:
 
 ```bash
-# CPU profiling
-cargo bench --bench crypto_benchmarks
-cargo bench --bench network_benchmarks
-cargo bench --bench consensus_benchmarks
+# Key Generation
+qudag key generate --algorithm ml-dsa    # ML-DSA-87 signatures
+qudag key generate --algorithm ml-kem    # ML-KEM-768 encryption
+qudag key generate --algorithm hqc       # HQC hybrid encryption
+qudag key list
+qudag key export <key-id> --format pem
 
-# Memory profiling
-valgrind --tool=memcheck ./target/debug/qudag-cli start
+# Signing Operations
+qudag sign "message to sign" --key <key-id>
+qudag sign --file document.pdf --key <key-id> --output document.sig
+qudag verify <signature> "message" --key <public-key>
 
-# Network profiling
-iperf3 -c localhost -p 8000
+# Encryption Operations
+qudag encrypt "secret message" --recipient <public-key>
+qudag encrypt --file secret.doc --recipient <public-key> --output secret.enc
+qudag decrypt <ciphertext> --key <private-key>
+qudag hybrid-encrypt <data> --recipients key1,key2,key3
 ```
 
-## Performance Benchmarks
+### DAG Visualization
 
-### Current Performance Metrics
+Generate and analyze DAG structure:
 
-Based on comprehensive benchmarking across the QuDAG protocol stack:
+```bash
+# Generate DAG visualization
+qudag dag --output dag_graph.dot
+qudag dag --format png --output dag_graph.png
+qudag dag --depth 10 --highlight-tips
 
-#### Cryptographic Operations
-```
-ML-KEM-768 Operations (per operation)
-├── Key Generation:     1.94ms  (516 ops/sec)
-├── Encapsulation:      0.89ms  (1,124 ops/sec)
-└── Decapsulation:      1.12ms  (893 ops/sec)
-
-ML-DSA Operations (per operation)
-├── Key Generation:     2.45ms  (408 ops/sec)
-├── Signing:            1.78ms  (562 ops/sec)
-└── Verification:       0.187ms (5,348 ops/sec)
-
-Quantum Fingerprinting (per operation)
-├── Generation:         0.235ms (4,255 ops/sec)
-├── Verification:       0.156ms (6,410 ops/sec)
-└── BLAKE3 Hashing:     0.043ms (23,256 ops/sec)
+# DAG Analysis
+qudag dag analyze --metrics
+qudag dag tips --format json
+qudag dag ancestors <vertex-id>
+qudag dag descendants <vertex-id>
 ```
 
-#### Network Operations
-```
-P2P Network Performance
-├── Peer Discovery:     487ms   (2.05 ops/sec)
-├── Circuit Setup:      198ms   (5.05 ops/sec)
-├── Message Routing:    47ms    (21.3 ops/sec)
-├── Onion Encryption:   2.3ms   (435 ops/sec)
-└── Onion Decryption:   1.8ms   (556 ops/sec)
+### Password Vault
 
-Dark Addressing Performance
-├── Domain Registration: 0.045ms (22,222 ops/sec)
-├── Domain Resolution:   0.128ms (7,813 ops/sec)
-├── Shadow Generation:   0.079ms (12,658 ops/sec)
-└── Address Validation:  0.034ms (29,412 ops/sec)
-```
+The QuDAG CLI includes a quantum-resistant password vault for secure credential management:
 
-#### DAG Consensus Performance
-```
-QR-Avalanche DAG Consensus
-├── Vertex Validation:   2.1ms   (476 ops/sec)
-├── Consensus Round:     145ms   (6.9 ops/sec)
-├── DAG Finality:        <1s     (99th percentile)
-└── Vertex Throughput:   10,000+ vertices/sec (theoretical)
-```
+```bash
+# Initialize a new vault
+qudag vault init
 
-#### System Resource Usage
-```
-Memory Consumption
-├── Base Node:          52MB    (minimal configuration)
-├── Active Node:        97MB    (under moderate load)
-├── Peak Usage:         184MB   (high load scenarios)
-└── Crypto Cache:       15MB    (key and signature cache)
+# Generate secure passwords
+qudag vault generate                    # Default 16-character password
+qudag vault generate --length 32       # 32-character password
+qudag vault generate --count 5         # Generate 5 passwords
+qudag vault generate --no-symbols      # Alphanumeric only
 
-CPU Utilization (4-core system)
-├── Idle:               <5%     (maintenance only)
-├── Normal Load:        15-25%  (active consensus)
-├── High Load:          45-60%  (peak throughput)
-└── Crypto Intensive:   80-90%  (batch processing)
+# Add password entries
+qudag vault add github --username myuser    # Prompts for password
+qudag vault add email --generate           # Auto-generates password
 
-Network Bandwidth
-├── Baseline:           10KB/s  (keep-alive traffic)
-├── Normal:             100KB/s (moderate activity)
-├── Active:             1MB/s   (high message volume)
-└── Burst:              10MB/s  (state synchronization)
-```
+# Retrieve passwords
+qudag vault get github                 # Shows password details
+qudag vault get github --clipboard     # Copies to clipboard
 
-#### Latency Characteristics
-```
-End-to-End Message Latency
-├── Direct Route:       25ms    (median)
-├── 3-Hop Onion:        85ms    (median)
-├── 5-Hop Onion:        142ms   (median)
-└── 7-Hop Onion:        203ms   (median)
+# List vault entries
+qudag vault list                       # Simple list
+qudag vault list --format json        # JSON output
+qudag vault list --format tree        # Tree structure
 
-DAG Consensus Finality
-├── Single Vertex:      150ms   (median)
-├── Batch Processing:   280ms   (median)
-├── High Contention:    450ms   (median)
-└── Network Partition:  2.5s    (recovery time)
+# Update existing entries
+qudag vault update github --password   # Change password
+qudag vault update github --username   # Change username
+
+# Remove entries
+qudag vault remove github             # Remove entry
+qudag vault remove github --force     # Skip confirmation
+
+# Vault management
+qudag vault export backup.qdag        # Export encrypted backup
+qudag vault import backup.qdag        # Import from backup
+qudag vault passwd                     # Change master password
+qudag vault stats                      # Show vault statistics
+
+# Configuration
+qudag vault config show               # Show vault settings
+qudag vault config set auto_lock 600  # Set auto-lock timeout
 ```
 
-### Performance Scaling
+### Network Operations
 
-#### Horizontal Scaling
-- **Node Count**: Linear throughput scaling up to 1,000 nodes
-- **DAG Consensus**: Sub-linear scaling with network size (Byzantine fault tolerance)
-- **Network**: O(log n) routing with Kademlia DHT
+```bash
+# Show network statistics
+qudag network stats
 
-#### Vertical Scaling
-- **CPU Cores**: Near-linear improvement with additional cores
-- **Memory**: Efficient memory usage with configurable limits
-- **Storage**: Minimal disk I/O with in-memory state management
+# Test peer connectivity
+qudag network test
 
-### Optimization Features
+# Monitor network events
+qudag network monitor --interval 5
 
-#### Cryptographic Optimizations
-- **Hardware Acceleration**: AVX2/NEON SIMD when available
-- **Constant-Time**: All operations resistant to timing attacks
-- **Memory Alignment**: 32-byte alignment for crypto operations
-- **Batch Processing**: Vectorized operations for multiple signatures
+# NAT Traversal
+qudag nat status
+qudag nat configure --upnp
+qudag nat test
 
-#### Network Optimizations
-- **Connection Pooling**: Reuse of established circuits
-- **Adaptive Routing**: Dynamic path selection based on performance
-- **Traffic Shaping**: Intelligent batching and timing
-- **Compression**: Efficient message serialization
+# Routing Configuration
+qudag route onion --hops 3
+qudag route direct --peer <peer-id>
+qudag tunnel create --to <destination>
+```
 
-#### DAG Consensus Optimizations
-- **Parallel Processing**: Concurrent vertex validation
-- **Early Termination**: Fast finality under good conditions
-- **Adaptive Thresholds**: Dynamic adjustment based on network health
-- **DAG Pruning**: Efficient memory management for large DAG structures
+### Monitoring and Debugging
 
-These benchmarks demonstrate QuDAG's capability to handle high-throughput, low-latency anonymous communication while maintaining post-quantum security guarantees.
+```bash
+# Real-time monitoring
+qudag monitor --metrics --log --interval 1
 
-## Security Features
+# Performance metrics
+qudag metrics --format prometheus
+qudag metrics export --output metrics.json
 
-### Cryptographic Security
+# Debug operations
+qudag debug network --verbose
+qudag debug consensus --verbose
+qudag debug profile --duration 60
 
-| Feature | Implementation | Status |
-|---------|----------------|--------|
-| **Post-Quantum KEM** | ML-KEM-768 (NIST Level 3) | ✅ Production Ready |
-| **Digital Signatures** | ML-DSA with constant-time ops | ✅ Production Ready |
-| **Hash Functions** | BLAKE3 quantum-resistant | ✅ Production Ready |
-| **Code-Based Crypto** | HQC encryption | ✅ Production Ready |
-| **Memory Security** | ZeroizeOnDrop for secrets | ✅ Production Ready |
-| **Side-Channel Protection** | Constant-time implementations | ✅ Production Ready |
+# Benchmarking
+qudag benchmark --test crypto --duration 30
+qudag benchmark --test network --parallel
 
-### Network Security
+# Health checks
+qudag health --detailed
+qudag health export --format json
+```
 
-| Feature | Description | Status |
-|---------|-------------|--------|
-| **Anonymous Routing** | Multi-hop onion routing with ML-KEM | ✅ Production Ready |
-| **Traffic Obfuscation** | ChaCha20Poly1305 with timing obfuscation | ✅ Production Ready |
-| **Peer Authentication** | ML-DSA-based peer verification | ✅ Production Ready |
-| **Session Security** | Perfect forward secrecy with ML-KEM | ✅ Production Ready |
-| **DDoS Protection** | Rate limiting and connection filtering | ✅ Production Ready |
-| **NAT Traversal** | STUN/TURN/UPnP with hole punching | ✅ Production Ready |
-| **Dark Addressing** | Quantum-resistant .dark domains | ✅ Production Ready |
+### Configuration
 
-### Protocol Security
+```bash
+# Show current configuration
+qudag config show
 
-| Feature | Description | Status |
-|---------|-------------|--------|
-| **Byzantine Fault Tolerance** | QR-Avalanche consensus | ✅ Production Ready |
-| **State Validation** | Cryptographic integrity checks | ✅ Production Ready |
-| **Replay Protection** | Timestamp and nonce validation | ✅ Production Ready |
-| **Input Validation** | Comprehensive sanitization | ✅ Production Ready |
-| **Error Handling** | Secure failure modes | ✅ Production Ready |
-| **Fork Detection** | Automatic detection and resolution | ✅ Production Ready |
-| **Message Authentication** | ML-DSA signatures on all messages | ✅ Production Ready |
+# Set configuration value
+qudag config set key value
 
-### Implementation Security
+# Import/Export configuration
+qudag config import config.toml
+qudag config export --output backup-config.toml
 
-| Feature | Description | Status |
-|---------|-------------|--------|
-| **Memory Safety** | Rust ownership model | ✅ Production Ready |
-| **No Unsafe Code** | `#![deny(unsafe_code)]` enforced | ✅ Production Ready |
-| **Dependency Auditing** | Regular security audits | ✅ Production Ready |
-| **Fuzzing** | Continuous fuzz testing | ✅ Production Ready |
-| **Static Analysis** | Clippy and additional tools | ✅ Production Ready |
+# Generate systemd service
+qudag systemd --output /etc/systemd/system/
+```
 
-## Project Status
+## Examples
 
-### Implementation Status
+### Setting Up Your First Node
 
-| Component | Status | Details |
-|-----------|--------|---------|
-| **Cryptographic Core** | ✅ Production Ready | ML-KEM-768, ML-DSA, HQC, BLAKE3 with NIST compliance |
-| **P2P Networking** | ✅ Production Ready | LibP2P with Kademlia DHT, Gossipsub, onion routing |
-| **DAG Consensus** | ✅ Production Ready | QR-Avalanche with parallel processing and validation |
-| **Dark Addressing** | ✅ Production Ready | Registration, resolution, shadows, fingerprinting |
-| **CLI Interface** | ✅ Production Ready | All commands structured, routing working |
-| **NAT Traversal** | ✅ Production Ready | STUN/TURN, UPnP, hole punching implemented |
-| **Traffic Obfuscation** | ✅ Production Ready | ChaCha20Poly1305 with timing obfuscation |
-| **Test Framework** | ✅ Production Ready | Unit, integration, property, security tests |
-| **Benchmarking** | ✅ Production Ready | Performance benchmarks for all components |
-| **Documentation** | ✅ Production Ready | Architecture, usage, and development guides |
-| **RPC Server** | ✅ Production Ready | TCP/Unix socket with ML-DSA authentication |
-| **Node Integration** | 🔄 Integration Phase | Components built, final integration in progress |
-| **Protocol Bridge** | 🔄 Integration Phase | Network-DAG-Protocol coordination layer |
-| **State Persistence** | 🚧 In Development | Storage interface defined, implementation pending |
+```bash
+# 1. Start your node
+qudag start --port 8000
 
-### Command Implementation Status
+# 2. Register your identity
+qudag address register mynode.dark
 
-| Feature | CLI | Backend | Notes |
-|---------|-----|---------|-------|
-| **Node Start/Stop** | ✅ | ✅ | RPC server implemented, node integration pending |
-| **Node Status** | ✅ | ✅ | RPC endpoints functional, real metrics available |
-| **Peer Management** | ✅ | ✅ | P2P networking layer fully implemented |
-| **Network Stats** | ✅ | ✅ | Real-time metrics from network layer |
-| **Dark Addresses** | ✅ | ✅ | Fully functional end-to-end |
-| **Shadow Addresses** | ✅ | ✅ | Temporary addresses with TTL working |
-| **Quantum Fingerprints** | ✅ | ✅ | ML-DSA signing operational |
-| **Onion Routing** | ✅ | ✅ | Multi-hop routing with ML-KEM encryption |
-| **DAG Operations** | ✅ | ✅ | Vertex processing and consensus working |
+# 3. Connect to the network (use bootstrap peers)
+qudag peer add /ip4/bootstrap.qudag.io/tcp/8000/p2p/12D3KooW...
 
-### Development Roadmap
+# 4. Check status
+qudag status
+```
 
-| Phase | Timeline | Features |
-|-------|----------|----------|
-| **Phase 1** | ✅ Complete | Core cryptography, P2P networking, DAG consensus |
-| **Phase 2** | Q1 2025 | Final integration, state persistence, optimization |
-| **Phase 3** | Q2 2025 | Beta testing, security audits, performance tuning |
-| **Phase 4** | Q3 2025 | Production deployment, mainnet launch |
+### Creating a Private Network
 
-### Known Limitations
+```bash
+# Node 1
+qudag start --port 8001
+qudag address register node1.dark
 
-| Area | Limitation | Priority |
-|------|------------|----------|
-| **Integration** | Final component integration pending | High |
-| **Persistence** | In-memory only state | High |
-| **Configuration** | Limited runtime configuration | Medium |
-| **Monitoring** | Advanced metrics pending | Low |
-| **UI/UX** | CLI only, no GUI | Low |
+# Node 2
+qudag start --port 8002
+qudag address register node2.dark
+qudag peer add /ip4/127.0.0.1/tcp/8001/p2p/...
 
-## Resources
+# Node 3
+qudag start --port 8003
+qudag address register node3.dark
+qudag peer add /ip4/127.0.0.1/tcp/8001/p2p/...
+qudag peer add /ip4/127.0.0.1/tcp/8002/p2p/...
+```
 
-### Documentation
+### Dark Domain System
 
-| Resource | Description | Status |
-|----------|-------------|--------|
-| [Architecture Guide](docs/architecture/README.md) | System design and components | ✅ Available |
-| [Security Documentation](docs/security/README.md) | Security model and analysis | ✅ Available |
-| [API Documentation](https://docs.rs/qudag) | Rust API documentation | 🔄 Generating |
-| [Developer Guide](CLAUDE.md) | Development guidelines | ✅ Available |
-| [Performance Benchmarks](performance_report.md) | Detailed performance analysis | ✅ Available |
+```bash
+# Register domains for different services
+qudag address register chat.dark
+qudag address register files.dark
+qudag address register api.dark
 
-### Community
+# Create temporary addresses for ephemeral communication
+qudag address shadow --ttl 3600  # 1 hour
+qudag address shadow --ttl 86400 # 24 hours
 
-| Platform | Link | Purpose |
-|----------|------|----------|
-| **GitHub** | [ruvnet/QuDAG](https://github.com/ruvnet/QuDAG) | Source code and issues |
-| **Documentation** | [docs.qudag.io](https://docs.qudag.io) | Comprehensive guides |
-| **Research** | [Research Papers](https://github.com/ruvnet/QuDAG/tree/main/research) | Academic publications |
-| **Contributing** | [CONTRIBUTING.md](CONTRIBUTING.md) | Contribution guidelines |
-| **Security** | [SECURITY.md](SECURITY.md) | Security policy and reporting |
+# Resolve any .dark domain to find peers
+qudag address resolve chat.dark
+qudag address resolve files.dark
+```
 
-### Getting Help
+### Exchange and Business Plan Workflow
 
-| Issue Type | Best Place to Ask |
-|------------|-------------------|
-| **Bug Reports** | [GitHub Issues](https://github.com/ruvnet/QuDAG/issues) |
-| **Feature Requests** | [GitHub Discussions](https://github.com/ruvnet/QuDAG/discussions) |
-| **Security Issues** | [Security Email](mailto:security@qudag.io) |
-| **Development Questions** | [GitHub Discussions](https://github.com/ruvnet/QuDAG/discussions) |
+```bash
+# Initialize exchange with business plan
+qudag exchange business-plan enable --auto-distribution --role-earnings
+
+# Create accounts for participants
+qudag exchange create-account --name "agent-provider" --email agent@example.com
+qudag exchange create-account --name "plugin-creator" --email plugin@example.com
+qudag exchange create-account --name "node-operator" --email node@example.com
+
+# Register contributors
+qudag exchange business-plan contributors register agent-001 agent-provider vault-001
+qudag exchange business-plan contributors register plugin-002 plugin-creator vault-002 --custom-percentage 0.12
+qudag exchange business-plan contributors register node-003 node-operator vault-003
+
+# Configure payout thresholds
+qudag exchange business-plan configure threshold 100
+qudag exchange business-plan configure system-fee 0.001
+
+# Process transactions with automatic fee distribution
+qudag exchange transfer --from "user" --to "service" --amount 10000  # Fees auto-distributed
+
+# Check payout history
+qudag exchange business-plan payouts --limit 20
+```
+
+### MCP Server for AI Agents
+
+```bash
+# Start MCP server with full QuDAG integration
+qudag mcp start --port 3000 --enable-vault --enable-exchange
+
+# In another terminal, list available tools for agents
+qudag mcp tools list
+
+# Example output:
+# - vault_create: Create secure vaults
+# - vault_unlock: Access vault contents
+# - exchange_transfer: Send rUv tokens
+# - dag_query: Query DAG structure
+# - network_peer_info: Get peer information
+
+# Check server status
+qudag mcp status
+```
+
+### Password Vault Setup
+
+```bash
+# Initialize your vault
+qudag vault init
+
+# Generate and store service passwords
+qudag vault add github --username myuser --generate
+qudag vault add docker --username dockerhub_user --generate
+qudag vault add email --username user@example.com
+
+# Create organized structure
+qudag vault add work/aws --username admin --generate
+qudag vault add work/kubernetes --generate
+qudag vault add personal/social/twitter --username @myhandle
+
+# Backup your vault
+qudag vault export ~/secure-backup.qdag
+
+# Daily usage
+qudag vault get github --clipboard  # Copy to clipboard
+qudag vault list work/             # List work passwords
+qudag vault generate --length 32   # Generate new password
+```
+
+## Configuration File
+
+QuDAG CLI uses a configuration file at `~/.qudag/config.toml`:
+
+```toml
+[node]
+port = 8000
+rpc_port = 9090
+data_dir = "~/.qudag/data"
+log_level = "info"
+
+[network]
+max_peers = 50
+bootstrap_peers = [
+    "/ip4/bootstrap1.qudag.io/tcp/8000/p2p/12D3KooW...",
+    "/ip4/bootstrap2.qudag.io/tcp/8000/p2p/12D3KooW..."
+]
+
+[dark_addressing]
+enable = true
+ttl_default = 3600
+
+[security]
+enable_encryption = true
+quantum_resistant = true
+
+[vault]
+path = "~/.qudag/vault.qdag"
+auto_lock = 300  # seconds
+clipboard_timeout = 30  # seconds
+kdf_iterations = 3
+kdf_memory = 65536  # KB
+
+[exchange]
+enable = true
+network_name = "qudag-mainnet"
+chain_id = 1
+immutable_deployment = false
+
+[exchange.fee_model]
+f_min = 0.001  # 0.1%
+f_max = 0.01   # 1.0%
+f_min_verified = 0.0025  # 0.25%
+f_max_verified = 0.005   # 0.5%
+time_constant_days = 30
+usage_threshold = 10000
+
+[exchange.business_plan]
+enabled = true
+auto_distribution = true
+vault_management = true
+role_earnings = true
+bounty_rewards = true
+min_payout_threshold = 100
+system_fee_percentage = 0.001
+
+[mcp]
+enable = true
+port = 3000
+host = "127.0.0.1"
+transport = "http"  # http, stdio, or websocket
+enable_vault_tools = true
+enable_exchange_tools = true
+enable_dag_tools = true
+enable_network_tools = true
+
+[monitoring]
+enable_metrics = true
+metrics_port = 9091
+enable_tracing = true
+trace_export = "jaeger"  # jaeger, otlp, or none
+```
+
+## Output Formats
+
+Many commands support different output formats:
+
+```bash
+# JSON output
+qudag status --output json
+
+# Table output (default)
+qudag peer list --output table
+
+# Raw output for scripting
+qudag peer list --output raw
+```
+
+## Logging
+
+```bash
+# View logs
+qudag logs
+
+# Follow logs in real-time
+qudag logs --follow
+
+# Filter by level
+qudag logs --level error
+
+# Save logs to file
+qudag logs --output /var/log/qudag.log
+```
+
+## Systemd Integration
+
+Generate systemd service files:
+
+```bash
+# Generate service file
+qudag systemd --output /etc/systemd/system/
+
+# Enable and start
+sudo systemctl enable qudag
+sudo systemctl start qudag
+sudo systemctl status qudag
+```
+
+## Environment Variables
+
+- `QUDAG_CONFIG` - Path to configuration file
+- `QUDAG_DATA_DIR` - Data directory override
+- `QUDAG_LOG_LEVEL` - Log level (trace, debug, info, warn, error)
+- `QUDAG_PORT` - Default port override
+- `QUDAG_RPC_PORT` - RPC port override
+- `QUDAG_EXCHANGE_ENABLED` - Enable/disable exchange (true/false)
+- `QUDAG_MCP_PORT` - MCP server port override
+- `QUDAG_MCP_TRANSPORT` - MCP transport (http, stdio, websocket)
+- `QUDAG_VAULT_PATH` - Vault file path override
+- `QUDAG_NETWORK_NAME` - Network name for exchange
+- `QUDAG_CHAIN_ID` - Chain ID for exchange
+
+## Exit Codes
+
+- `0` - Success
+- `1` - General error
+- `2` - Configuration error
+- `3` - Network error
+- `4` - Permission error
+- `5` - Not found error
+
+## Shell Completion
+
+Generate shell completion scripts:
+
+```bash
+# Bash
+qudag completions bash > /etc/bash_completion.d/qudag
+
+# Zsh
+qudag completions zsh > ~/.zsh/completions/_qudag
+
+# Fish
+qudag completions fish > ~/.config/fish/completions/qudag.fish
+```
+
+## Security Considerations
+
+- All communication is quantum-resistant encrypted
+- Private keys are stored securely in `~/.qudag/keys/`
+- Configuration supports file permissions verification
+- Network traffic uses onion routing for anonymity
+
+## Troubleshooting
+
+### Common Issues
+
+**Node won't start**
+```bash
+# Check if port is in use
+netstat -ln | grep :8000
+
+# Check logs
+qudag logs --level error
+```
+
+**Can't connect to peers**
+```bash
+# Test network connectivity
+qudag network test
+
+# Check firewall settings
+sudo ufw status
+```
+
+**Permission errors**
+```bash
+# Check data directory permissions
+ls -la ~/.qudag/
+
+# Fix permissions
+chmod 700 ~/.qudag/
+```
+
+**Exchange not working**
+```bash
+# Check if exchange is enabled
+qudag exchange status
+
+# Verify configuration
+qudag config show | grep exchange
+
+# Check vault connectivity
+qudag vault status
+```
+
+**MCP server issues**
+```bash
+# Check if port is available
+lsof -i :3000
+
+# Test MCP server
+qudag mcp status
+
+# View MCP logs
+qudag mcp logs --level debug
+```
+
+**Business plan payout issues**
+```bash
+# Check business plan status
+qudag exchange business-plan status
+
+# Verify contributor registration
+qudag exchange business-plan contributors list
+
+# Check minimum thresholds
+qudag exchange business-plan configure show
+```
+
+## Documentation
+
+- [QuDAG CLI Documentation](https://docs.rs/qudag-cli)
+- [Exchange Core Documentation](https://docs.rs/qudag-exchange-core)
+- [MCP Server Documentation](https://docs.rs/qudag-mcp)
+- [QuDAG Project](https://github.com/ruvnet/QuDAG)
+- [User Guide](https://github.com/ruvnet/QuDAG/blob/main/docs/cli/README.md)
+- [Exchange Business Plan](https://github.com/ruvnet/QuDAG/blob/main/qudag-exchange/docs/business-plan.md)
 
 ## License
 
-Licensed under either:
-- Apache License 2.0
-- MIT License
-
----
-
-Created by [rUv](https://github.com/ruvnet)
-
-[GitHub](https://github.com/ruvnet/QuDAG) • [Documentation](https://docs.qudag.io) • [Research](https://github.com/ruvnet/QuDAG/tree/main/research)
+Licensed under either MIT or Apache-2.0 at your option.

@@ -48,7 +48,7 @@ kill_timeout = "5s"
   [[services.ports]]
     port = 80
     handlers = ["http"]
-    force_https = true
+    force_https = false
 
   [[services.ports]]
     port = 443
@@ -57,7 +57,7 @@ kill_timeout = "5s"
   [[services.http_checks]]
     interval = "30s"
     timeout = "10s"
-    grace_period = "10s"
+    grace_period = "30s"  # Increased grace period for startup
     method = "GET"
     path = "/health"
     protocol = "http"
@@ -118,12 +118,8 @@ kill_timeout = "5s"
     # Ensure TLS directory exists
     mkdir -p /data/qudag/tls
     
-    # Generate self-signed certificate if not exists (for testing)
-    if [ ! -f /data/qudag/tls/cert.pem ]; then
-      openssl req -x509 -newkey rsa:4096 -keyout /data/qudag/tls/key.pem \
-        -out /data/qudag/tls/cert.pem -days 365 -nodes \
-        -subj "/C=NL/ST=NH/L=Amsterdam/O=QuDAG/CN=qudag-testnet-node2.fly.dev"
-    fi
+    # TLS is handled by Fly.io proxy, no need for self-signed certificates
+    # This simplifies the setup and avoids certificate issues
     
     # Wait for bootstrap node to be ready
     echo "Waiting for bootstrap node..."

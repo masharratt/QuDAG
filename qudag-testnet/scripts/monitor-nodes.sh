@@ -103,16 +103,24 @@ get_node_status() {
     
     # Check health endpoint
     local health_url="https://$app_name.fly.dev/health"
-    if curl -sf "$health_url" &>/dev/null; then
+    # Use -k to ignore certificate issues and increase timeout
+    if curl -sfk --max-time 10 "$health_url" &>/dev/null; then
         status+="\"health\": \"healthy\","
     else
-        status+="\"health\": \"unhealthy\","
+        # Fallback to HTTP if HTTPS fails
+        local http_health_url="http://$app_name.fly.dev/health"
+        if curl -sf --max-time 10 "$http_health_url" &>/dev/null; then
+            status+="\"health\": \"healthy (http)\","
+        else
+            status+="\"health\": \"unhealthy\","
+        fi
     fi
     
     # Get metrics if verbose
     if [ "$VERBOSE" = true ]; then
-        local metrics_url="https://$app_name.fly.dev/metrics"
-        local metrics_data=$(curl -sf "$metrics_url" 2>/dev/null || echo "")
+        # Metrics are on port 9090, not through HTTPS proxy
+        local metrics_url="http://$app_name.fly.dev:9090/metrics"
+        local metrics_data=$(curl -sf --max-time 10 "$metrics_url" 2>/dev/null || echo "")
         
         if [ -n "$metrics_data" ]; then
             # Extract basic metrics (simplified parsing)

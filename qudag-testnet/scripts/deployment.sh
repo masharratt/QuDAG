@@ -221,13 +221,19 @@ verify_deployment() {
         if flyctl status -a "$app_name" | grep -q "Deployed"; then
             log_success "$app_name is deployed"
             
-            # Check health endpoint
+            # Check health endpoint with proper error handling
             APP_URL="https://$app_name.fly.dev"
-            if curl -sf "$APP_URL/health" > /dev/null 2>&1; then
+            if curl -sfk --max-time 10 "$APP_URL/health" > /dev/null 2>&1; then
                 log_success "$app_name health check passed"
             else
-                log_warning "$app_name health check failed (may need more time to start)"
-                all_healthy=false
+                # Try HTTP fallback
+                HTTP_URL="http://$app_name.fly.dev"
+                if curl -sf --max-time 10 "$HTTP_URL/health" > /dev/null 2>&1; then
+                    log_warning "$app_name health check passed (HTTP only)"
+                else
+                    log_warning "$app_name health check failed (may need more time to start)"
+                    all_healthy=false
+                fi
             fi
         else
             log_error "$app_name is not deployed properly"
@@ -262,9 +268,9 @@ print_summary() {
     echo "  - Cleanup: ./scripts/cleanup.sh"
     echo
     echo "API Endpoints:"
-    echo "  - Health: https://<app-name>.fly.dev/health"
-    echo "  - Metrics: https://<app-name>.fly.dev:9090/metrics"
-    echo "  - RPC: https://<app-name>.fly.dev/api/v1/rpc"
+    echo "  - Health: http://<app-name>.fly.dev/health (or https with -k flag)"
+    echo "  - Metrics: http://<app-name>.fly.dev:9090/metrics"
+    echo "  - RPC: http://<app-name>.fly.dev/api/v1/rpc"
     echo
     echo "Monitoring:"
     echo "  - Prometheus: http://localhost:9094 (local)"
