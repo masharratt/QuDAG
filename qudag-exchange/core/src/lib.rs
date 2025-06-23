@@ -34,6 +34,7 @@ pub mod types;
 pub mod fee_model;
 pub mod immutable;
 pub mod config;
+pub mod payout;
 
 // Re-exports
 pub use error::{Error, Result};
@@ -46,7 +47,14 @@ pub use state::LedgerState;
 pub use types::rUv;
 pub use fee_model::{FeeModel, FeeModelParams, AgentStatus, FeeCalculator};
 pub use immutable::{ImmutableDeployment, ImmutableConfig, ImmutableStatus, LockableConfig, ImmutableSignature};
-pub use config::{ExchangeConfig, ExchangeConfigBuilder, NetworkConfig, SecurityConfig, ConfigSummary};
+pub use config::{
+    ExchangeConfig, ExchangeConfigBuilder, NetworkConfig, SecurityConfig, ConfigSummary,
+    BusinessPlanConfig, BusinessPlanSummary, GovernanceConfig
+};
+pub use payout::{
+    PayoutConfig, FeeRouter, ContributorRole, ContributorInfo, PayoutEntry, PayoutTransaction,
+    PayoutSplitTemplates, PayoutSplit, ContributorType
+};
 
 /// Core version string
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

@@ -9,7 +9,7 @@ use serde::{Serialize, Deserialize};
 use crate::{types::{rUv, Nonce, Hash}, Error, Result};
 
 /// Account identifier - a unique ID for each account
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct AccountId(String);
 
 impl AccountId {

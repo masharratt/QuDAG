@@ -11,6 +11,7 @@ use crate::{
     types::{rUv, Timestamp}, 
     fee_model::{FeeModel, FeeModelParams, AgentStatus},
     immutable::{ImmutableDeployment, LockableConfig, ImmutableStatus},
+    payout::{PayoutConfig, FeeRouter},
     Error, Result,
 };
 
@@ -29,6 +30,13 @@ pub struct ExchangeConfig {
     
     /// Security configuration
     pub security: SecurityConfig,
+    
+    /// Business plan features configuration (optional)
+    pub business_plan: Option<BusinessPlanConfig>,
+    
+    /// Fee router for automatic payouts (not serialized, recreated from config)
+    #[serde(skip)]
+    pub fee_router: Option<FeeRouter>,
 }
 
 /// Network configuration
@@ -105,6 +113,8 @@ impl ExchangeConfig {
             fee_model: None,
             network: NetworkConfig::default(),
             security: SecurityConfig::default(),
+            business_plan: None, // Disabled by default
+            fee_router: None,
         };
         
         // Initialize fee model from immutable deployment params
@@ -122,6 +132,8 @@ impl ExchangeConfig {
                 ..NetworkConfig::default()
             },
             security: SecurityConfig::default(),
+            business_plan: None, // Disabled by default
+            fee_router: None,
         };
         
         config.initialize_fee_model()?;
@@ -249,6 +261,23 @@ impl ExchangeConfig {
         let immutable_status = self.get_immutable_status(current_time);
         let fee_params = &self.immutable_deployment.system_config.fee_params;
         
+        let business_plan_summary = self.business_plan.as_ref().map(|bp| {
+            let total_contributors = self.fee_router.as_ref()
+                .map(|router| router.get_payout_history(None).len() as u32)
+                .unwrap_or(0);
+            
+            BusinessPlanSummary {
+                enabled: bp.enabled,
+                auto_distribution_enabled: bp.enable_auto_distribution,
+                vault_management_enabled: bp.enable_vault_management,
+                role_earnings_enabled: bp.enable_role_earnings,
+                bounty_rewards_enabled: bp.enable_bounty_rewards,
+                total_contributors,
+                min_payout_threshold: bp.payout_config.min_payout_threshold.amount(),
+                system_fee_percentage: bp.payout_config.system_fee_percentage,
+            }
+        });
+        
         ConfigSummary {
             network_name: self.network.network_name.clone(),
             chain_id: self.network.chain_id,
@@ -263,6 +292,7 @@ impl ExchangeConfig {
             },
             security_enabled: self.security.require_quantum_signatures,
             dark_addressing_enabled: self.network.enable_dark_addressing,
+            business_plan_summary,
         }
     }
     
@@ -274,6 +304,65 @@ impl ExchangeConfig {
         current_time: Timestamp,
     ) -> Result<()> {
         self.immutable_deployment.governance_override(governance_keypair, current_time)
+    }
+    
+    /// Enable business plan features
+    pub fn enable_business_plan(&mut self, config: BusinessPlanConfig) -> Result<()> {
+        // Validate business plan configuration
+        config.payout_config.validate()?;
+        
+        // Initialize fee router if auto-distribution is enabled
+        if config.enable_auto_distribution {
+            self.fee_router = Some(FeeRouter::new(config.payout_config.clone()));
+        }
+        
+        self.business_plan = Some(config);
+        Ok(())
+    }
+    
+    /// Disable business plan features
+    pub fn disable_business_plan(&mut self) {
+        self.business_plan = None;
+        self.fee_router = None;
+    }
+    
+    /// Check if business plan features are enabled
+    pub fn has_business_plan(&self) -> bool {
+        self.business_plan.as_ref().map_or(false, |bp| bp.enabled)
+    }
+    
+    /// Get fee router if available
+    pub fn fee_router(&self) -> Option<&FeeRouter> {
+        self.fee_router.as_ref()
+    }
+    
+    /// Get mutable fee router if available
+    pub fn fee_router_mut(&mut self) -> Option<&mut FeeRouter> {
+        self.fee_router.as_mut()
+    }
+    
+    /// Update business plan configuration
+    pub fn update_business_plan(&mut self, config: BusinessPlanConfig, current_time: Timestamp) -> Result<()> {
+        if !self.can_modify_config(current_time) {
+            return Err(Error::Other("Cannot modify business plan configuration: system is immutably locked".into()));
+        }
+        
+        // Validate new configuration
+        config.payout_config.validate()?;
+        
+        // Update fee router if needed
+        if config.enable_auto_distribution {
+            if let Some(ref mut fee_router) = self.fee_router {
+                fee_router.update_config(config.payout_config.clone())?;
+            } else {
+                self.fee_router = Some(FeeRouter::new(config.payout_config.clone()));
+            }
+        } else {
+            self.fee_router = None;
+        }
+        
+        self.business_plan = Some(config);
+        Ok(())
     }
     
     /// Save configuration to bytes for persistence
@@ -289,6 +378,14 @@ impl ExchangeConfig {
         
         // Re-initialize fee model since it's not serialized
         config.initialize_fee_model()?;
+        
+        // Re-initialize fee router if business plan is enabled
+        if let Some(ref business_plan) = config.business_plan {
+            if business_plan.enabled && business_plan.enable_auto_distribution {
+                config.fee_router = Some(FeeRouter::new(business_plan.payout_config.clone()));
+            }
+        }
+        
         config.validate()?;
         Ok(config)
     }
@@ -297,6 +394,72 @@ impl ExchangeConfig {
 impl Default for ExchangeConfig {
     fn default() -> Self {
         Self::new().expect("Default configuration should be valid")
+    }
+}
+
+/// Business plan features configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BusinessPlanConfig {
+    /// Enable business plan features
+    pub enabled: bool,
+    
+    /// Payout system configuration
+    pub payout_config: PayoutConfig,
+    
+    /// Enable contributor vault management
+    pub enable_vault_management: bool,
+    
+    /// Enable automatic fee distribution
+    pub enable_auto_distribution: bool,
+    
+    /// Enable role-based earnings tracking
+    pub enable_role_earnings: bool,
+    
+    /// Enable bounty agent rewards
+    pub enable_bounty_rewards: bool,
+    
+    /// Governance settings
+    pub governance: GovernanceConfig,
+}
+
+impl Default for BusinessPlanConfig {
+    fn default() -> Self {
+        Self {
+            enabled: false, // Opt-in by default
+            payout_config: PayoutConfig::default(),
+            enable_vault_management: false,
+            enable_auto_distribution: false,
+            enable_role_earnings: false,
+            enable_bounty_rewards: false,
+            governance: GovernanceConfig::default(),
+        }
+    }
+}
+
+/// Governance configuration for business plan features
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GovernanceConfig {
+    /// Allow contributors to override default payout percentages
+    pub allow_custom_percentages: bool,
+    
+    /// Require governance approval for large payouts
+    pub require_approval_threshold: Option<rUv>,
+    
+    /// Enable democratic voting on payout changes
+    pub enable_voting: bool,
+    
+    /// Minimum voting period in seconds
+    pub min_voting_period_seconds: u64,
+}
+
+impl Default for GovernanceConfig {
+    fn default() -> Self {
+        Self {
+            allow_custom_percentages: true,
+            require_approval_threshold: Some(rUv::new(10000)), // 10k rUv
+            enable_voting: false,
+            min_voting_period_seconds: 7 * 24 * 60 * 60, // 7 days
+        }
     }
 }
 
@@ -309,6 +472,20 @@ pub struct ConfigSummary {
     pub fee_model_summary: FeeModelSummary,
     pub security_enabled: bool,
     pub dark_addressing_enabled: bool,
+    pub business_plan_summary: Option<BusinessPlanSummary>,
+}
+
+/// Business plan features summary for display
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct BusinessPlanSummary {
+    pub enabled: bool,
+    pub auto_distribution_enabled: bool,
+    pub vault_management_enabled: bool,
+    pub role_earnings_enabled: bool,
+    pub bounty_rewards_enabled: bool,
+    pub total_contributors: u32,
+    pub min_payout_threshold: u64,
+    pub system_fee_percentage: f64,
 }
 
 /// Fee model summary for display
@@ -328,6 +505,7 @@ pub struct ExchangeConfigBuilder {
     security: SecurityConfig,
     fee_params: FeeModelParams,
     enable_immutable: bool,
+    business_plan: Option<BusinessPlanConfig>,
 }
 
 impl ExchangeConfigBuilder {
@@ -338,6 +516,7 @@ impl ExchangeConfigBuilder {
             security: SecurityConfig::default(),
             fee_params: FeeModelParams::default(),
             enable_immutable: false,
+            business_plan: None,
         }
     }
     
@@ -377,6 +556,22 @@ impl ExchangeConfigBuilder {
         self
     }
     
+    /// Enable business plan features
+    pub fn with_business_plan(mut self, business_plan: BusinessPlanConfig) -> Self {
+        self.business_plan = Some(business_plan);
+        self
+    }
+    
+    /// Enable basic business plan features with default configuration
+    pub fn with_basic_business_plan(mut self) -> Self {
+        let mut bp_config = BusinessPlanConfig::default();
+        bp_config.enabled = true;
+        bp_config.enable_auto_distribution = true;
+        bp_config.enable_role_earnings = true;
+        self.business_plan = Some(bp_config);
+        self
+    }
+    
     /// Build the configuration
     pub fn build(self) -> Result<ExchangeConfig> {
         let lockable_config = LockableConfig {
@@ -391,6 +586,11 @@ impl ExchangeConfigBuilder {
         
         if self.enable_immutable {
             config.enable_immutable_mode()?;
+        }
+        
+        // Enable business plan if configured
+        if let Some(business_plan) = self.business_plan {
+            config.enable_business_plan(business_plan)?;
         }
         
         config.validate()?;

@@ -2,7 +2,7 @@
 
 [package]
 name = "qudag-exchange-standalone-cli"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 authors = ["QuDAG Exchange Development Team"]
 license = "MIT OR Apache-2.0"
@@ -18,7 +18,7 @@ path = "src/main.rs"
 
 [dependencies]
 # Core dependency
-qudag-exchange-core = { version = "0.2.0", path = "../core" }
+qudag-exchange-core = { version = "0.3.0", path = "../core" }
 
 # CLI framework
 clap = { version = "4.5", features = ["derive", "env", "color"] }

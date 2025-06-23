@@ -39,7 +39,7 @@ qudag-network = { version = "0.4.0", path = "../../core/network" }
 qudag-protocol = { version = "0.4.0", path = "../../core/protocol" }
 qudag-vault-core = { version = "0.4.0", path = "../../core/vault" }
 qudag-mcp = { version = "0.4.0", path = "../../qudag-mcp" }
-qudag-exchange-core = { version = "0.2.0", path = "../../qudag-exchange/core" }
+qudag-exchange-core = { version = "0.3.0", path = "../../qudag-exchange/core" }
 reqwest = { version = "0.11", features = ["json"] }
 
 [[bin]]

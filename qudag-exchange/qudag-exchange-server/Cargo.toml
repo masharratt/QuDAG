@@ -2,7 +2,7 @@
 
 [package]
 name = "qudag-exchange-server"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 authors = ["QuDAG Exchange Development Team"]
 license = "MIT OR Apache-2.0"
@@ -17,7 +17,7 @@ name = "qudag-exchange-server"
 path = "src/main.rs"
 
 [dependencies]
-qudag-exchange-core = { version = "0.2.0", path = "../core" }
+qudag-exchange-core = { version = "0.3.0", path = "../core" }
 
 # Web framework
 axum = "0.7"

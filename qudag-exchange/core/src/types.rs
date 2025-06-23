@@ -60,6 +60,25 @@ impl rUv {
     pub fn saturating_sub(self, other: Self) -> Self {
         Self(self.0.saturating_sub(other.0))
     }
+    
+    /// Add another rUv amount (returns Error on overflow)
+    pub fn add(self, other: Self) -> Result<Self, &'static str> {
+        self.checked_add(other).ok_or("rUv addition overflow")
+    }
+    
+    /// Multiply by a percentage (0.0 to 1.0) 
+    pub fn multiply(self, percentage: f64) -> Result<Self, &'static str> {
+        if percentage < 0.0 || percentage > 1.0 {
+            return Err("Percentage must be between 0.0 and 1.0");
+        }
+        
+        let result = (self.0 as f64 * percentage).round() as u64;
+        if result > u64::MAX {
+            return Err("rUv multiplication overflow");
+        }
+        
+        Ok(Self(result))
+    }
 }
 
 impl From<u64> for rUv {
