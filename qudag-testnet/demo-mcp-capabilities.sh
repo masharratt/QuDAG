@@ -15,6 +15,7 @@ NC='\033[0m'
 
 # MCP endpoint
 MCP_URL="http://109.105.222.156:3333"
+# Note: HTTPS domain access (https://qudag-testnet-node1.fly.dev/mcp) is planned but currently unavailable
 
 echo -e "${PURPLE}╔══════════════════════════════════════════════════════════╗${NC}"
 echo -e "${PURPLE}║      QuDAG MCP (Model Context Protocol) Demo             ║${NC}"

@@ -174,10 +174,17 @@ fn main() {
     println!("  Metrics: Active on port {}", metrics_port);
     println!();
     println!("MCP endpoints available at:");
-    println!("  http://0.0.0.0:{}/mcp", mcp_port);
-    println!("  http://0.0.0.0:{}/mcp/tools", mcp_port);
-    println!("  http://0.0.0.0:{}/mcp/resources", mcp_port);
-    println!("  http://0.0.0.0:{}/mcp/events (SSE)", mcp_port);
+    println!("  Direct: http://0.0.0.0:{}/mcp", mcp_port);
+    println!("  Via HTTP: http://0.0.0.0:{}/mcp", http_port);
+    println!("  Via HTTPS: https://qudag-testnet-node1.fly.dev/mcp");
+    println!();
+    println!("Available endpoints:");
+    println!("  /mcp - Discovery");
+    println!("  /mcp/info - Server info");
+    println!("  /mcp/tools - List tools");
+    println!("  /mcp/resources - List resources");
+    println!("  /mcp/events - SSE stream");
+    println!("  /mcp/rpc - JSON-RPC");
     println!();
     println!("Press Ctrl+C to stop the node");
     
@@ -909,12 +916,28 @@ fn start_http_server(port: &str, state: Arc<Mutex<NodeState>>) {
 }
 
 fn handle_http_request(stream: &mut TcpStream, state: &Arc<Mutex<NodeState>>) {
-    let mut buffer = [0; 1024];
+    let mut buffer = [0; 4096];
     match stream.read(&mut buffer) {
         Ok(size) => {
             let request = String::from_utf8_lossy(&buffer[..size]);
             
-            if request.contains("GET /health") {
+            // Check if this is an MCP request
+            if request.contains("/mcp") || request.contains("/.well-known/mcp") {
+                // Get MCP state from node state
+                let mcp_state = {
+                    let state_lock = state.lock().unwrap();
+                    // Create MCP state on demand
+                    Arc::new(Mutex::new(McpState {
+                        tools: init_mcp_tools(),
+                        resources: init_mcp_resources(),
+                        capabilities: init_mcp_capabilities(),
+                        active_sessions: HashMap::new(),
+                    }))
+                };
+                
+                // Delegate to MCP handler
+                handle_mcp_request(stream, state, &mcp_state);
+            } else if request.contains("GET /health") {
                 handle_health_endpoint(stream, state);
             } else if request.contains("GET /api/v1/status") {
                 handle_status_endpoint(stream, state);
@@ -949,7 +972,8 @@ fn handle_health_endpoint(stream: &mut TcpStream, state: &Arc<Mutex<NodeState>>)
             "bytes_sent": network_lock.bytes_sent,
             "bytes_received": network_lock.bytes_received,
             "mcp_enabled": true,
-            "mcp_port": 3333
+            "mcp_port": 3333,
+            "mcp_http_enabled": true
         }
     });
     
@@ -988,12 +1012,19 @@ fn handle_status_endpoint(stream: &mut TcpStream, state: &Arc<Mutex<NodeState>>)
         "mcp": {
             "enabled": true,
             "port": 3333,
+            "http_port": 8080,
+            "accessible_via": [
+                "http://NODE_IP:3333/mcp",
+                "https://qudag-testnet-node1.fly.dev/mcp"
+            ],
             "endpoints": [
                 "/mcp",
+                "/mcp/info",
                 "/mcp/tools",
                 "/mcp/resources",
                 "/mcp/events",
-                "/mcp/rpc"
+                "/mcp/rpc",
+                "/.well-known/mcp"
             ]
         }
     });
