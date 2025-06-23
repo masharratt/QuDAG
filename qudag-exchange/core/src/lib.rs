@@ -1,5 +1,5 @@
 //! QuDAG Exchange Core Library
-//! 
+//!
 //! This crate provides the core functionality for the QuDAG Exchange system:
 //! - rUv (Resource Utilization Voucher) token ledger
 //! - Resource metering and cost calculations
@@ -17,44 +17,46 @@
 extern crate alloc;
 
 #[cfg(not(feature = "std"))]
-use alloc::{string::String, vec::Vec, collections::BTreeMap};
+use alloc::{collections::BTreeMap, string::String, vec::Vec};
 
 #[cfg(feature = "std")]
-use std::{string::String, vec::Vec, collections::BTreeMap};
+use std::{collections::BTreeMap, string::String, vec::Vec};
 
 // Public modules
-pub mod error;
-pub mod ledger;
 pub mod account;
-pub mod transaction;
-pub mod metering;
+pub mod config;
 pub mod consensus;
-pub mod state;
-pub mod types;
+pub mod error;
 pub mod fee_model;
 pub mod immutable;
-pub mod config;
+pub mod ledger;
+pub mod metering;
 pub mod payout;
+pub mod state;
+pub mod transaction;
+pub mod types;
 
 // Re-exports
-pub use error::{Error, Result};
-pub use ledger::Ledger;
 pub use account::{Account, AccountId, Balance};
-pub use transaction::{Transaction, TransactionId, TransactionStatus};
-pub use metering::{ResourceMeter, OperationCost};
-pub use consensus::ConsensusAdapter;
-pub use state::LedgerState;
-pub use types::rUv;
-pub use fee_model::{FeeModel, FeeModelParams, AgentStatus, FeeCalculator};
-pub use immutable::{ImmutableDeployment, ImmutableConfig, ImmutableStatus, LockableConfig, ImmutableSignature};
 pub use config::{
-    ExchangeConfig, ExchangeConfigBuilder, NetworkConfig, SecurityConfig, ConfigSummary,
-    BusinessPlanConfig, BusinessPlanSummary, GovernanceConfig
+    BusinessPlanConfig, BusinessPlanSummary, ConfigSummary, ExchangeConfig, ExchangeConfigBuilder,
+    GovernanceConfig, NetworkConfig, SecurityConfig,
 };
+pub use consensus::ConsensusAdapter;
+pub use error::{Error, Result};
+pub use fee_model::{AgentStatus, FeeCalculator, FeeModel, FeeModelParams};
+pub use immutable::{
+    ImmutableConfig, ImmutableDeployment, ImmutableSignature, ImmutableStatus, LockableConfig,
+};
+pub use ledger::Ledger;
+pub use metering::{OperationCost, ResourceMeter};
 pub use payout::{
-    PayoutConfig, FeeRouter, ContributorRole, ContributorInfo, PayoutEntry, PayoutTransaction,
-    PayoutSplitTemplates, PayoutSplit, ContributorType
+    ContributorInfo, ContributorRole, ContributorType, FeeRouter, PayoutConfig, PayoutEntry,
+    PayoutSplit, PayoutSplitTemplates, PayoutTransaction,
 };
+pub use state::LedgerState;
+pub use transaction::{Transaction, TransactionId, TransactionStatus};
+pub use types::rUv;
 
 /// Core version string
 pub const VERSION: &str = env!("CARGO_PKG_VERSION");

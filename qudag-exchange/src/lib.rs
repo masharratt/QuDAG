@@ -52,8 +52,8 @@ use std::sync::Arc;
 pub mod error;
 
 // Re-export from core
-pub use qudag_exchange_core::*;
 pub use error::{ExchangeError as Error, Result};
+pub use qudag_exchange_core::*;
 
 /// The main exchange interface for interacting with the QuDAG Exchange network.
 ///
@@ -119,10 +119,10 @@ impl Exchange {
             network: network.to_string(),
             ..Default::default()
         };
-        
+
         Self::with_config(config).await
     }
-    
+
     /// Creates a new Exchange instance with custom configuration.
     ///
     /// # Arguments
@@ -157,7 +157,7 @@ impl Exchange {
         // Implementation details...
         todo!()
     }
-    
+
     /// Creates a new account with quantum-resistant keys.
     ///
     /// This method generates a new ML-DSA key pair, creates an account,
@@ -192,7 +192,7 @@ impl Exchange {
         // Implementation details...
         todo!()
     }
-    
+
     /// Retrieves the current balance for an account.
     ///
     /// # Arguments
@@ -220,7 +220,7 @@ impl Exchange {
         // Implementation details...
         todo!()
     }
-    
+
     /// Submits a transaction to the network.
     ///
     /// The transaction is validated, signed (if not already signed),
@@ -263,7 +263,7 @@ impl Exchange {
         // Implementation details...
         todo!()
     }
-    
+
     /// Waits for a transaction to be confirmed.
     ///
     /// This method blocks until the transaction reaches the specified
@@ -330,19 +330,19 @@ impl Exchange {
 pub struct ExchangeConfig {
     /// Network to connect to ("mainnet", "testnet", "local")
     pub network: String,
-    
+
     /// Data directory for storage (defaults to platform-specific location)
     pub data_dir: Option<std::path::PathBuf>,
-    
+
     /// Bootstrap peer addresses for initial connection
     pub bootstrap_peers: Vec<String>,
-    
+
     /// Maximum number of peer connections
     pub max_peers: usize,
-    
+
     /// Consensus configuration
     pub consensus_config: ConsensusConfig,
-    
+
     /// Enable debug logging
     pub debug: bool,
 }
@@ -382,16 +382,16 @@ impl Default for ExchangeConfig {
 pub struct ConsensusConfig {
     /// Number of validators to query (k parameter)
     pub sample_size: usize,
-    
+
     /// Quorum threshold for positive responses (α parameter)
     pub quorum_size: usize,
-    
+
     /// Consecutive successes needed for decision (β parameter)
     pub decision_threshold: u32,
-    
+
     /// Timeout for each query round
     pub query_timeout: std::time::Duration,
-    
+
     /// Maximum time to wait for consensus
     pub max_consensus_time: std::time::Duration,
 }
@@ -434,13 +434,13 @@ impl Default for ConsensusConfig {
 pub struct TransactionResult {
     /// Unique identifier for the transaction
     pub transaction_id: TransactionId,
-    
+
     /// Initial status of the transaction
     pub status: TransactionStatus,
-    
+
     /// Estimated fee (if calculable)
     pub estimated_fee: Option<f64>,
-    
+
     /// Estimated confirmation time
     pub estimated_confirmation_time: Option<std::time::Duration>,
 }
@@ -494,7 +494,7 @@ impl Provider {
     pub fn builder() -> ProviderBuilder {
         ProviderBuilder::new()
     }
-    
+
     /// Starts the resource provider.
     ///
     /// This method begins advertising resources and accepting jobs.
@@ -518,7 +518,7 @@ impl Provider {
         // Implementation details...
         todo!()
     }
-    
+
     /// Stops the resource provider gracefully.
     ///
     /// This method stops accepting new jobs and waits for active jobs to complete.
@@ -549,7 +549,7 @@ impl Provider {
         // Implementation details...
         todo!()
     }
-    
+
     /// Gets current provider statistics.
     ///
     /// # Returns
@@ -611,7 +611,7 @@ impl ProviderBuilder {
             min_job_duration: None,
         }
     }
-    
+
     /// Sets the account for the provider.
     ///
     /// # Arguments
@@ -625,7 +625,7 @@ impl ProviderBuilder {
         self.account = Some(account.clone());
         self
     }
-    
+
     // TODO: Re-enable when ResourceSpec is implemented
     // /// Adds a resource to offer.
     // ///
@@ -640,7 +640,7 @@ impl ProviderBuilder {
     //     self.resources.push(resource);
     //     self
     // }
-    
+
     // TODO: Re-enable when PricingStrategy is implemented
     // /// Sets the pricing strategy.
     // ///
@@ -655,7 +655,7 @@ impl ProviderBuilder {
     //     self.pricing = Some(strategy);
     //     self
     // }
-    
+
     /// Builds the Provider instance.
     ///
     /// # Returns
@@ -680,10 +680,10 @@ impl ProviderBuilder {
 // pub enum PricingStrategy {
 //     /// Fixed price per resource unit
 //     Fixed(f64),
-//     
+//
 //     /// Market-based dynamic pricing
 //     MarketBased,
-//     
+//
 //     /// Custom pricing rules
 //     Custom(CustomPricing),
 // }
@@ -695,22 +695,22 @@ impl ProviderBuilder {
 pub struct ProviderStats {
     /// Number of jobs completed
     pub jobs_completed: u64,
-    
+
     /// Number of jobs failed
     pub jobs_failed: u64,
-    
+
     /// Total rUv earned
     pub total_earned: f64,
-    
+
     /// Average job completion time
     pub avg_completion_time: std::time::Duration,
-    
+
     /// Provider uptime
     pub uptime: std::time::Duration,
-    
+
     /// Resource utilization percentage
     pub utilization: f64,
-    
+
     /// Customer satisfaction rating (0-5)
     pub satisfaction_rating: f64,
 }
@@ -755,7 +755,7 @@ impl Market {
     //     // Implementation details...
     //     todo!()
     // }
-    
+
     /// Gets current market statistics.
     ///
     /// # Returns
@@ -780,7 +780,7 @@ impl Market {
         // Implementation details...
         todo!()
     }
-    
+
     // TODO: Implement when OfferId and Reservation types are available
     // /// Reserves resources from an offer.
     // pub async fn reserve_resources(
@@ -798,22 +798,22 @@ impl Market {
 pub struct MarketStats {
     /// Number of active resource offers
     pub active_offers: u64,
-    
+
     /// Total providers in the market
     pub total_providers: u64,
-    
+
     /// 24-hour trading volume in rUv
     pub volume_24h: f64,
-    
+
     /// Average CPU price per hour
     pub avg_cpu_price: f64,
-    
+
     /// Average GPU price per hour
     pub avg_gpu_price: f64,
-    
+
     /// Average storage price per GB per month
     pub avg_storage_price: f64,
-    
+
     /// Market liquidity score (0-100)
     pub liquidity_score: f64,
 }
@@ -823,16 +823,16 @@ pub struct MarketStats {
 pub struct Reservation {
     /// Unique reservation identifier
     pub id: String,
-    
+
     /// Resource access endpoint
     pub access_endpoint: String,
-    
+
     /// Authentication credentials
     pub auth_token: String,
-    
+
     /// Reservation expiration time
     pub expires_at: std::time::SystemTime,
-    
+
     /// Total cost in rUv
     pub total_cost: f64,
 }
@@ -840,13 +840,13 @@ pub struct Reservation {
 #[cfg(test)]
 mod tests {
     use super::*;
-    
+
     #[tokio::test]
     async fn test_exchange_creation() {
         let exchange = Exchange::new("testnet").await.unwrap();
         // Add test assertions
     }
-    
+
     #[tokio::test]
     async fn test_account_creation() {
         let exchange = Exchange::new("testnet").await.unwrap();

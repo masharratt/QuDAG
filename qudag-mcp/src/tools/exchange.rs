@@ -5,7 +5,9 @@ use serde_json::{json, Value};
 use std::collections::HashMap;
 
 use crate::error::{Error, Result};
-use crate::tools::{get_required_string_arg, get_optional_u64_arg, get_optional_string_arg, McpTool};
+use crate::tools::{
+    get_optional_string_arg, get_optional_u64_arg, get_required_string_arg, McpTool,
+};
 
 /// Exchange tool for rUv token operations
 pub struct ExchangeTool {
@@ -47,7 +49,7 @@ impl McpTool for ExchangeTool {
                     "type": "string",
                     "enum": [
                         "create_account",
-                        "get_balance", 
+                        "get_balance",
                         "transfer",
                         "mint",
                         "burn",
@@ -62,7 +64,7 @@ impl McpTool for ExchangeTool {
                     "description": "Account identifier for balance queries and transfers"
                 },
                 "from_account": {
-                    "type": "string", 
+                    "type": "string",
                     "description": "Source account for transfers"
                 },
                 "to_account": {
@@ -126,9 +128,9 @@ impl McpTool for ExchangeTool {
 
     async fn execute(&self, arguments: Option<Value>) -> Result<Value> {
         let args = arguments.ok_or_else(|| Error::invalid_request("Arguments required"))?;
-        
+
         let operation = get_required_string_arg(&args, "operation")?;
-        
+
         match operation.as_str() {
             "create_account" => {
                 let account_id = get_required_string_arg(&args, "account_id")?;
@@ -144,7 +146,8 @@ impl McpTool for ExchangeTool {
                 let amount = get_optional_u64_arg(&args, "amount")
                     .ok_or_else(|| Error::invalid_request("Amount required for transfer"))?;
                 let memo = get_optional_string_arg(&args, "memo");
-                self.transfer(&from_account, &to_account, amount, memo).await
+                self.transfer(&from_account, &to_account, amount, memo)
+                    .await
             }
             "mint" => {
                 let account_id = get_required_string_arg(&args, "account_id")?;
@@ -158,16 +161,13 @@ impl McpTool for ExchangeTool {
                     .ok_or_else(|| Error::invalid_request("Amount required for burn"))?;
                 self.burn(&account_id, amount).await
             }
-            "list_accounts" => {
-                self.list_accounts().await
-            }
-            "get_total_supply" => {
-                self.get_total_supply().await
-            }
-            "get_network_status" => {
-                self.get_network_status().await
-            }
-            _ => Err(Error::invalid_request(format!("Unknown operation: {}", operation)))
+            "list_accounts" => self.list_accounts().await,
+            "get_total_supply" => self.get_total_supply().await,
+            "get_network_status" => self.get_network_status().await,
+            _ => Err(Error::invalid_request(format!(
+                "Unknown operation: {}",
+                operation
+            ))),
         }
     }
 
@@ -217,12 +217,18 @@ impl ExchangeTool {
     }
 
     /// Transfer rUv tokens between accounts
-    async fn transfer(&self, from_account: &str, to_account: &str, amount: u64, memo: Option<String>) -> Result<Value> {
+    async fn transfer(
+        &self,
+        from_account: &str,
+        to_account: &str,
+        amount: u64,
+        memo: Option<String>,
+    ) -> Result<Value> {
         // This would integrate with the actual QuDAG Exchange core
         // For now, return a simulated response
         Ok(json!({
             "success": true,
-            "operation": "transfer", 
+            "operation": "transfer",
             "transaction_id": format!("tx_{}", uuid::Uuid::new_v4()),
             "from_account": from_account,
             "to_account": to_account,
@@ -279,7 +285,7 @@ impl ExchangeTool {
                 {
                     "account_id": "bob",
                     "balance": 500,
-                    "created_at": "2024-01-01T00:00:00Z", 
+                    "created_at": "2024-01-01T00:00:00Z",
                     "last_activity": chrono::Utc::now().to_rfc3339()
                 }
             ],

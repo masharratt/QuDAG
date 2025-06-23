@@ -7,7 +7,7 @@ kill_signal = "SIGINT"
 kill_timeout = "5s"
 
 [build]
-  dockerfile = "../Dockerfile"
+  dockerfile = "../Dockerfile.production"
 
 [build.args]
   NODE_TYPE = "bootstrap"
@@ -112,21 +112,7 @@ kill_timeout = "5s"
   source = "qudag_data_node1"
   destination = "/data/qudag"
 
-[processes]
-  app = """
-    set -e
-    echo "Starting QuDAG Bootstrap Node (Toronto)..."
-    
-    # Copy configuration
-    cp /app/configs/node1.toml /data/qudag/config.toml
-    
-    # Ensure directories exist
-    mkdir -p /data/qudag/tls
-    mkdir -p /data/qudag/db
-    
-    # Start the node
-    exec /app/qudag-node --config /data/qudag/config.toml
-  """
+# Docker ENTRYPOINT handles process execution
 
 [[statics]]
   guest_path = "/app/configs/node1.toml"

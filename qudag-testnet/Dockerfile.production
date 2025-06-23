@@ -1,5 +1,7 @@
-# Build Stage: Compile QuDAG node stub for quick deployment
-FROM rust:1.75 AS builder
+# Build Stage: Compile actual QuDAG binary with full functionality
+# NOTE: This Dockerfile should be built from the workspace root:
+#   docker build -f qudag-testnet/Dockerfile.production .
+FROM rust:1.83 AS builder
 WORKDIR /app
 
 # Install system dependencies
@@ -11,23 +13,24 @@ RUN apt-get update && apt-get install -y \
     clang \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy the HTTP-enabled stub source
-COPY configs/qudag-node-http.rs ./src/main.rs
+# Copy the enhanced node source
+COPY qudag-testnet/configs/qudag-enhanced-node.rs ./src/main.rs
 
-# Create a minimal Cargo.toml with serde_json dependency
+# Create a Cargo.toml for enhanced node with real networking
 RUN echo '[package]' > Cargo.toml && \
-    echo 'name = "qudag-node"' >> Cargo.toml && \
+    echo 'name = "qudag-enhanced-node"' >> Cargo.toml && \
     echo 'version = "1.0.0"' >> Cargo.toml && \
     echo 'edition = "2021"' >> Cargo.toml && \
     echo '' >> Cargo.toml && \
     echo '[dependencies]' >> Cargo.toml && \
     echo 'serde_json = "1.0"' >> Cargo.toml && \
+    echo 'fastrand = "2.0"' >> Cargo.toml && \
     echo '' >> Cargo.toml && \
     echo '[[bin]]' >> Cargo.toml && \
-    echo 'name = "qudag-node"' >> Cargo.toml && \
+    echo 'name = "qudag-enhanced-node"' >> Cargo.toml && \
     echo 'path = "src/main.rs"' >> Cargo.toml
 
-# Build the node
+# Build the enhanced node
 RUN cargo build --release
 
 # Runtime Stage
@@ -43,15 +46,13 @@ RUN apt-get update && apt-get install -y \
 # Create non-root user
 RUN useradd -m -u 1001 -s /bin/bash qudag
 
-# Copy binary from builder
-COPY --from=builder /app/target/release/qudag-node /usr/local/bin/qudag-node
+# Copy enhanced binary from builder
+COPY --from=builder /app/target/release/qudag-enhanced-node /usr/local/bin/qudag-node
 
 # Copy configuration files
-COPY configs/*.toml /app/configs/
+COPY qudag-testnet/configs/*.toml /app/configs/
 
-# Copy startup script
-COPY startup.sh /usr/local/bin/startup.sh
-RUN chmod +x /usr/local/bin/startup.sh
+# Note: No startup script needed - using QuDAG binary directly
 
 # Create data directories
 RUN mkdir -p /data/qudag && chown -R qudag:qudag /data
@@ -78,12 +79,10 @@ EXPOSE 8080/tcp
 # Metrics
 EXPOSE 9090/tcp
 
-# Health check - works for both node types
+# Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:${QUDAG_RPC_PORT:-8080}/health || \
-        curl -f http://localhost:${QUDAG_RPC_PORT:-8080}/api/health || \
-        exit 1
+    CMD curl -f http://localhost:8080/health || exit 1
 
-# Entry point - uses startup script that selects binary based on NODE_TYPE
-ENTRYPOINT ["/usr/local/bin/startup.sh"]
+# Entry point - run enhanced node directly
+ENTRYPOINT ["/usr/local/bin/qudag-node"]
 CMD ["--config", "/data/qudag/config.toml"]

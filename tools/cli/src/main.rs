@@ -1371,7 +1371,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     };
                     println!("💰 Balance for {}: {} rUv", account, balance);
                 }
-                ExchangeCommands::Transfer { from, to, amount, memo } => {
+                ExchangeCommands::Transfer {
+                    from,
+                    to,
+                    amount,
+                    memo,
+                } => {
                     if from == to {
                         eprintln!("❌ Cannot transfer to the same account");
                         std::process::exit(1);
@@ -1431,40 +1436,49 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     println!("├── 🔒 Immutable Mode: Not enabled");
                     println!("└── 🛡️  Byzantine Tolerance: f < n/3");
                 }
-                
-                ExchangeCommands::DeployImmutable { key_path, grace_period } => {
+
+                ExchangeCommands::DeployImmutable {
+                    key_path,
+                    grace_period,
+                } => {
                     println!("🔒 Deploying Exchange in Immutable Mode");
                     println!("├── Grace period: {} hours", grace_period);
                     if let Some(path) = key_path {
                         println!("├── Key path: {:?}", path);
-                        
+
                         // In a real implementation, this would:
                         // 1. Load the ML-DSA keypair from the file
                         // 2. Create immutable deployment configuration
                         // 3. Sign the configuration with quantum-resistant signature
                         // 4. Lock the system parameters
-                        
+
                         println!("✅ Immutable deployment initiated");
                         println!("📝 Configuration hash: 0x{}", hex::encode(&[0u8; 32]));
                         println!("🔐 Quantum signature: ML-DSA-87");
                         println!("⏰ Grace period ends in {} hours", grace_period);
-                        println!("🚨 After grace period, no configuration changes will be possible!");
+                        println!(
+                            "🚨 After grace period, no configuration changes will be possible!"
+                        );
                     } else {
                         println!("🔑 No key path provided - using default key");
                         println!("✅ Immutable deployment initiated with default key");
                         println!("⏰ Grace period: {} hours", grace_period);
                     }
                 }
-                
-                ExchangeCommands::ConfigureFees { 
-                    f_min, f_max, f_min_verified, f_max_verified, 
-                    time_constant_days, usage_threshold 
+
+                ExchangeCommands::ConfigureFees {
+                    f_min,
+                    f_max,
+                    f_min_verified,
+                    f_max_verified,
+                    time_constant_days,
+                    usage_threshold,
                 } => {
                     println!("⚙️  Configuring Dynamic Fee Model");
-                    
+
                     // Build new parameters with provided values or defaults
                     let mut updated = false;
-                    
+
                     if let Some(min) = f_min {
                         println!("├── Setting f_min: {:.3}% ({:.6})", min * 100.0, min);
                         updated = true;
@@ -1474,11 +1488,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         updated = true;
                     }
                     if let Some(min_verified) = f_min_verified {
-                        println!("├── Setting f_min_verified: {:.3}% ({:.6})", min_verified * 100.0, min_verified);
+                        println!(
+                            "├── Setting f_min_verified: {:.3}% ({:.6})",
+                            min_verified * 100.0,
+                            min_verified
+                        );
                         updated = true;
                     }
                     if let Some(max_verified) = f_max_verified {
-                        println!("├── Setting f_max_verified: {:.3}% ({:.6})", max_verified * 100.0, max_verified);
+                        println!(
+                            "├── Setting f_max_verified: {:.3}% ({:.6})",
+                            max_verified * 100.0,
+                            max_verified
+                        );
                         updated = true;
                     }
                     if let Some(days) = time_constant_days {
@@ -1489,11 +1511,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         println!("├── Setting usage threshold: {} rUv", threshold);
                         updated = true;
                     }
-                    
+
                     if updated {
                         println!("✅ Fee model parameters updated");
                         println!("📊 New parameters will take effect immediately");
-                        println!("🔒 Note: Parameters cannot be changed if system is immutably deployed");
+                        println!(
+                            "🔒 Note: Parameters cannot be changed if system is immutably deployed"
+                        );
                     } else {
                         println!("📋 Current Fee Model Parameters:");
                         println!("├── f_min: 0.1% (0.001)");
@@ -1504,7 +1528,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         println!("└── Usage threshold: 10,000 rUv");
                     }
                 }
-                
+
                 ExchangeCommands::FeeStatus { examples, format } => {
                     if format == "json" {
                         let status = serde_json::json!({
@@ -1531,7 +1555,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         println!("├── Time Constant: 90 days (3 months)");
                         println!("├── Usage Threshold: 10,000 rUv/month");
                         println!("└── Algorithm: Exponential phase-in functions");
-                        
+
                         if examples {
                             println!("");
                             println!("💡 Fee Examples:");
@@ -1549,7 +1573,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         }
                     }
                 }
-                
+
                 ExchangeCommands::ImmutableStatus { format } => {
                     if format == "json" {
                         let status = serde_json::json!({
@@ -1576,30 +1600,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                         println!("   qudag exchange deploy-immutable --key-path <path>");
                     }
                 }
-                
-                ExchangeCommands::VerifyAgent { account, proof_path } => {
+
+                ExchangeCommands::VerifyAgent {
+                    account,
+                    proof_path,
+                } => {
                     println!("✅ Agent Verification");
                     println!("├── Account: {}", account);
                     println!("├── Proof file: {:?}", proof_path);
-                    
+
                     // In a real implementation, this would:
                     // 1. Load verification proof from file
                     // 2. Validate the proof (KYC, identity, etc.)
                     // 3. Update agent status in the ledger
                     // 4. Enable reduced fee rates
-                    
+
                     println!("✅ Agent verified successfully");
                     println!("📋 Status: Verified agent");
                     println!("💰 Fee benefits: 0.25%-0.50% range (vs 0.1%-1.0%)");
                     println!("🚀 High usage rewards: Lower fees for >10K rUv/month");
                     println!("🔐 Verification method: Quantum-resistant proof");
                 }
-                
+
                 ExchangeCommands::UpdateUsage { account, usage } => {
                     println!("📊 Usage Statistics Update");
                     println!("├── Account: {}", account);
                     println!("├── Monthly usage: {} rUv", usage);
-                    
+
                     let usage_level = if usage < 1000 {
                         "Low"
                     } else if usage < 10000 {
@@ -1609,29 +1636,33 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
                     } else {
                         "Very High"
                     };
-                    
+
                     println!("├── Usage level: {}", usage_level);
                     println!("└── Fee impact: Updated in fee calculations");
                     println!("✅ Usage statistics updated");
-                    
+
                     if usage >= 10000 {
                         println!("🎯 Note: High usage (≥10K rUv) provides fee benefits for verified agents");
                     }
                 }
-                
+
                 ExchangeCommands::CalculateFee { account, amount } => {
                     println!("💰 Fee Calculation");
                     println!("├── Account: {}", account);
                     println!("├── Transaction amount: {} rUv", amount);
-                    
+
                     // Mock calculation - in real implementation would use actual agent status
                     let base_rate = 0.005; // 0.5% as example
                     let fee_amount = (amount as f64 * base_rate) as u64;
-                    
-                    println!("├── Current fee rate: {:.3}% ({:.6})", base_rate * 100.0, base_rate);
+
+                    println!(
+                        "├── Current fee rate: {:.3}% ({:.6})",
+                        base_rate * 100.0,
+                        base_rate
+                    );
                     println!("├── Fee amount: {} rUv", fee_amount);
                     println!("└── Total cost: {} rUv", amount + fee_amount);
-                    
+
                     println!("📋 Fee Breakdown:");
                     println!("├── Base rate depends on:");
                     println!("│   ├── Agent verification status");

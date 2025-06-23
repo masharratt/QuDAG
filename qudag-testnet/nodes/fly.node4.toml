@@ -7,7 +7,7 @@ kill_signal = "SIGINT"
 kill_timeout = "5s"
 
 [build]
-  dockerfile = "../Dockerfile"
+  dockerfile = "../Dockerfile.production"
 
 [build.args]
   NODE_TYPE = "validator"
@@ -109,10 +109,12 @@ kill_timeout = "5s"
 [processes]
   app = """
     set -e
-    echo "Starting QuDAG Validator Node (San Francisco)..."
+    echo "Starting QuDAG Validator Node (San Francisco) with full functionality..."
     
-    # Copy configuration
-    cp /app/configs/node4.toml /data/qudag/config.toml
+    # Copy configuration if it exists
+    if [ -f /app/configs/node4.toml ]; then
+      cp /app/configs/node4.toml /data/qudag/config.toml
+    fi
     
     # Ensure directories exist
     mkdir -p /data/qudag/tls
@@ -120,10 +122,10 @@ kill_timeout = "5s"
     
     # Wait for bootstrap node
     echo "Waiting for bootstrap node..."
-    sleep 20
+    sleep 25
     
-    # Start the node
-    exec /app/qudag-node --config /data/qudag/config.toml
+    # Start the real QuDAG node with full functionality
+    exec /usr/local/bin/qudag-node run-node --port 4001 --data-dir /data/qudag --peer /dns4/qudag-testnet-node1.fly.dev/tcp/4001
   """
 
 [[statics]]

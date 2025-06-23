@@ -46,7 +46,7 @@ impl Performance {
     pub fn now() -> f64 {
         js_sys::Date::now()
     }
-    
+
     /// Measure execution time of a function
     #[wasm_bindgen(js_name = "measure")]
     pub fn measure(name: &str, start: f64) -> f64 {
@@ -68,11 +68,7 @@ impl Memory {
         if let Ok(memory) = js_sys::Reflect::get(&wasm_bindgen::memory(), &"buffer".into()) {
             if let Some(buffer) = memory.dyn_ref::<js_sys::ArrayBuffer>() {
                 let obj = js_sys::Object::new();
-                js_sys::Reflect::set(
-                    &obj,
-                    &"bytes".into(),
-                    &buffer.byte_length().into(),
-                ).unwrap();
+                js_sys::Reflect::set(&obj, &"bytes".into(), &buffer.byte_length().into()).unwrap();
                 return obj.into();
             }
         }
@@ -91,20 +87,19 @@ impl Encoding {
     pub fn bytes_to_hex(bytes: &[u8]) -> String {
         hex::encode(bytes)
     }
-    
+
     /// Convert hex string to bytes
     #[wasm_bindgen(js_name = "hexToBytes")]
     pub fn hex_to_bytes(hex: &str) -> Result<Vec<u8>, JsError> {
-        hex::decode(hex)
-            .map_err(|e| JsError::new(&format!("Invalid hex string: {}", e)))
+        hex::decode(hex).map_err(|e| JsError::new(&format!("Invalid hex string: {}", e)))
     }
-    
+
     /// Convert string to bytes (UTF-8)
     #[wasm_bindgen(js_name = "stringToBytes")]
     pub fn string_to_bytes(s: &str) -> Vec<u8> {
         s.as_bytes().to_vec()
     }
-    
+
     /// Convert bytes to string (UTF-8)
     #[wasm_bindgen(js_name = "bytesToString")]
     pub fn bytes_to_string(bytes: &[u8]) -> Result<String, JsError> {
@@ -124,14 +119,14 @@ impl Validation {
     pub fn is_dark_domain(domain: &str) -> bool {
         domain.ends_with(".dark") && domain.len() > 5
     }
-    
+
     /// Validate a peer address
     #[wasm_bindgen(js_name = "isPeerAddress")]
     pub fn is_peer_address(address: &str) -> bool {
         // Simple validation - check if it looks like multiaddr
         address.starts_with("/ip4/") || address.starts_with("/ip6/")
     }
-    
+
     /// Validate a hex string
     #[wasm_bindgen(js_name = "isValidHex")]
     pub fn is_valid_hex(hex: &str) -> bool {
@@ -153,7 +148,7 @@ impl Random {
             .map_err(|e| JsError::new(&format!("Failed to generate random bytes: {}", e)))?;
         Ok(bytes)
     }
-    
+
     /// Generate a random ID
     #[wasm_bindgen(js_name = "getId")]
     pub fn get_id() -> String {
@@ -166,7 +161,7 @@ impl Random {
 mod tests {
     use super::*;
     use wasm_bindgen_test::*;
-    
+
     #[wasm_bindgen_test]
     fn test_encoding_roundtrip() {
         let original = "Hello, QuDAG!";
@@ -176,7 +171,7 @@ mod tests {
         let decoded = Encoding::bytes_to_string(&decoded_bytes).unwrap();
         assert_eq!(original, decoded);
     }
-    
+
     #[wasm_bindgen_test]
     fn test_validation() {
         assert!(Validation::is_dark_domain("test.dark"));

@@ -8,8 +8,8 @@
 use wasm_bindgen::prelude::*;
 // use qudag_network::dark_resolver::{DarkResolver, DarkResolverError};
 use serde::{Deserialize, Serialize};
-use std::sync::{Arc, Mutex};
 use std::collections::HashMap;
+use std::sync::{Arc, Mutex};
 
 /// WASM wrapper for dark addressing
 #[wasm_bindgen]
@@ -27,21 +27,23 @@ impl WasmDarkResolver {
             registry: Arc::new(Mutex::new(HashMap::new())),
         }
     }
-    
+
     /// Register a .dark domain
     #[wasm_bindgen(js_name = "registerDomain")]
     pub async fn register_domain(&self, domain: &str) -> Result<JsValue, JsError> {
         if !domain.ends_with(".dark") {
             return Err(JsError::new("Domain must end with .dark"));
         }
-        
-        let mut registry = self.registry.lock()
+
+        let mut registry = self
+            .registry
+            .lock()
             .map_err(|e| JsError::new(&format!("Failed to lock registry: {}", e)))?;
-        
+
         if registry.contains_key(domain) {
             return Err(JsError::new("Domain already registered"));
         }
-        
+
         let address_info = DarkAddressInfo {
             domain: domain.to_string(),
             public_key: generate_mock_public_key(),
@@ -50,24 +52,26 @@ impl WasmDarkResolver {
             expires_at: js_sys::Date::now() as u64 + 86400000, // 24 hours
             quantum_fingerprint: generate_mock_fingerprint(),
         };
-        
+
         registry.insert(domain.to_string(), address_info.clone());
-        
+
         Ok(serde_wasm_bindgen::to_value(&address_info)?)
     }
-    
+
     /// Resolve a .dark domain
     #[wasm_bindgen(js_name = "resolveDomain")]
     pub async fn resolve_domain(&self, domain: &str) -> Result<JsValue, JsError> {
-        let registry = self.registry.lock()
+        let registry = self
+            .registry
+            .lock()
             .map_err(|e| JsError::new(&format!("Failed to lock registry: {}", e)))?;
-        
+
         match registry.get(domain) {
             Some(info) => Ok(serde_wasm_bindgen::to_value(info)?),
             None => Err(JsError::new("Domain not found")),
         }
     }
-    
+
     /// Generate a shadow address
     #[wasm_bindgen(js_name = "generateShadowAddress")]
     pub fn generate_shadow_address(&self, ttl_seconds: u32) -> Result<JsValue, JsError> {
@@ -79,16 +83,16 @@ impl WasmDarkResolver {
             public_key: generate_mock_public_key(),
             is_active: true,
         };
-        
+
         // In a real implementation, this would be stored
         Ok(serde_wasm_bindgen::to_value(&shadow_address)?)
     }
-    
+
     /// Create a quantum fingerprint for data
     #[wasm_bindgen(js_name = "createFingerprint")]
     pub fn create_fingerprint(&self, data: &[u8]) -> Result<JsValue, JsError> {
         use qudag_crypto::HashFunction;
-        
+
         let hash = HashFunction::Blake3.hash(data);
         let fingerprint = QuantumFingerprint {
             hash: hex::encode(hash),
@@ -97,41 +101,57 @@ impl WasmDarkResolver {
             timestamp: js_sys::Date::now() as u64,
             data_size: data.len(),
         };
-        
+
         Ok(serde_wasm_bindgen::to_value(&fingerprint)?)
     }
-    
+
     /// List all registered domains
     #[wasm_bindgen(js_name = "listDomains")]
     pub fn list_domains(&self) -> Result<JsValue, JsError> {
-        let registry = self.registry.lock()
+        let registry = self
+            .registry
+            .lock()
             .map_err(|e| JsError::new(&format!("Failed to lock registry: {}", e)))?;
-        
+
         let domains: Vec<String> = registry.keys().cloned().collect();
         Ok(serde_wasm_bindgen::to_value(&domains)?)
     }
-    
+
     /// Check if a domain is available
     #[wasm_bindgen(js_name = "isDomainAvailable")]
     pub fn is_domain_available(&self, domain: &str) -> Result<bool, JsError> {
-        let registry = self.registry.lock()
+        let registry = self
+            .registry
+            .lock()
             .map_err(|e| JsError::new(&format!("Failed to lock registry: {}", e)))?;
-        
+
         Ok(!registry.contains_key(domain))
     }
 }
 
 // Helper functions
 fn generate_mock_public_key() -> String {
-    hex::encode((0..32).map(|_| js_sys::Math::random() as u8).collect::<Vec<u8>>())
+    hex::encode(
+        (0..32)
+            .map(|_| js_sys::Math::random() as u8)
+            .collect::<Vec<u8>>(),
+    )
 }
 
 fn generate_mock_fingerprint() -> String {
-    hex::encode((0..64).map(|_| js_sys::Math::random() as u8).collect::<Vec<u8>>())
+    hex::encode(
+        (0..64)
+            .map(|_| js_sys::Math::random() as u8)
+            .collect::<Vec<u8>>(),
+    )
 }
 
 fn generate_mock_signature() -> String {
-    hex::encode((0..128).map(|_| js_sys::Math::random() as u8).collect::<Vec<u8>>())
+    hex::encode(
+        (0..128)
+            .map(|_| js_sys::Math::random() as u8)
+            .collect::<Vec<u8>>(),
+    )
 }
 
 // Data structures
@@ -167,14 +187,14 @@ struct QuantumFingerprint {
 mod tests {
     use super::*;
     use wasm_bindgen_test::*;
-    
+
     #[wasm_bindgen_test]
     async fn test_domain_registration() {
         let resolver = WasmDarkResolver::new();
         let result = resolver.register_domain("test.dark").await;
         assert!(result.is_ok());
     }
-    
+
     #[wasm_bindgen_test]
     fn test_shadow_address_generation() {
         let resolver = WasmDarkResolver::new();
