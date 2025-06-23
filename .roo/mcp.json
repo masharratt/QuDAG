@@ -7,7 +7,17 @@
         "start",
         "--transport",
         "stdio"
-      ]
+      ],
+      "alwaysAllow": [
+        "qudag_exchange",
+        "vault",
+        "crypto",
+        "config",
+        "dag",
+        "network",
+        "system"
+      ],
+      "timeout": 600
     },
     "supabase": {
       "command": "npx",

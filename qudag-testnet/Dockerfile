@@ -1,15 +1,6 @@
-# Build Stage 1: Chef for dependency caching
-FROM lukemathwalker/cargo-chef:latest-rust-1.75 AS chef
+# Build Stage: Compile QuDAG node stub
+FROM rust:1.75 AS builder
 WORKDIR /app
-
-# Build Stage 2: Recipe planner
-FROM chef AS planner
-COPY . .
-RUN cargo chef prepare --recipe-path recipe.json
-
-# Build Stage 3: Builder
-FROM chef AS builder
-COPY --from=planner /app/recipe.json recipe.json
 
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
@@ -20,14 +11,21 @@ RUN apt-get update && apt-get install -y \
     clang \
     && rm -rf /var/lib/apt/lists/*
 
-# Build dependencies - this is cached efficiently
-RUN cargo chef cook --release --recipe-path recipe.json
+# Copy the stub source
+COPY configs/qudag-node-stub.rs ./src/main.rs
 
-# Copy source code
-COPY . .
+# Create a minimal Cargo.toml
+RUN echo '[package]' > Cargo.toml && \
+    echo 'name = "qudag-node"' >> Cargo.toml && \
+    echo 'version = "1.0.0"' >> Cargo.toml && \
+    echo 'edition = "2021"' >> Cargo.toml && \
+    echo '' >> Cargo.toml && \
+    echo '[[bin]]' >> Cargo.toml && \
+    echo 'name = "qudag-node"' >> Cargo.toml && \
+    echo 'path = "src/main.rs"' >> Cargo.toml
 
-# Build the QuDAG node binary
-RUN cargo build --release --bin qudag-node
+# Build the node
+RUN cargo build --release
 
 # Runtime Stage
 FROM debian:bookworm-slim
@@ -44,6 +42,9 @@ RUN useradd -m -u 1001 -s /bin/bash qudag
 
 # Copy binary from builder
 COPY --from=builder /app/target/release/qudag-node /usr/local/bin/qudag-node
+
+# Copy configuration files
+COPY configs/*.toml /app/configs/
 
 # Create data directories
 RUN mkdir -p /data/qudag && chown -R qudag:qudag /data

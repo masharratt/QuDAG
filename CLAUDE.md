@@ -28,6 +28,28 @@
 - `qudag dark register <domain> [--fingerprint <fp>]`: Register dark domain
 - `qudag network status`: Show network topology and health
 
+## QuDAG Exchange Operations
+- `qudag exchange create-account --name <name>`: Create new rUv token account
+- `qudag exchange balance --account <name>`: Check account balance
+- `qudag exchange transfer --from <sender> --to <receiver> --amount <n>`: Transfer rUv tokens
+- `qudag exchange list-accounts`: List all exchange accounts
+- `qudag exchange fee-info [--examples]`: Show fee model information
+- `qudag exchange verify-agent <account> --proof-path <path>`: Verify agent for reduced fees
+- `qudag exchange calculate-fee --account <name> --amount <n>`: Calculate transaction fee
+- `qudag exchange immutable-status`: Check immutable deployment status
+- `qudag exchange deploy-immutable --key-path <path>`: Deploy in immutable mode
+
+## QuDAG Exchange Business Plan
+- `qudag exchange business-plan enable [--auto-distribution]`: Enable payout features
+- `qudag exchange business-plan disable`: Disable business plan features
+- `qudag exchange business-plan status`: Show current business plan status
+- `qudag exchange business-plan configure threshold <amount>`: Set payout threshold
+- `qudag exchange business-plan configure system-fee <percentage>`: Set system fee
+- `qudag exchange business-plan contributors register <id> <role> <vault>`: Register contributor
+- `qudag exchange business-plan contributors list`: List all contributors
+- `qudag exchange business-plan contributors show <id>`: Show contributor details
+- `qudag exchange business-plan payouts [--limit <n>]`: View payout history
+
 ## Claude-Flow Complete Command Reference
 
 ### Core System Commands
@@ -264,6 +286,79 @@ Available SPARC modes: orchestrator, coder, researcher, tdd, architect, reviewer
 ./claude-flow swarm "Test vault security in browser, Node.js, and native environments" --strategy testing --mode distributed --parallel
 ```
 
+### Exchange and Business Plan Workflow
+```bash
+# Research exchange fee models and tokenomics
+./claude-flow sparc run researcher "Analyze optimal fee structures for rUv token exchange with dynamic pricing"
+
+# Develop exchange core functionality
+./claude-flow sparc tdd "Implement quantum-resistant rUv token transfers with ML-DSA signatures"
+
+# Test fee distribution system
+./claude-flow swarm "Test business plan payout distribution across contributor roles" --strategy testing --mode hierarchical --monitor
+
+# Deploy and verify immutable exchange
+./claude-flow sparc run coder "Deploy exchange with immutable quantum-locked configuration"
+
+# Store exchange configuration in memory
+./claude-flow memory store "exchange_config" "Fee model: 0.1%-1.0% dynamic, verified agents 0.25%-0.5%"
+./claude-flow memory store "payout_splits" "Single-agent: 95/5, Plugin-enhanced: 85/10/5, Node-ops: 80/15/5"
+```
+
+## Exchange Development Workflows
+
+### rUv Token Management Workflow
+```bash
+# Create and manage rUv accounts
+qudag exchange create-account --name "alice_vault"
+qudag exchange create-account --name "bob_vault" --email "bob@example.com"
+
+# Check balances and transfer tokens
+qudag exchange balance --account "alice_vault"
+qudag exchange transfer --from "alice_vault" --to "bob_vault" --amount 1000
+
+# Monitor fee calculations
+qudag exchange calculate-fee --account "alice_vault" --amount 10000
+qudag exchange fee-info --examples
+```
+
+### Business Plan Configuration Workflow
+```bash
+# Enable business plan with all features
+qudag exchange business-plan enable \
+    --auto-distribution \
+    --vault-management \
+    --role-earnings \
+    --bounty-rewards
+
+# Configure payout parameters
+qudag exchange business-plan configure threshold 100
+qudag exchange business-plan configure system-fee 0.001
+
+# Register contributors
+qudag exchange business-plan contributors register agent-001 agent-provider alice_vault
+qudag exchange business-plan contributors register plugin-002 plugin-creator bob_vault --custom-percentage 0.12
+
+# Monitor payouts
+qudag exchange business-plan status
+qudag exchange business-plan payouts --limit 50
+```
+
+### Exchange Security Workflow
+```bash
+# Verify agent for reduced fees
+qudag exchange verify-agent "alice_vault" --proof-path ./proofs/alice_kyc.proof
+
+# Deploy immutable exchange
+qudag exchange deploy-immutable --key-path ./keys/quantum_master.key
+
+# Check immutable status
+qudag exchange immutable-status --format json
+
+# Audit exchange operations
+./claude-flow swarm "Audit exchange smart contract for quantum resistance and timing attacks" --strategy maintenance --mode centralized
+```
+
 ## QuDAG Integration Patterns
 
 ### Memory-Driven Quantum Coordination
@@ -378,6 +473,24 @@ TodoWrite([
     dependencies: ["wasm_crypto_bindings", "p2p_network_integration"],
     estimatedTime: "240min",
     assignedAgent: "security_team"
+  },
+  {
+    id: "exchange_implementation",
+    content: "Implement rUv token exchange with business plan payout distribution",
+    status: "pending",
+    priority: "high",
+    dependencies: ["quantum_crypto_architecture", "dag_consensus_implementation"],
+    estimatedTime: "210min",
+    assignedAgent: "exchange_team"
+  },
+  {
+    id: "business_plan_testing",
+    content: "Test fee distribution and contributor payout mechanisms",
+    status: "pending",
+    priority: "medium",
+    dependencies: ["exchange_implementation"],
+    estimatedTime: "120min",
+    assignedAgent: "business_team"
   }
 ]);
 ```
@@ -398,6 +511,10 @@ Task("WASM Team", "Create WASM bindings based on Memory crypto interface specifi
 // Integration and testing coordination
 Task("Integration Team", "Integrate all components using Memory coordination specifications");
 Task("Security Team", "Test quantum resistance using Memory security test specifications");
+
+// Exchange and business plan development
+Task("Exchange Team", "Implement rUv token system with dynamic fee model and store configuration in Memory");
+Task("Business Team", "Design payout distribution system for contributors and store splits in Memory");
 ```
 
 ### Multi-Node Testing Coordination

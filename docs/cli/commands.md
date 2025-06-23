@@ -153,6 +153,126 @@ Profile node performance
 qudag debug profile [--duration <seconds>]
 ```
 
+## Exchange Commands
+
+### exchange create-account
+Create a new rUv token account
+```bash
+qudag exchange create-account --name <account-name> [--email <email>]
+```
+
+### exchange balance
+Check account balance
+```bash
+qudag exchange balance --account <account-name> [--format <text|json>]
+```
+
+### exchange transfer
+Transfer rUv tokens between accounts
+```bash
+qudag exchange transfer --from <sender> --to <receiver> --amount <amount>
+```
+
+### exchange list-accounts
+List all accounts
+```bash
+qudag exchange list-accounts [--format <text|json|table>]
+```
+
+### exchange fee-info
+Show fee model information
+```bash
+qudag exchange fee-info [--examples] [--format <text|json>]
+```
+
+### exchange verify-agent
+Verify agent status for reduced fees
+```bash
+qudag exchange verify-agent <account> --proof-path <path>
+```
+
+### exchange calculate-fee
+Calculate transaction fee
+```bash
+qudag exchange calculate-fee --account <account> --amount <amount>
+```
+
+### exchange immutable-status
+Check immutable deployment status
+```bash
+qudag exchange immutable-status [--format <text|json>]
+```
+
+### exchange deploy-immutable
+Deploy exchange in immutable mode
+```bash
+qudag exchange deploy-immutable --key-path <quantum-key-path>
+```
+
+## Business Plan Commands
+
+### business-plan enable
+Enable business plan features
+```bash
+qudag exchange business-plan enable [OPTIONS]
+
+Options:
+--auto-distribution     Enable automatic fee distribution
+--vault-management      Enable vault management features
+--role-earnings        Enable role-based earnings
+--bounty-rewards       Enable bounty reward system
+```
+
+### business-plan disable
+Disable business plan features
+```bash
+qudag exchange business-plan disable
+```
+
+### business-plan status
+Show business plan status
+```bash
+qudag exchange business-plan status
+```
+
+### business-plan configure
+Configure business plan settings
+```bash
+# Set minimum payout threshold
+qudag exchange business-plan configure threshold <amount>
+
+# Set system fee percentage
+qudag exchange business-plan configure system-fee <percentage>
+
+# Configure single-agent split
+qudag exchange business-plan configure single-agent --agent <pct> --infrastructure <pct>
+
+# Configure plugin-enhanced split
+qudag exchange business-plan configure plugin-enhanced --agent <pct> --plugin <pct> --infrastructure <pct>
+```
+
+### business-plan contributors
+Manage business plan contributors
+```bash
+# Register contributor
+qudag exchange business-plan contributors register <id> <role> <vault-id> [--custom-percentage <pct>]
+
+# List all contributors
+qudag exchange business-plan contributors list
+
+# Show contributor details
+qudag exchange business-plan contributors show <id>
+
+# Update contributor
+qudag exchange business-plan contributors update <id> --custom-percentage <pct>
+```
+
+### business-plan payouts
+View payout history
+```bash
+qudag exchange business-plan payouts [--limit <n>] [--contributor <id>]
+```
+
 ## Advanced Commands
 
 ### crypto verify

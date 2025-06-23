@@ -8,10 +8,10 @@ kill_timeout = "5s"
 
 [build]
   dockerfile = "../Dockerfile"
-  build-args = {
-    NODE_TYPE = "validator",
-    NODE_NAME = "singapore-node"
-  }
+
+[build.args]
+  NODE_TYPE = "validator"
+  NODE_NAME = "singapore-node"
 
 [env]
   RUST_LOG = "info,qudag=debug"
