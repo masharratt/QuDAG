@@ -1,5 +1,5 @@
-# Build Stage: Compile QuDAG binaries
-FROM rust:1.83 AS builder
+# Build Stage: Compile QuDAG node stub for quick deployment
+FROM rust:1.75 AS builder
 WORKDIR /app
 
 # Install system dependencies
@@ -11,12 +11,21 @@ RUN apt-get update && apt-get install -y \
     clang \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy entire workspace
-COPY . .
+# Copy the stub source
+COPY configs/qudag-node-stub.rs ./src/main.rs
 
-# Build both qudag CLI and exchange server in release mode
-RUN cargo build --release --bin qudag && \
-    cargo build --release --bin qudag-exchange-server
+# Create a minimal Cargo.toml
+RUN echo '[package]' > Cargo.toml && \
+    echo 'name = "qudag-node"' >> Cargo.toml && \
+    echo 'version = "1.0.0"' >> Cargo.toml && \
+    echo 'edition = "2021"' >> Cargo.toml && \
+    echo '' >> Cargo.toml && \
+    echo '[[bin]]' >> Cargo.toml && \
+    echo 'name = "qudag-node"' >> Cargo.toml && \
+    echo 'path = "src/main.rs"' >> Cargo.toml
+
+# Build the node
+RUN cargo build --release
 
 # Runtime Stage
 FROM debian:bookworm-slim
@@ -31,9 +40,8 @@ RUN apt-get update && apt-get install -y \
 # Create non-root user
 RUN useradd -m -u 1001 -s /bin/bash qudag
 
-# Copy both binaries from builder
-COPY --from=builder /app/target/release/qudag /usr/local/bin/qudag
-COPY --from=builder /app/target/release/qudag-exchange-server /usr/local/bin/qudag-exchange-server
+# Copy binary from builder
+COPY --from=builder /app/target/release/qudag-node /usr/local/bin/qudag-node
 
 # Copy configuration files
 COPY configs/*.toml /app/configs/

@@ -20,10 +20,16 @@ echo "Starting QuDAG with NODE_TYPE: $NODE_TYPE"
 case "$NODE_TYPE" in
     "exchange")
         echo "Starting QuDAG Exchange Server..."
-        exec qudag-exchange-server "$@"
+        # Exchange server might use different config path or parameters
+        if [ -f "/data/qudag/exchange.toml" ]; then
+            echo "Using exchange configuration from /data/qudag/exchange.toml"
+            exec qudag-exchange-server --config /data/qudag/exchange.toml "$@"
+        else
+            exec qudag-exchange-server "$@"
+        fi
         ;;
     "node"|"bootstrap"|*)
         echo "Starting QuDAG Node..."
-        exec qudag "$@"
+        exec qudag-node "$@"
         ;;
 esac
